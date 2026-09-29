@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>起承転結ガチャ</title>
+<title>起承転結</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
@@ -70,6 +70,22 @@ button{font:inherit;cursor:pointer;border:none;color:var(--ink);background:none}
 .genre:active{transform:scale(.96)}
 .genre:hover{box-shadow:0 0 30px color-mix(in srgb,var(--c) 40%,transparent)}
 
+.gchip{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;font-size:14px;color:var(--sub)}
+.gchip b{color:var(--g);font-weight:900}
+.btn.small{padding:8px 14px;font-size:13px;border-radius:10px}
+.gnote{font-size:13px;color:var(--sub);margin:14px 0 0;line-height:1.7}
+.guide{border-left:3px solid var(--g);background:rgba(0,0,0,.25);border-radius:0 12px 12px 0;padding:12px 16px;margin-bottom:14px}
+.guide .gh{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+.guide .gk{font-family:var(--mincho);font-weight:800;font-size:22px;color:var(--g)}
+.guide ul{margin:8px 0 0;padding-left:1.4em;font-size:14px;line-height:1.8;color:#d6d2ea;list-style:none}
+.guide ul li{position:relative}
+.guide ul li::before{content:"○";position:absolute;left:-1.4em;color:var(--g);font-weight:700}
+.guide ul.ng{margin-top:6px;padding-top:6px;border-top:1px dashed var(--edge);color:#b9b4cf}
+.guide ul.ng li::before{content:"✕";color:#ff8fa3}
+.submit{margin-top:18px;background:var(--glass);border:1px solid var(--edge);border-radius:18px;padding:18px}
+.submit ol{margin:10px 0 0;padding-left:1.4em;font-size:14px;line-height:1.9;color:#d6d2ea}
+.btn.copy{width:100%;font-size:20px;padding:18px;letter-spacing:.1em}
+.btn.copy.done{background:linear-gradient(135deg,#fff,var(--ok))}
 /* お題カード */
 .odai{position:relative;border-radius:20px;padding:22px 22px 20px;overflow:hidden;
   background:linear-gradient(150deg,color-mix(in srgb,var(--g) 22%,#15121f),#0d0b16 75%);
@@ -199,7 +215,7 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
 </head>
 <body>
 <div class="wrap">
-  <div class="logo"><h1>起承転結ガチャ</h1><p>AIが出すのは、きっかけの一行だけ。物語を書くのは、あなた。</p></div>
+  <div class="logo"><h1>起承転結</h1><p>引いた一行から、四つの場面で短い物語を書きます</p></div>
 
   <div class="steps" id="steps">
     <div class="medal">起</div><div class="bar"></div><div class="medal">承</div><div class="bar"></div>
@@ -208,8 +224,10 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
 
   <!-- ジャンル -->
   <section id="scGenre" class="panel fadein">
-    <p class="label">ジャンルをえらぶ</p>
+    <p class="label" id="genreLabel">ジャンルをえらぶ</p>
     <div class="genres" id="genres"></div>
+    <p class="gnote" id="genreNote"></p>
+    <div class="nav" id="genreCancelRow"><span></span><button class="btn" id="btnGenreCancel">やめる</button></div>
   </section>
 
   <!-- 書く -->
@@ -218,20 +236,23 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
       <p class="label">ここまでの物語</p>
       <div class="story" id="storySoFar"></div>
     </div>
+    <div class="gchip"><span>ジャンル：<b id="gchipName"></b></span><button class="btn small" id="btnGenre">ジャンルを変える</button></div>
     <div class="odai" id="odai">
       <div class="tag"><span id="odaiTag"></span><span class="rar" id="odaiRar"></span></div>
       <div class="line" id="odaiLine"></div>
     </div>
     <div class="row" id="drawRow">
-      <button class="btn main big" id="btnDraw">ガチャを引く</button>
+      <button class="btn main big" id="btnDraw">一行目を引く</button>
     </div>
     <div class="row" id="changeRow">
       <button class="btn" id="btnChange">↻ チェンジ（残り <span id="chLeft">0</span>）</button>
-      <span style="font-size:13px;color:var(--sub)" id="stageHint"></span>
+      
     </div>
     <div class="msg" id="aiMsg"></div>
 
     <div id="writeBox" class="panel hidden" style="margin-top:14px">
+      <div class="guide"><div class="gh"><span class="gk" id="guideK"></span><span id="guideT"></span></div>
+        <ul id="guideList"></ul><ul class="ng" id="guideNg"></ul></div>
       <textarea id="body" placeholder="ここに続きを書いてください"></textarea>
       <div class="gauge" id="gauge"><i id="gaugeBar"></i></div>
       <div class="count"><span><strong id="cnt">0</strong> / <span id="target">0</span> 字</span><span id="cntNote"></span></div>
@@ -264,11 +285,18 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
         <div class="badges" id="rBadges"></div>
         <div class="full" id="rFull"></div>
       </div>
-      <div class="nav">
-        <button class="btn" id="btnEdit">← 書き直す</button>
-        <button class="btn main" id="btnCopy">提出用にコピー</button>
+      <div class="submit">
+        <button class="btn main copy" id="btnCopy">📋 小説をコピーする</button>
+        <div class="msg" id="copyMsg" style="color:var(--ok)"></div>
+        <p class="label" style="margin:10px 0 0">ロイロでの提出のしかた</p>
+        <ol>
+          <li>上のボタンを押して、小説をコピーする</li>
+          <li>ロイロノートを開いて、提出先の授業を開く</li>
+          <li>テキストカードを作って、長押し →［ペースト］で貼りつける</li>
+          <li>カードを提出箱に出す</li>
+        </ol>
       </div>
-      <div class="msg" id="copyMsg" style="color:var(--ok)"></div>
+      <div class="nav"><button class="btn" id="btnEdit">← 書き直す</button><span></span></div>
     </div>
     <div class="nav" style="margin-top:26px"><span></span><button class="btn" id="btnReset">最初からやり直す</button></div>
   </section>
@@ -303,10 +331,22 @@ const SETUP = {
 };
 const LIMITS = { perDay: 40, cooldown: 4 };
 const STAGES = [
-  { key:"ki",    name:"起", target:200, changes:3, tag:"書き出しの一文",   hint:"物語のはじまり",     btn:"ガチャを引く" },
-  { key:"sho",   name:"承", target:300, changes:2, tag:"次に起こること",   hint:"話がふくらむところ", btn:"展開ガチャを引く" },
-  { key:"ten",   name:"転", target:300, changes:2, tag:"EVENT",           hint:"流れが変わるところ", btn:"EVENTを引く" },
-  { key:"ketsu", name:"結", target:200, changes:2, tag:"しめくくり",       hint:"物語のおわり",       btn:"結末ガチャを引く" },
+  { key:"ki", name:"起", target:200, changes:3, tag:"書き出しの一文", btn:"一行目を引く",
+    guide:"物語のはじまり。だれが、どこにいるのかを見せる",
+    points:["主人公はだれ？ 名前や学年、どんな人か","どこで、いつの話？ その場の様子","引いた一文を、主人公はどう受けとめた？"],
+    ng:["人物や設定の説明を並べるだけにしない","いきなり謎の答えや結末まで書かない"] },
+  { key:"sho", name:"承", target:300, changes:2, tag:"次に起こること", btn:"次の展開を引く",
+    guide:"起で始まったことが、ふくらんでいく",
+    points:["引いた展開を、場面として書く（会話を入れてもいい）","主人公の気持ちや、ほかの人物との関係を深める","このあと何か起きそう、という空気を少し残す"],
+    ng:["ここで大事件を起こさない（それは転の仕事）","起と同じことをくり返さない"] },
+  { key:"ten", name:"転", target:300, changes:2, tag:"EVENT", btn:"EVENTを引く",
+    guide:"思いがけないことが起きて、流れが大きく変わる",
+    points:["EVENTの一行を、目の前で起きたことのように書く","主人公はどう驚いた？ どう動いた？","それまでの話の見え方が変わると、なお良い"],
+    ng:["「夢でした」「全部うそでした」で片づけない","起・承と関係のない出来事にしない"] },
+  { key:"ketsu", name:"結", target:200, changes:2, tag:"しめくくり", btn:"結末の方向を引く",
+    guide:"物語をしめくくる。ぜんぶ説明しなくていい",
+    points:["転のあと、主人公はどうなった？","はじめ（起）と比べて、何が変わった？","最後の一文は、余韻が残るように"],
+    ng:["新しい人物や新しい謎を出さない","「〜という話でした」「〜が大切だと思った」でまとめない"] },
 ];
 const GENRES = [
   { key:"nichijo", em:"日", name:"日常",         sub:"なにげない毎日",     c:"#7ee8a6", c2:"#1f9d6b" },
@@ -427,7 +467,13 @@ function render(){
     if(d.classList.contains("medal")) d.className="medal"+(!S.genre?"": done?" done": i===S.stage?" now":"");
     else d.className="bar"+(S.genre && (S.done||i<S.stage)?" done":""); });
 
-  $("scGenre").classList.toggle("hidden",!!S.genre);
+  const picking=!S.genre||choosing;
+  $("scGenre").classList.toggle("hidden",!picking);
+  $("genreLabel").textContent=S.genre?"ジャンルを変える":"ジャンルをえらぶ";
+  $("genreCancelRow").classList.toggle("hidden",!S.genre);
+  $("genreNote").textContent=!S.genre?"": canFreeSwap()? "まだ書き始めていないので、一行目から引き直せます（チェンジの回数は減りません）。"
+    : "ここまで書いた文章はそのまま残ります。次に引く一行から、新しいジャンルになります。";
+  if(picking){ $("scWrite").classList.add("hidden"); $("scResult").classList.add("hidden"); return; }
   const writing=S.genre && S.stage<4;
   $("scWrite").classList.toggle("hidden",!writing);
   $("scResult").classList.toggle("hidden",!(S.genre && S.stage>=4));
@@ -438,12 +484,15 @@ function render(){
     $("odaiTag").textContent=st.name+"｜"+st.tag;
     $("odaiRar").textContent= line ? (ri===-1?"!!":(RARITY[ri]||RARITY[0]).stars) : "";
     $("odai").classList.toggle("r5", ri===2 && !!line);
-    $("odaiLine").innerHTML= line ? esc(line) : '<span class="empty">'+(S.stage===0?"ガチャを引いて、物語の書き出しを手に入れよう":"ボタンを押して、次の展開を引こう")+'</span>';
+    $("odaiLine").innerHTML= line ? esc(line) : '<span class="empty">'+(S.stage===0?"ボタンを押して、物語の一行目を引こう":"ボタンを押して、次の展開を引こう")+'</span>';
     $("drawRow").classList.toggle("hidden",!!line);
     $("btnDraw").textContent=st.btn; $("btnDraw").disabled=busy;
     const left=st.changes-(S.used[st.key]||0);
     $("chLeft").textContent=left; $("changeRow").classList.toggle("hidden",!line); $("btnChange").disabled=busy||left<=0;
-    $("stageHint").textContent=st.name+"は「"+st.hint+"」";
+    $("gchipName").textContent=genreOf(S.genre).name;
+    $("guideK").textContent=st.name; $("guideT").textContent=st.guide;
+    $("guideList").innerHTML=st.points.map(x=>"<li>"+esc(x)+"</li>").join("");
+    $("guideNg").innerHTML=st.ng.map(x=>"<li>"+esc(x)+"</li>").join("");
     const sp=$("storyPanel");
     if(S.stage>0){ sp.classList.remove("hidden");
       $("storySoFar").innerHTML=STAGES.slice(0,S.stage).map((x,i)=>'<span class="st">'+x.name+'</span>'
@@ -511,7 +560,13 @@ function plainText(){
 
 /* ---- イベント ---- */
 $("genres").innerHTML=GENRES.map(g=>'<button class="genre" style="--c:'+g.c+'" data-k="'+g.key+'"><span class="em">'+g.em+'</span><span class="nm">'+g.name+'</span><span class="sb">'+g.sub+'</span></button>').join("");
-$("genres").addEventListener("click",e=>{const b=e.target.closest(".genre"); if(!b) return; S.genre=b.dataset.k; save(); render();});
+let choosing=false;
+function canFreeSwap(){ return S.stage===0 && !(S.bodies.ki||"").trim(); }
+$("genres").addEventListener("click",e=>{const b=e.target.closest(".genre"); if(!b) return;
+  if(S.genre && b.dataset.k!==S.genre && canFreeSwap()){ delete S.lines.ki; delete S.rar.ki; S.tried.ki=[]; }
+  S.genre=b.dataset.k; choosing=false; save(); render(); window.scrollTo(0,0);});
+$("btnGenre").onclick=()=>{ if(busy) return; choosing=true; render(); window.scrollTo(0,0); };
+$("btnGenreCancel").onclick=()=>{ choosing=false; render(); };
 $("btnDraw").onclick=()=>draw(false);
 $("btnChange").onclick=()=>draw(true);
 $("body").addEventListener("input",()=>{S.bodies[STAGES[S.stage].key]=$("body").value; save(); updateCount(true);});
@@ -525,7 +580,9 @@ $("btnEdit").onclick=()=>{S.done=false; S.stage=0; save(); render(); window.scro
 $("btnCopy").onclick=async()=>{ const txt=plainText(); let ok=false;
   try{await navigator.clipboard.writeText(txt); ok=true;}catch(e){}
   if(!ok){const a=$("copyArea"); a.value=txt; a.select(); a.setSelectionRange(0,99999); try{ok=document.execCommand("copy");}catch(e){}}
-  $("copyMsg").textContent= ok?"コピーしました。ロイロのテキストカードに貼りつけて提出してください。":"コピーできませんでした。上の本文を長押しで選んでコピーしてください。"; };
+  $("copyMsg").textContent= ok?"コピーしました！ ロイロのテキストカードに貼りつけてください。":"うまくコピーできませんでした。上の本文を長押しして選び、コピーしてください。";
+  if(ok){ $("btnCopy").textContent="✓ コピーしました"; $("btnCopy").classList.add("done");
+    setTimeout(()=>{ $("btnCopy").textContent="📋 小説をコピーする"; $("btnCopy").classList.remove("done"); },3000); } };
 let arm=0;
 $("btnReset").onclick=()=>{ if(Date.now()-arm<3000){ S=fresh(); save(); document.documentElement.style.setProperty("--g","#c9a8ff"); document.documentElement.style.setProperty("--g2","#7a5cff");
     $("btnReset").textContent="最初からやり直す"; render(); window.scrollTo(0,0); }
