@@ -102,6 +102,14 @@ button{font:inherit;cursor:pointer;border:none;color:var(--ink);background:none}
 .btn:disabled{opacity:.3;cursor:default;transform:none}
 .btn.main{background:linear-gradient(135deg,#fff,var(--g));color:#15121f;border:none;box-shadow:0 8px 24px color-mix(in srgb,var(--g) 45%,transparent)}
 .btn.big{font-size:20px;padding:18px 34px;letter-spacing:.12em;font-weight:900;width:100%}
+.past{margin-top:12px}
+.past .label{margin:0 0 8px}
+.pastbtn{display:block;width:100%;text-align:left;margin-top:8px;padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.28);
+  border:1px dashed var(--edge);font-family:var(--mincho);font-size:16px;line-height:1.7;color:#d6d2ea;transition:border-color .2s,transform .12s}
+.pastbtn:hover{border-color:var(--g)}
+.pastbtn:active{transform:scale(.98)}
+.pastbtn small{display:block;font-family:var(--gothic);font-size:11px;letter-spacing:.15em;color:var(--g);margin-bottom:2px}
+.pastbtn:disabled{opacity:.3;cursor:default}
 .msg{min-height:1.4em;font-size:14px;color:var(--ng);margin-top:8px}
 
 /* 書く */
@@ -248,6 +256,10 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
       <button class="btn" id="btnChange">↻ チェンジ（残り <span id="chLeft">0</span>）</button>
       
     </div>
+    <div class="past hidden" id="pastBox">
+      <p class="label">前に引いた一行にもどす（チェンジの回数は減りません）</p>
+      <div id="pastList"></div>
+    </div>
     <div class="msg" id="aiMsg"></div>
 
     <div id="writeBox" class="panel hidden" style="margin-top:14px">
@@ -367,8 +379,8 @@ const RARITY = [ // 見た目だけの演出（内容には影響しません）
 const KEY="kishou_v1", QKEY="kishou_quota";
 const $=id=>document.getElementById(id);
 const store={ get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}} };
-function fresh(){ return {genre:null,stage:0,lines:{},rar:{},bodies:{},used:{},tried:{},start:null,title:"",done:false}; }
-let S=store.get(KEY)||fresh(); if(!S.rar) S.rar={};
+function fresh(){ return {genre:null,stage:0,lines:{},rar:{},hist:{},bodies:{},used:{},tried:{},start:null,title:"",done:false}; }
+let S=store.get(KEY)||fresh(); if(!S.rar) S.rar={}; if(!S.hist) S.hist={};
 let lastCall=0, busy=false;
 const save=()=>store.set(KEY,S);
 
@@ -443,7 +455,8 @@ async function draw(isChange){
   G.classList.remove("charge"); G.classList.add("reveal");
   if(!S.start) S.start=Date.now();
   if(isChange) S.used[st.key]=(S.used[st.key]||0)+1;
-  S.lines[st.key]=line; S.rar[st.key]=isEv? -1 : ri; save();
+  S.lines[st.key]=line; S.rar[st.key]=isEv? -1 : ri;
+  (S.hist[st.key]=S.hist[st.key]||[]).push({line, rar:S.rar[st.key]}); save();
   await sleep(750);
   await typeOut($("gLine"), line);
   G.classList.add("canclose");
@@ -489,6 +502,10 @@ function render(){
     $("btnDraw").textContent=st.btn; $("btnDraw").disabled=busy;
     const left=st.changes-(S.used[st.key]||0);
     $("chLeft").textContent=left; $("changeRow").classList.toggle("hidden",!line); $("btnChange").disabled=busy||left<=0;
+    const past=(S.hist[st.key]||[]).map((h,i)=>({h,i})).filter(o=>o.h.line!==line);
+    $("pastBox").classList.toggle("hidden",!line||!past.length);
+    $("pastList").innerHTML=past.reverse().map(o=>'<button class="pastbtn" data-i="'+o.i+'"'+(busy?" disabled":"")+'><small>'
+      +(o.h.rar===-1?"!!":(RARITY[o.h.rar]||RARITY[0]).stars)+'</small>'+esc(o.h.line)+'</button>').join("");
     $("gchipName").textContent=genreOf(S.genre).name;
     $("guideK").textContent=st.name; $("guideT").textContent=st.guide;
     $("guideList").innerHTML=st.points.map(x=>"<li>"+esc(x)+"</li>").join("");
@@ -563,12 +580,16 @@ $("genres").innerHTML=GENRES.map(g=>'<button class="genre" style="--c:'+g.c+'" d
 let choosing=false;
 function canFreeSwap(){ return S.stage===0 && !(S.bodies.ki||"").trim(); }
 $("genres").addEventListener("click",e=>{const b=e.target.closest(".genre"); if(!b) return;
-  if(S.genre && b.dataset.k!==S.genre && canFreeSwap()){ delete S.lines.ki; delete S.rar.ki; S.tried.ki=[]; }
+  if(S.genre && b.dataset.k!==S.genre && canFreeSwap()){ delete S.lines.ki; delete S.rar.ki; S.tried.ki=[]; S.hist.ki=[]; }
   S.genre=b.dataset.k; choosing=false; save(); render(); window.scrollTo(0,0);});
 $("btnGenre").onclick=()=>{ if(busy) return; choosing=true; render(); window.scrollTo(0,0); };
 $("btnGenreCancel").onclick=()=>{ choosing=false; render(); };
 $("btnDraw").onclick=()=>draw(false);
 $("btnChange").onclick=()=>draw(true);
+$("pastList").addEventListener("click",e=>{const b=e.target.closest(".pastbtn"); if(!b||busy) return;
+  const k=STAGES[S.stage].key, h=(S.hist[k]||[])[+b.dataset.i]; if(!h) return;
+  S.lines[k]=h.line; S.rar[k]=h.rar; save(); render();
+  $("odai").classList.remove("fadein"); void $("odai").offsetWidth; $("odai").classList.add("fadein");});
 $("body").addEventListener("input",()=>{S.bodies[STAGES[S.stage].key]=$("body").value; save(); updateCount(true);});
 $("btnNext").onclick=()=>{const st=STAGES[S.stage]; if(countChars($("body").value).n<st.target) return;
   S.bodies[st.key]=$("body").value; S.stage++; wasFull=false; save(); $("body").blur(); render(); window.scrollTo({top:0,behavior:"smooth"});};
