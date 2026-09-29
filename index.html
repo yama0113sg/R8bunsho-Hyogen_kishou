@@ -384,6 +384,8 @@ function fresh(){ return {genre:null,stage:0,lines:{},rar:{},hist:{},bodies:{},u
 let S=store.get(KEY)||fresh(); if(!S.rar) S.rar={}; if(!S.hist) S.hist={};
 let lastCall=0, busy=false;
 const save=()=>store.set(KEY,S);
+// チェンジの回数はジャンルごと・段階ごとに数える
+const uk=k=>S.genre+":"+k, usedOf=k=>S.used[uk(k)]||0;
 
 /* ---- 回数制限 ---- */
 function today(){const d=new Date();return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
@@ -437,7 +439,7 @@ let closeGacha=null;
 async function draw(isChange){
   if(busy) return;
   const st=STAGES[S.stage];
-  if(isChange && (S.used[st.key]||0)>=st.changes) return;
+  if(isChange && usedOf(st.key)>=st.changes) return;
   const wait=LIMITS.cooldown*1000-(Date.now()-lastCall);
   if(wait>0){ $("aiMsg").textContent="あと "+Math.ceil(wait/1000)+" 秒まってね"; return; }
   busy=true; $("aiMsg").textContent="";
@@ -455,7 +457,7 @@ async function draw(isChange){
   makeSparks(); G.classList.add("boom"); await sleep(120);
   G.classList.remove("charge"); G.classList.add("reveal");
   if(!S.start) S.start=Date.now();
-  if(isChange) S.used[st.key]=(S.used[st.key]||0)+1;
+  if(isChange) S.used[uk(st.key)]=usedOf(st.key)+1;
   S.lines[st.key]=line; S.rar[st.key]=isEv? -1 : ri;
   (S.hist[st.key]=S.hist[st.key]||[]).push({line, rar:S.rar[st.key]}); save();
   await sleep(750);
@@ -501,7 +503,7 @@ function render(){
     $("odaiLine").innerHTML= line ? esc(line) : '<span class="empty">'+(S.stage===0?"ボタンを押して、物語の一行目を引こう":"ボタンを押して、次の展開を引こう")+'</span>';
     $("drawRow").classList.toggle("hidden",!!line);
     $("btnDraw").textContent=st.btn; $("btnDraw").disabled=busy;
-    const left=st.changes-(S.used[st.key]||0);
+    const left=st.changes-usedOf(st.key);
     $("chLeft").textContent=left; $("changeRow").classList.toggle("hidden",!line); $("btnChange").disabled=busy||left<=0;
     const past=(S.hist[st.key]||[]).map((h,i)=>({h,i})).filter(o=>o.h.line!==line);
     $("pastBox").classList.toggle("hidden",!line||!past.length);
@@ -546,7 +548,7 @@ function updateCount(fx){
 /* ---- 結果 ---- */
 function totals(){
   let n=0; STAGES.forEach(s=>n+=countChars(S.bodies[s.key]||"").n);
-  const ch=STAGES.reduce((a,s)=>a+(S.used[s.key]||0),0);
+  const ch=Object.values(S.used).reduce((a,v)=>a+(v||0),0);
   const min=S.start? Math.max(1,Math.floor(((S.finishedAt||Date.now())-S.start)/60000)) : 0;
   return {n,ch,min};
 }
@@ -554,7 +556,7 @@ function badges(t){
   const all=STAGES.map(s=>S.bodies[s.key]||"").join("");
   return [
     {name:"ノーチェンジ完走",got:t.ch===0},
-    {name:"EVENTを一発で受け入れた",got:!S.used.ten},
+    {name:"EVENTを一発で受け入れた",got:!Object.keys(S.used).some(k=>k.endsWith("ten")&&S.used[k])},
     {name:"台詞使い",got:(all.match(/「/g)||[]).length>=3},
     {name:"★5を引いた",got:Object.values(S.rar).includes(2)},
     {name:"1200字こえ",got:t.n>=1200},
