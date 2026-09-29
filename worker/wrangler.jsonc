@@ -1,0 +1,10 @@
+// Cloudflare の Worker「kishou」を、このフォルダから自動で更新するための設定
+// GEMINI_API_KEY は Cloudflare 側の Secret に置いたまま（ここには書かない）
+{
+  "name": "kishou",
+  "main": "worker_kishou.js",
+  "compatibility_date": "2025-09-01",
+  "vars": {
+    "ALLOWED_ORIGIN": "https://yama0113sg.github.io"
+  }
+}
