@@ -110,6 +110,13 @@ button{font:inherit;cursor:pointer;border:none;color:var(--ink);background:none}
 .pastbtn:active{transform:scale(.98)}
 .pastbtn small{display:block;font-family:var(--gothic);font-size:11px;letter-spacing:.15em;color:var(--g);margin-bottom:2px}
 .pastbtn:disabled{opacity:.3;cursor:default}
+.hint{margin-top:12px}
+.btn.hintbtn{font-size:14px;padding:10px 16px;border-radius:12px;border-style:dashed}
+.hintbox{position:relative;margin-top:10px;padding:12px 40px 12px 16px;border-radius:14px;background:rgba(0,0,0,.28);border:1px dashed var(--edge)}
+.hintbox .hl{font-size:11px;letter-spacing:.2em;color:var(--sub)}
+.hintbox ul{margin:6px 0 0;padding-left:1.2em;font-size:15px;line-height:1.8;color:#d6d2ea}
+.hintbox .x{position:absolute;top:6px;right:8px;width:30px;height:30px;border-radius:50%;color:var(--sub);font-size:16px}
+.hmsg{font-size:13px;color:var(--sub);margin-top:6px;min-height:1em}
 .msg{min-height:1.4em;font-size:14px;color:var(--ng);margin-top:8px}
 
 /* 書く */
@@ -268,6 +275,12 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
       <textarea id="body" placeholder="ここに続きを書いてください"></textarea>
       <div class="gauge" id="gauge"><i id="gaugeBar"></i></div>
       <div class="count"><span><strong id="cnt">0</strong> / <span id="target">0</span> 字</span><span id="cntNote"></span></div>
+      <div class="hint hidden fadein" id="hintArea">
+        <button class="btn hintbtn" id="btnHint">💡 ヒントをもらう（残り <span id="hintLeft">2</span>）</button>
+        <div class="hintbox hidden" id="hintBox"><span class="hl">ヒント（使わなくてもOK）</span><ul id="hintList"></ul>
+          <button class="x" id="btnHintClose" aria-label="閉じる">✕</button></div>
+        <div class="hmsg" id="hintMsg"></div>
+      </div>
       <div class="nav">
         <button class="btn" id="btnBack">← もどる</button>
         <button class="btn main next" id="btnNext" disabled>次へ →</button>
@@ -342,23 +355,28 @@ const SETUP = {
   proxyUrl: "https://kishou.ryousukey0113.workers.dev",   // ← 新しく作る Worker の URL
 };
 const LIMITS = { perDay: 40, cooldown: 4 };
+const HINT = { perStage: 2, idleSec: 30 };   // ヒント：各段階の回数／手が止まってから出るまでの秒数
 const STAGES = [
   { key:"ki", name:"起", target:200, changes:3, tag:"書き出しの一文", btn:"一行目を引く",
     guide:"物語のはじまり。だれが、どこにいるのかを見せる",
     points:["主人公はだれ？ 名前や学年、どんな人か","どこで、いつの話？ その場の様子","引いた一文を、主人公はどう受けとめた？"],
-    ng:["人物や設定の説明を並べるだけにしない","いきなり謎の答えや結末まで書かない"] },
+    ng:["人物や設定の説明を並べるだけにしない","いきなり謎の答えや結末まで書かない"],
+    hints:["主人公は何年生で、どんな性格？","そこはどんな場所？ 何が見えて、何が聞こえる？","引いた一文を見て、主人公はまず何をした？","そのとき主人公は、どんな顔をしていた？"] },
   { key:"sho", name:"承", target:300, changes:2, tag:"次に起こること", btn:"次の展開を引く",
     guide:"起で始まったことが、ふくらんでいく",
     points:["引いた展開を、場面として書く（会話を入れてもいい）","主人公の気持ちや、ほかの人物との関係を深める","このあと何か起きそう、という空気を少し残す"],
-    ng:["ここで大事件を起こさない（それは転の仕事）","起と同じことをくり返さない"] },
+    ng:["ここで大事件を起こさない（それは転の仕事）","起と同じことをくり返さない"],
+    hints:["主人公は、このことをだれかに話した？","そのとき、相手はなんと言った？","主人公の気持ちは、起のときと比べてどう変わった？","このあと起きそうな「何か」の気配は？"] },
   { key:"ten", name:"転", target:300, changes:2, tag:"EVENT", btn:"EVENTを引く",
     guide:"思いがけないことが起きて、流れが大きく変わる",
     points:["EVENTの一行を、目の前で起きたことのように書く","主人公はどう驚いた？ どう動いた？","それまでの話の見え方が変わると、なお良い"],
-    ng:["「夢でした」「全部うそでした」で片づけない","起・承と関係のない出来事にしない"] },
+    ng:["「夢でした」「全部うそでした」で片づけない","起・承と関係のない出来事にしない"],
+    hints:["その瞬間、主人公の目には何が見えた？","主人公は、まず何をした？ 何もできなかった？","それまで信じていたことの、何がくずれた？","近くにいた人は、どう反応した？"] },
   { key:"ketsu", name:"結", target:200, changes:2, tag:"しめくくり", btn:"結末の方向を引く",
     guide:"物語をしめくくる。ぜんぶ説明しなくていい",
     points:["転のあと、主人公はどうなった？","はじめ（起）と比べて、何が変わった？","最後の一文は、余韻が残るように"],
-    ng:["新しい人物や新しい謎を出さない","「〜という話でした」「〜が大切だと思った」でまとめない"] },
+    ng:["新しい人物や新しい謎を出さない","「〜という話でした」「〜が大切だと思った」でまとめない"],
+    hints:["転のあと、主人公は最初に何をした？","起のころの主人公と、何が変わった？","最後の場面で、主人公はどこにいる？","最後に主人公の目に映るものは何？"] },
 ];
 const GENRES = [
   { key:"nichijo", em:"日", name:"日常",         sub:"なにげない毎日",     c:"#7ee8a6", c2:"#1f9d6b" },
@@ -380,8 +398,8 @@ const RARITY = [ // 見た目だけの演出（内容には影響しません）
 const KEY="kishou_v1", QKEY="kishou_quota";
 const $=id=>document.getElementById(id);
 const store={ get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}} };
-function fresh(){ return {genre:null,stage:0,lines:{},rar:{},hist:{},bodies:{},used:{},tried:{},start:null,title:"",done:false}; }
-let S=store.get(KEY)||fresh(); if(!S.rar) S.rar={}; if(!S.hist) S.hist={};
+function fresh(){ return {genre:null,stage:0,lines:{},rar:{},hist:{},hints:{},bodies:{},used:{},tried:{},start:null,title:"",done:false}; }
+let S=store.get(KEY)||fresh(); if(!S.rar) S.rar={}; if(!S.hist) S.hist={}; if(!S.hints) S.hints={};
 let lastCall=0, busy=false;
 const save=()=>store.set(KEY,S);
 // チェンジの回数はジャンルごと・段階ごとに数える
@@ -399,7 +417,7 @@ function showQuota(){$("quota").textContent="今日のAI 残り "+Math.max(0,LIM
 /* ---- 字数（ずる対策つき） ---- */
 function countChars(text){
   const raw=text.replace(/\s/g,""); let t=raw;
-  Object.values(S.lines).forEach(l=>{const s=(l||"").replace(/\s/g,""); if(s.length>=8) t=t.split(s).join("");});
+  [...Object.values(S.lines), ...Object.values(S.hints).flatMap(h=>h.all||[])].forEach(l=>{const s=(l||"").replace(/\s/g,""); if(s.length>=8) t=t.split(s).join("");});
   t=t.replace(/(.)\1{3,}/gu,"$1$1$1");
   const seen=new Set(); let out="";
   t.split(/(?<=[。！？!?])/).forEach(p=>{ if(p.length>=6){ if(seen.has(p)) return; seen.add(p);} out+=p; });
@@ -426,6 +444,47 @@ async function askAI(){
   q.n++; store.set(QKEY,q); showQuota();
   (S.tried[st.key]=S.tried[st.key]||[]).push(j.line);
   return j.line;
+}
+
+/* ---- ヒント（問いかけだけ。本文は書かせない） ---- */
+const hintOf=k=>S.hints[k]||(S.hints[k]={used:0,all:[],show:[]});
+let hintReady={}, idleT=null;
+function armIdle(){
+  clearTimeout(idleT); const k=STAGES[S.stage]&&STAGES[S.stage].key;
+  if(!k||hintReady[k]||$("writeBox").classList.contains("hidden")) return;
+  idleT=setTimeout(()=>{ hintReady[k]=true; renderHint(); },HINT.idleSec*1000);
+}
+function renderHint(){
+  const st=STAGES[S.stage]; if(!st) return; const h=hintOf(st.key);
+  if(h.used>0) hintReady[st.key]=true;
+  $("hintArea").classList.toggle("hidden",!hintReady[st.key]);
+  const left=HINT.perStage-h.used;
+  $("hintLeft").textContent=left; $("btnHint").disabled=busy||left<=0;
+  $("hintBox").classList.toggle("hidden",!h.show.length);
+  $("hintList").innerHTML=h.show.map(x=>"<li>"+esc(x)+"</li>").join("");
+}
+function fallbackHints(st,h){
+  const pool=st.hints.filter(x=>!h.all.includes(x)); const src=pool.length>=2?pool:st.hints.slice();
+  const out=[]; while(out.length<2&&src.length) out.push(src.splice(Math.floor(Math.random()*src.length),1)[0]); return out;
+}
+async function askHint(){
+  const st=STAGES[S.stage], h=hintOf(st.key), q=quota();
+  if(busy||h.used>=HINT.perStage) return;
+  const wait=LIMITS.cooldown*1000-(Date.now()-lastCall);
+  if(wait>0){ $("hintMsg").textContent="あと "+Math.ceil(wait/1000)+" 秒まってね"; return; }
+  busy=true; $("hintMsg").textContent="考え中…"; $("btnHint").disabled=true;
+  let list=null;
+  if(q.n<LIMITS.perDay && SETUP.proxyUrl){
+    lastCall=Date.now();
+    try{ const r=await fetch(SETUP.proxyUrl,{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({mode:"hint",stage:st.key,genre:S.genre,story:storyUpTo(S.stage),line:S.lines[st.key]||"",body:$("body").value.slice(-1500),avoid:h.all})});
+      const j=await r.json();
+      if(r.ok && Array.isArray(j.hints) && j.hints.length){ list=j.hints.slice(0,2).map(String); q.n++; store.set(QKEY,q); showQuota(); }
+    }catch(e){}
+  }
+  if(!list) list=fallbackHints(st,h);   // AIがだめなときは、決まった問いを出す
+  h.used++; h.show=list; h.all.push(...list); save();
+  busy=false; $("hintMsg").textContent=""; renderHint(); updateCount(false);
 }
 
 /* ---- ガチャ演出 ---- */
@@ -523,6 +582,7 @@ function render(){
     $("body").placeholder= S.stage===0 ? "書き出しの一文に続けて、物語を書いてください" : "この展開になるように、続きを書いてください";
     if(document.activeElement!==$("body")) $("body").value=S.bodies[st.key]||"";
     $("btnBack").style.visibility=S.stage>0?"visible":"hidden";
+    renderHint(); armIdle();
     updateCount(false);
   } else {
     $("titleIn").value=S.title||"";
@@ -575,7 +635,8 @@ function plainText(){
   let s="『"+S.title+"』\nジャンル："+g.name+"\n――――――――\n";
   STAGES.forEach((st,i)=>{ s+="\n【"+st.name+"】\n";
     s+= i===0 ? "◆"+S.lines.ki+"（AIの書き出し）\n"+(S.bodies.ki||"")+"\n" : "◆AIの展開："+S.lines[st.key]+"\n"+(S.bodies[st.key]||"")+"\n"; });
-  return s+"\n――――――――\n字数："+t.n+"字／時間："+t.min+"分／チェンジ："+t.ch+"回\n";
+  const hn=Object.values(S.hints).reduce((a,h)=>a+(h.used||0),0);
+  return s+"\n――――――――\n字数："+t.n+"字／時間："+t.min+"分／チェンジ："+t.ch+"回／ヒント："+hn+"回\n";
 }
 
 /* ---- イベント ---- */
@@ -593,7 +654,9 @@ $("pastList").addEventListener("click",e=>{const b=e.target.closest(".pastbtn");
   const k=STAGES[S.stage].key, h=(S.hist[k]||[])[+b.dataset.i]; if(!h) return;
   S.lines[k]=h.line; S.rar[k]=h.rar; save(); render();
   $("odai").classList.remove("fadein"); void $("odai").offsetWidth; $("odai").classList.add("fadein");});
-$("body").addEventListener("input",()=>{S.bodies[STAGES[S.stage].key]=$("body").value; save(); updateCount(true);});
+$("body").addEventListener("input",()=>{S.bodies[STAGES[S.stage].key]=$("body").value; save(); updateCount(true); armIdle();});
+$("btnHint").onclick=()=>askHint();
+$("btnHintClose").onclick=()=>{ const h=hintOf(STAGES[S.stage].key); h.show=[]; save(); renderHint(); };
 $("btnNext").onclick=()=>{const st=STAGES[S.stage]; if(countChars($("body").value).n<st.target) return;
   S.bodies[st.key]=$("body").value; S.stage++; wasFull=false; save(); $("body").blur(); render(); window.scrollTo({top:0,behavior:"smooth"});};
 $("btnBack").onclick=()=>{ if(S.stage>0){S.bodies[STAGES[S.stage].key]=$("body").value; S.stage--; save(); $("body").blur(); render();} };
