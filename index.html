@@ -41,7 +41,7 @@ button{font:inherit;cursor:pointer;border:none;color:var(--ink);background:none}
 .logo p{margin:4px 0 0;color:var(--sub);font-size:13px;letter-spacing:.12em}
 
 /* 起承転結メダル */
-.steps{display:flex;align-items:center;justify-content:center;margin:22px 0 22px;gap:0}
+.steps{display:flex;align-items:center;justify-content:center;margin:8px 0 22px;gap:0}
 .medal{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font-family:var(--mincho);font-weight:800;
   font-size:24px;color:var(--sub);background:var(--glass);border:1.5px solid var(--edge);position:relative;transition:.4s}
 .bar{width:clamp(24px,8vw,70px);height:2px;background:var(--edge);transition:.4s}
@@ -224,6 +224,73 @@ input[type=text]{width:100%;font-family:var(--mincho);font-size:22px;font-weight
 input[type=text]:focus{outline:none;border-color:var(--g)}
 .foot{margin-top:30px;text-align:center;font-size:12px;color:var(--sub);user-select:none;-webkit-user-select:none;letter-spacing:.1em}
 #copyArea{position:fixed;left:-9999px;top:0}
+
+/* タブ */
+.tabs{display:flex;justify-content:center;gap:8px;margin:14px 0 18px}
+.tab{padding:8px 18px;border-radius:99px;border:1px solid var(--edge);font-size:14px;color:var(--sub);background:var(--glass)}
+.tab.on{color:#15121f;background:linear-gradient(135deg,#fff,var(--g));border-color:transparent;font-weight:700}
+.tab b{font-variant-numeric:tabular-nums}
+
+/* しばり */
+.bindrow{margin-bottom:12px}
+.bindcard{position:relative;border-radius:16px;padding:12px 16px;background:linear-gradient(150deg,rgba(255,211,106,.14),rgba(0,0,0,.25) 70%);
+  border:1px solid rgba(255,211,106,.55)}
+.bindcard .bl{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;letter-spacing:.2em;color:#ffd36a;font-weight:700}
+.bindcard .bt{font-family:var(--mincho);font-weight:700;font-size:18px;line-height:1.6;margin-top:4px}
+.bindcard .bs{font-size:12px;letter-spacing:.05em;padding:3px 10px;border-radius:99px;background:rgba(0,0,0,.35);color:var(--sub);white-space:nowrap}
+.bindcard .bs.ok{color:var(--ok)} .bindcard .bs.ng{color:#ff8fa3}
+.bindcard .row{margin-top:10px}
+.bindcard.flip{animation:bflip .6s cubic-bezier(.3,1.3,.5,1)}
+@keyframes bflip{from{transform:perspective(600px) rotateY(90deg);opacity:0}}
+.badge.bind{border-color:rgba(255,211,106,.6)}
+
+/* 本棚 */
+.shelfwrap{background:var(--glass);border:1px solid var(--edge);border-radius:22px;padding:18px 14px 18px;margin-bottom:14px}
+.shelfhead{display:flex;justify-content:space-between;align-items:baseline;margin:0 4px 6px}
+.shelfhead h2{font-family:var(--mincho);font-size:20px;margin:0;letter-spacing:.2em}
+.shelfhead span{font-size:12px;color:var(--sub)}
+.shelf{display:flex;flex-wrap:wrap;gap:14px 5px;padding:0 10px;margin-top:6px;
+  background:repeating-linear-gradient(to bottom,transparent 0 192px,rgba(255,236,210,.22) 192px 196px,rgba(255,236,210,.1) 196px 200px,rgba(0,0,0,.4) 200px 206px)}
+.slot{height:192px;display:flex;align-items:flex-end}
+.spine{width:44px;height:var(--h);border-radius:4px 4px 2px 2px;position:relative;display:flex;flex-direction:column;align-items:center;padding:14px 0 8px;overflow:hidden;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--c2) 45%,#000) 0,color-mix(in srgb,var(--c2) 80%,#000) 16%,color-mix(in srgb,var(--c2) 85%,var(--c)) 50%,color-mix(in srgb,var(--c2) 60%,#000) 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),3px 0 8px rgba(0,0,0,.45);transition:transform .2s}
+.spine:hover,.spine:active{transform:translateY(-8px)}
+.spine::before,.spine::after{content:"";position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,.28)}
+.spine::before{top:6px}.spine::after{bottom:30px}
+.spine.fin::before,.spine.fin::after{height:3px;background:linear-gradient(90deg,#9a6d1f,#ffe39a 50%,#9a6d1f)}
+.spine .t{writing-mode:vertical-rl;font-family:var(--mincho);font-weight:700;font-size:15px;color:#fff;letter-spacing:.1em;flex:1;overflow:hidden;
+  text-shadow:0 1px 3px rgba(0,0,0,.6);line-height:1}
+.spine .d{font-size:10px;color:rgba(255,255,255,.8);margin-top:10px;font-variant-numeric:tabular-nums}
+.spine.antho{width:60px;background:linear-gradient(90deg,#15101f,#2b2140 20%,#3a2d55 50%,#1c1529);border:1px solid rgba(255,211,106,.35)}
+.spine.antho::before,.spine.antho::after{height:3px;background:linear-gradient(90deg,#9a6d1f,#ffe39a 50%,#9a6d1f)}
+.spine.antho .k{font-size:10px;letter-spacing:.2em;color:#ffd36a;writing-mode:vertical-rl;margin-bottom:6px}
+.shelfempty{color:var(--sub);font-size:14px;line-height:1.8;text-align:center;padding:30px 10px}
+.shelfnote{font-size:12px;color:var(--sub);line-height:1.7;margin:10px 4px 0}
+.finmark{display:inline-block;margin-left:8px;padding:3px 10px;border-radius:99px;font-size:11px;letter-spacing:.15em;vertical-align:middle;
+  color:#1a1426;background:linear-gradient(135deg,#fff3b0,#ffc94d)}
+.meta{font-size:13px;color:var(--sub);margin:-8px 0 14px;line-height:1.7}
+.seg{display:flex;gap:6px;margin-bottom:10px}
+.seg button{padding:7px 14px;border-radius:99px;font-size:13px;border:1px solid var(--edge);color:var(--sub)}
+.seg button.on{color:#15121f;background:#fff;border-color:transparent;font-weight:700}
+.btn.danger{color:#ff8fa3}
+.cols{display:flex;gap:10px;flex-wrap:wrap}
+.cols .btn{flex:1 1 140px}
+
+/* 整える */
+#pBody{min-height:60vh;background-image:radial-gradient(rgba(255,255,255,.07) 1px,transparent 1.2px);background-size:22px 22px}
+.orig{max-height:40vh;overflow:auto;margin:10px 0 14px;font-size:15px}
+input.ptitle{font-size:20px;margin-bottom:12px}
+
+/* 短編集 */
+.alist{display:flex;flex-direction:column;gap:8px;margin:8px 0 16px}
+.aitem{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--edge)}
+.aitem .n{font-family:var(--mincho);font-weight:800;color:#ffd36a;width:1.6em;text-align:center}
+.aitem .tt{flex:1;min-width:0;font-family:var(--mincho);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aitem .tt small{display:block;font-family:var(--gothic);font-weight:500;font-size:11px;color:var(--sub)}
+.aitem .dot{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
+.aitem button{width:36px;height:36px;border-radius:10px;background:var(--glass2);border:1px solid var(--edge);font-size:15px;flex:none}
+.aitem button:disabled{opacity:.25}
 .fadein{animation:fi .5s ease-out}
 @keyframes fi{from{opacity:0;transform:translateY(12px)}}
 </style>
@@ -231,6 +298,11 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
 <body>
 <div class="wrap">
   <div class="logo"><h1>起承転結</h1><p>引いた一行から、四つの場面で短い物語を書きます</p></div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab" data-v="write">✎ 書く</button>
+    <button class="tab" data-v="shelf">📚 本棚 <b id="shelfN">0</b></button>
+  </div>
 
   <div class="steps" id="steps">
     <div class="medal">起</div><div class="bar"></div><div class="medal">承</div><div class="bar"></div>
@@ -252,6 +324,14 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
       <div class="story" id="storySoFar"></div>
     </div>
     <div class="gchip"><span>ジャンル：<b id="gchipName"></b></span><button class="btn small" id="btnGenre">ジャンルを変える</button></div>
+    <div class="bindrow hidden" id="bindRow">
+      <button class="btn small" id="btnBind">🔒 しばりカードに挑戦する（やりたい人だけ）</button>
+      <div class="bindcard hidden" id="bindCard">
+        <div class="bl"><span>しばり</span><span class="bs" id="bindState"></span></div>
+        <div class="bt" id="bindText"></div>
+        <div class="row" id="bindBtns"><button class="btn small" id="btnBindRe">↻ 引き直す（残り <span id="bindLeft">1</span>）</button><button class="btn small" id="btnBindOff">やめる</button></div>
+      </div>
+    </div>
     <div class="odai" id="odai">
       <div class="tag"><span id="odaiTag"></span><span class="rar" id="odaiRar"></span></div>
       <div class="line" id="odaiLine"></div>
@@ -321,9 +401,77 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
           <li>カードを提出箱に出す</li>
         </ol>
       </div>
+      <div class="submit" style="text-align:center">📚 この物語は<b>本棚</b>に入りました。あとで整えたり、短編集にまとめたりできます。
+        <div class="row" style="justify-content:center"><button class="btn" id="btnToShelf">本棚を見る</button></div></div>
       <div class="nav"><button class="btn" id="btnEdit">← 書き直す</button><span></span></div>
     </div>
     <div class="nav" style="margin-top:26px"><span></span><button class="btn" id="btnReset">最初からやり直す</button></div>
+  </section>
+
+  <!-- 本棚 -->
+  <section id="scShelf" class="hidden fadein">
+    <div class="shelfwrap">
+      <div class="shelfhead"><h2>本棚</h2><span id="shelfCount"></span></div>
+      <div class="shelf" id="shelfBooks"></div>
+      <div class="shelfempty hidden" id="shelfEmpty">まだ本がありません。<br>書き上げた物語は、ここに一冊ずつ並んでいきます。</div>
+    </div>
+    <div class="shelfwrap">
+      <div class="shelfhead"><h2>短編集</h2><span>本棚の作品を選んで、一冊にまとめる</span></div>
+      <div class="shelf hidden" id="shelfAntho"></div>
+      <div class="row" style="padding:0 6px"><button class="btn" id="btnNewAntho">＋ 短編集をつくる</button></div>
+    </div>
+    <p class="shelfnote">背表紙に金の帯があるのは、整えて仕上げた本です。本棚はこの iPad の中だけに保存されます（Safari の履歴を消すと消えます）。提出はロイロで。</p>
+  </section>
+
+  <!-- 1冊を見る -->
+  <section id="scBook" class="hidden fadein">
+    <div class="rcard">
+      <div class="rgenre" id="bGenre"></div>
+      <div class="rtitle" id="bTitle"></div>
+      <div class="meta" id="bMeta"></div>
+      <div class="seg hidden" id="bSeg"><button data-m="fin" class="on">仕上げ版</button><button data-m="orig">はじめの版</button></div>
+      <div class="full" id="bFull"></div>
+    </div>
+    <div class="submit">
+      <div class="cols"><button class="btn main" id="btnPolish">✎ 整える</button><button class="btn" id="btnBookCopy">📋 コピーする</button></div>
+      <div class="msg" id="bookMsg" style="color:var(--ok)"></div>
+      <p class="gnote" style="margin-top:4px">整えると、起承転結の区切りをはずして、1本の文章として書き直せます。はじめの版は消えずに残ります。</p>
+    </div>
+    <div class="nav"><button class="btn" id="btnBookBack">← 本棚へ</button><button class="btn danger" id="btnBookDel">本棚から外す</button></div>
+  </section>
+
+  <!-- 整える -->
+  <section id="scPolish" class="hidden fadein">
+    <div class="panel">
+      <p class="label">整える ― 区切りをはずして、1本の文章として書き直す</p>
+      <input type="text" class="ptitle" id="pTitle" maxlength="30" placeholder="タイトル">
+      <button class="btn small" id="btnOrig">はじめの版を見る ▼</button>
+      <div class="full orig hidden" id="pOrig"></div>
+      <textarea id="pBody" style="margin-top:12px"></textarea>
+      <div class="count"><span>いま <strong id="pCnt">0</strong> 字</span><span id="pNote"></span></div>
+      <div class="nav">
+        <button class="btn" id="btnPolishBack">← もどる</button>
+        <button class="btn main" id="btnPolishDone">✓ 仕上げた</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 短編集をつくる -->
+  <section id="scAntho" class="hidden fadein">
+    <div class="panel">
+      <p class="label">短編集をつくる</p>
+      <input type="text" id="aTitle" maxlength="30" placeholder="短編集のタイトル">
+      <p class="label" style="margin-top:18px">収録する作品（上から順に並びます）</p>
+      <div class="alist" id="aIn"></div>
+      <p class="label">本棚の作品（＋で入れる）</p>
+      <div class="alist" id="aOut"></div>
+      <div class="submit" style="margin-top:6px">
+        <button class="btn main copy" id="btnAnthoCopy">📋 短編集をコピーする</button>
+        <div class="msg" id="anthoMsg" style="color:var(--ok)"></div>
+        <p class="gnote" style="margin-top:4px">整えた作品は仕上げ版が、まだの作品ははじめの版が入ります。</p>
+      </div>
+      <div class="nav"><button class="btn" id="btnAnthoBack">← 本棚へ</button><button class="btn danger" id="btnAnthoDel">この短編集を消す</button></div>
+    </div>
   </section>
 
   <div class="foot"><span id="quota"></span></div>
@@ -393,14 +541,32 @@ const RARITY = [ // 見た目だけの演出（内容には影響しません）
   { p:.30, stars:"★★★★",  col:"#ffd24d" },
   { p:.08, stars:"★★★★★", col:"#ff7de9", rainbow:true },
 ];
+// しばりカード（やりたい人だけ）。判定はプログラムで機械的に行う（AIには判定させない）
+// type… keep：最後まで守る／get：一度でも出せば達成／first：起の本文の書き出しで判定／last：結の最後の一文で判定
+const COLORS=["赤","青","白","黒","緑","黄","紫","茶色","灰色","金色","銀色","水色","桃色","ピンク","オレンジ","むらさき"];
+const BINDS = [
+  { id:"noquote",  text:"台詞（「」）を一つも使わない",               type:"keep",  bad:t=>/[「『]/.test(t) },
+  { id:"quote1st", text:"起の本文を、台詞から書き始める",             type:"first", ok:o=>/^[「『]/.test((o.bodies.ki||"").trim()) },
+  { id:"last10",   text:"物語の最後の一文を、10字以内にする",         type:"last",  ok:o=>[...lastSentence(o.bodies.ketsu||"")].length<=10 },
+  { id:"nofirst",  text:"「わたし・私・僕・俺・あたし」を使わない",   type:"keep",  bad:t=>/わたし|私(?![立服物鉄有])|僕|俺|あたし/.test(t) },
+  { id:"noexc",    text:"「！」を一度も使わない",                     type:"keep",  bad:t=>/[！!]/.test(t) },
+  { id:"nokata",   text:"カタカナの言葉を使わない（名前もふくむ）",   type:"keep",  bad:t=>/[ァ-ヺ]{2,}/.test(t) },
+  { id:"short40",  text:"どの文も40字以内にする",                     type:"keep",  bad:t=>sentences(t).some(x=>[...x].length>40) },
+  { id:"nososhite",text:"「そして」「だから」を使わない",             type:"keep",  bad:t=>/そして|だから/.test(t) },
+  { id:"rain",     text:"雨を降らせる（「雨」の字を出す）",           type:"get",   has:t=>/雨/.test(t) },
+  { id:"smell",    text:"においを書く（におい・匂い・香りのどれか）", type:"get",   has:t=>/におい|匂|臭|香り/.test(t) },
+  { id:"color3",   text:"色の名前を3つ以上出す",                      type:"get",   has:t=>COLORS.filter(c=>t.includes(c)).length>=3 },
+  { id:"letter",   text:"手紙かメモを登場させる",                     type:"get",   has:t=>/手紙|メモ|便箋|メッセージ/.test(t) },
+  { id:"clock",    text:"時刻を一度は書く（「〜時」）",               type:"get",   has:t=>/[0-9０-９一二三四五六七八九十]時/.test(t) },
+];
 /* ====================================== */
 
 const KEY="kishou_v1", QKEY="kishou_quota";
 const $=id=>document.getElementById(id);
 const store={ get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}} };
-function fresh(){ return {genre:null,stage:0,lines:{},rar:{},hist:{},hints:{},bodies:{},used:{},tried:{},start:null,title:"",done:false}; }
+function fresh(){ return {genre:null,bind:null,stage:0,lines:{},rar:{},hist:{},hints:{},bodies:{},used:{},tried:{},start:null,title:"",done:false}; }
 let S=store.get(KEY)||fresh(); if(!S.rar) S.rar={}; if(!S.hist) S.hist={}; if(!S.hints) S.hints={};
-let lastCall=0, busy=false;
+let lastCall=0, busy=false, arm=0;
 const save=()=>store.set(KEY,S);
 // チェンジの回数はジャンルごと・段階ごとに数える
 const uk=k=>S.genre+":"+k, usedOf=k=>S.used[uk(k)]||0;
@@ -536,6 +702,11 @@ const genreOf=k=>GENRES.find(g=>g.key===k)||GENRES[0];
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function render(){
   showQuota();
+  $("shelfN").textContent=SH.books.length;
+  [...$("tabs").children].forEach(t=>t.classList.toggle("on", t.dataset.v===(view==="write"?"write":"shelf")));
+  if(view!=="write"){ renderShelfViews(); return; }
+  ["scShelf","scBook","scPolish","scAntho"].forEach(id=>$(id).classList.add("hidden"));
+  $("steps").classList.remove("hidden"); if(!S.genre) setTheme(null);
   if(S.genre){ const g=genreOf(S.genre); document.documentElement.style.setProperty("--g",g.c); document.documentElement.style.setProperty("--g2",g.c2); }
   const kids=[...$("steps").children];
   kids.forEach((d,j)=>{ const i=j>>1; const done=S.done||i<S.stage;
@@ -582,13 +753,14 @@ function render(){
     $("body").placeholder= S.stage===0 ? "書き出しの一文に続けて、物語を書いてください" : "この展開になるように、続きを書いてください";
     if(document.activeElement!==$("body")) $("body").value=S.bodies[st.key]||"";
     $("btnBack").style.visibility=S.stage>0?"visible":"hidden";
-    renderHint(); armIdle();
+    renderHint(); armIdle(); renderBind();
     updateCount(false);
   } else {
     $("titleIn").value=S.title||"";
     $("titleBox").classList.toggle("hidden",S.done);
     $("resultBox").classList.toggle("hidden",!S.done);
     if(S.done) renderResult();
+    if(Date.now()-arm>=3000) $("btnReset").textContent=S.done?"✎ 次の物語を書く":"最初からやり直す";
   }
 }
 let wasFull=false;
@@ -606,38 +778,176 @@ function updateCount(fx){
 }
 
 /* ---- 結果 ---- */
-function totals(){
-  let n=0; STAGES.forEach(s=>n+=countChars(S.bodies[s.key]||"").n);
-  const ch=Object.values(S.used).reduce((a,v)=>a+(v||0),0);
-  const min=S.start? Math.max(1,Math.floor(((S.finishedAt||Date.now())-S.start)/60000)) : 0;
-  return {n,ch,min};
+function totals(o=S){
+  let n=0; STAGES.forEach(s=>n+=countChars(o.bodies[s.key]||"").n);
+  const ch=Object.values(o.used||{}).reduce((a,v)=>a+(v||0),0);
+  const min=o.start? Math.max(1,Math.floor(((o.finishedAt||Date.now())-o.start)/60000)) : 0;
+  const hn=Object.values(o.hints||{}).reduce((a,h)=>a+(h.used||0),0);
+  return {n,ch,min,hn};
 }
-function badges(t){
-  const all=STAGES.map(s=>S.bodies[s.key]||"").join("");
-  return [
+function badges(t,o=S){
+  const all=STAGES.map(s=>o.bodies[s.key]||"").join("");
+  const used=o.used||{};
+  const list=[
     {name:"ノーチェンジ完走",got:t.ch===0},
-    {name:"EVENTを一発で受け入れた",got:!Object.keys(S.used).some(k=>k.endsWith("ten")&&S.used[k])},
+    {name:"EVENTを一発で受け入れた",got:!Object.keys(used).some(k=>k.endsWith("ten")&&used[k])},
     {name:"台詞使い",got:(all.match(/「/g)||[]).length>=3},
-    {name:"★5を引いた",got:Object.values(S.rar).includes(2)},
+    {name:"★5を引いた",got:Object.values(o.rar||{}).includes(2)},
     {name:"1200字こえ",got:t.n>=1200},
   ];
+  const b=bindOf(o); if(b){ const ok=bindFinal(o); list.unshift({name:(ok?"しばり達成：":"しばり：")+b.text,got:ok,bind:true}); }
+  return list;
+}
+
+/* ---- しばり ---- */
+const bindOf=o=>o.bind&&BINDS.find(b=>b.id===o.bind.id);
+const allBody=o=>STAGES.map(s=>o.bodies[s.key]||"").join("\n");
+function sentences(t){ return t.split(/(?<=[。！？!?])|\n/).map(x=>x.replace(/\s/g,"")).filter(Boolean); }
+function lastSentence(t){ const a=sentences(t); return a.length? a[a.length-1].replace(/[。！？!?]+$/,"") : ""; }
+function bindFinal(o){ const b=bindOf(o); if(!b) return false; const t=allBody(o);
+  return b.type==="keep"? !b.bad(t) : b.type==="get"? b.has(t) : b.ok(o); }
+function bindNow(o){ // 書いている途中の表示
+  const b=bindOf(o), t=allBody(o);
+  if(b.type==="keep") return b.bad(t)? ["ng","破れています"] : ["ok","守れています"];
+  if(b.type==="get")  return b.has(t)? ["ok","達成"] : ["","まだ"];
+  if(b.type==="first") return (o.bodies.ki||"").trim()? (b.ok(o)?["ok","達成"]:["ng","できていません"]) : ["","起で判定"];
+  return (o.bodies.ketsu||"").trim()? (b.ok(o)?["ok","いまは達成"]:["","いまは未達成"]) : ["","結で判定"];
+}
+function renderBind(){
+  const b=bindOf(S), free=S.stage===0&&!(S.bodies.ki||"").trim();
+  $("bindRow").classList.toggle("hidden",!b&&!free);
+  $("btnBind").classList.toggle("hidden",!!b);
+  $("bindCard").classList.toggle("hidden",!b);
+  if(!b) return;
+  $("bindText").textContent=b.text;
+  const [cls,label]=bindNow(S); $("bindState").className="bs "+cls; $("bindState").textContent=label;
+  $("bindBtns").classList.toggle("hidden",!free);
+  $("bindLeft").textContent=S.bind.re?0:1; $("btnBindRe").disabled=!!S.bind.re;
+}
+function drawBind(){
+  const pool=BINDS.filter(b=>!S.bind||b.id!==S.bind.id);
+  S.bind={id:pool[Math.floor(Math.random()*pool.length)].id, re:!!S.bind};
+  save(); renderBind(); const c=$("bindCard"); c.classList.remove("flip"); void c.offsetWidth; c.classList.add("flip");
 }
 function renderResult(){
   const g=genreOf(S.genre), t=totals();
   $("rGenre").textContent="GENRE ｜ "+g.name; $("rTitle").textContent="『"+S.title+"』";
   $("rChars").textContent=t.n; $("rTime").textContent=t.min; $("rChanges").textContent=t.ch;
-  $("rBadges").innerHTML=badges(t).map(b=>'<span class="badge'+(b.got?" got":"")+'">'+(b.got?"★ ":"☆ ")+b.name+'</span>').join("");
+  $("rBadges").innerHTML=badgeHTML(badges(t));
   $("rFull").innerHTML=STAGES.map((s,i)=>'<span class="st">'+s.name+'</span>\n'
     +(i===0?'<span class="ai">'+esc(S.lines.ki)+'</span>':'<span class="ai">（'+esc(S.lines[s.key])+'）</span>\n')+esc(S.bodies[s.key]||"")).join("\n\n");
 }
-function plainText(){
-  const g=genreOf(S.genre), t=totals();
-  let s="『"+S.title+"』\nジャンル："+g.name+"\n――――――――\n";
+function badgeHTML(list){ return list.map(b=>'<span class="badge'+(b.got?" got":"")+(b.bind?" bind":"")+'">'+(b.got?"★ ":"☆ ")+esc(b.name)+'</span>').join(""); }
+function bindLine(o){ const b=bindOf(o); return b? "しばり："+b.text+"（"+(bindFinal(o)?"達成":"未達成")+"）\n" : ""; }
+function plainText(o=S){
+  const g=genreOf(o.genre), t=totals(o);
+  let s="『"+o.title+"』\nジャンル："+g.name+"\n――――――――\n";
   STAGES.forEach((st,i)=>{ s+="\n【"+st.name+"】\n";
-    s+= i===0 ? "◆"+S.lines.ki+"（AIの書き出し）\n"+(S.bodies.ki||"")+"\n" : "◆AIの展開："+S.lines[st.key]+"\n"+(S.bodies[st.key]||"")+"\n"; });
-  const hn=Object.values(S.hints).reduce((a,h)=>a+(h.used||0),0);
-  return s+"\n――――――――\n字数："+t.n+"字／時間："+t.min+"分／チェンジ："+t.ch+"回／ヒント："+hn+"回\n";
+    s+= i===0 ? "◆"+o.lines.ki+"（AIの書き出し）\n"+(o.bodies.ki||"")+"\n" : "◆AIの展開："+o.lines[st.key]+"\n"+(o.bodies[st.key]||"")+"\n"; });
+  return s+"\n――――――――\n字数："+t.n+"字／時間："+t.min+"分／チェンジ："+t.ch+"回／ヒント："+t.hn+"回\n"+bindLine(o);
 }
+
+/* ============ 本棚 ============ */
+const SKEY="kishou_shelf_v1";   // 「最初からやり直す」では消えない
+let SH=store.get(SKEY)||{books:[],antho:[]};
+const saveShelf=()=>store.set(SKEY,SH);
+let view="write", curBook=null, curAntho=null, bookMode="fin";
+const bookById=id=>SH.books.find(b=>b.id===id);
+const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const nchars=t=>[...String(t||"").replace(/\s/g,"")].length;
+const md=ts=>{const d=new Date(ts);return (d.getMonth()+1)+"/"+d.getDate();};
+const KAN="一二三四五六七八九十".split("").concat(["十一","十二","十三","十四","十五","十六","十七","十八","十九","二十"]);
+function upsertBook(){
+  const snap=JSON.parse(JSON.stringify({genre:S.genre,title:S.title,lines:S.lines,bodies:S.bodies,rar:S.rar,used:S.used,hints:S.hints,start:S.start,finishedAt:S.finishedAt,bind:S.bind}));
+  let b=S.bookId&&bookById(S.bookId);
+  if(b) Object.assign(b,snap);
+  else { b=Object.assign({id:newId(),created:Date.now(),final:null},snap); SH.books.push(b); S.bookId=b.id; save(); }
+  saveShelf();
+}
+function flatText(b){ // 区切りをはずした1本の文章（はじめの版から）
+  return [(b.lines.ki||"")+(b.bodies.ki||"").replace(/^\s+/,""),b.bodies.sho,b.bodies.ten,b.bodies.ketsu].map(x=>(x||"").trim()).filter(Boolean).join("\n\n");
+}
+const bTitle=b=>(b.final&&b.final.title)||b.title;
+const bText=b=>b.final? b.final.text : flatText(b);
+function origHTML(b){
+  return STAGES.map((s,i)=>'<span class="st">'+s.name+'</span>\n'
+    +(i===0?'<span class="ai">'+esc(b.lines.ki||"")+'</span>':'<span class="ai">（'+esc(b.lines[s.key]||"")+'）</span>\n')+esc(b.bodies[s.key]||"")).join("\n\n");
+}
+function bookText(b){
+  if(!b.final) return plainText(b);
+  const g=genreOf(b.genre);
+  let s="『"+bTitle(b)+"』\nジャンル："+g.name+"（仕上げ版）\n――――――――\n\n"+b.final.text.trim()+"\n\n――――――――\n";
+  s+="はじめの版 "+totals(b).n+"字 → 仕上げ版 "+nchars(b.final.text)+"字"+(b.final.title&&b.final.title!==b.title?"（はじめの題：『"+b.title+"』）":"")+"\n";
+  s+="AIが出したきっかけ：\n"+STAGES.map(st=>"◆"+st.name+"："+(b.lines[st.key]||"")).join("\n")+"\n"+bindLine(b);
+  return s;
+}
+function anthoText(a){
+  const items=a.ids.map(bookById).filter(Boolean);
+  let s="短編集『"+(a.title||"無題")+"』\n――――――――\n目次\n"+items.map((b,i)=>KAN[i]+"　『"+bTitle(b)+"』").join("\n")+"\n――――――――\n";
+  items.forEach((b,i)=>{ s+="\n"+KAN[i]+"　『"+bTitle(b)+"』（"+genreOf(b.genre).name+(b.final?"・仕上げ版":"")+"）\n\n"+bText(b).trim()+"\n\n"; });
+  const n=items.reduce((a,b)=>a+nchars(bText(b)),0);
+  return s+"――――――――\n収録 "+items.length+"編／合計 "+n+"字\n";
+}
+function spineHTML(b){
+  const g=genreOf(b.genre), n=nchars(bText(b)), h=Math.round(150+Math.min(36,Math.max(0,(n-1000)/25)));
+  return '<div class="slot"><button class="spine'+(b.final&&b.final.done?" fin":"")+'" data-b="'+b.id+'" style="--c:'+g.c+';--c2:'+g.c2+';--h:'+h+'px" title="'+esc(bTitle(b))+'">'
+    +'<span class="t">'+esc(bTitle(b))+'</span><span class="d">'+md(b.created)+'</span></button></div>';
+}
+function setTheme(genre){ const g=genre?genreOf(genre):{c:"#c9a8ff",c2:"#7a5cff"};
+  document.documentElement.style.setProperty("--g",g.c); document.documentElement.style.setProperty("--g2",g.c2); }
+async function copyText(txt,btn,msgEl,label){ let ok=false;
+  try{await navigator.clipboard.writeText(txt); ok=true;}catch(e){}
+  if(!ok){const a=$("copyArea"); a.value=txt; a.select(); a.setSelectionRange(0,999999); try{ok=document.execCommand("copy");}catch(e){}}
+  msgEl.textContent= ok?"コピーしました！ ロイロのテキストカードに貼りつけてください。":"うまくコピーできませんでした。もう一度押してください。";
+  if(ok){ btn.textContent="✓ コピーしました"; setTimeout(()=>btn.textContent=label,3000); } }
+
+function renderShelfViews(){
+  ["scGenre","scWrite","scResult","scShelf","scBook","scPolish","scAntho"].forEach(id=>$(id).classList.add("hidden"));
+  $("steps").classList.add("hidden");
+  if(view==="shelf"){ setTheme(null); $("scShelf").classList.remove("hidden");
+    const bs=SH.books.slice().sort((a,b)=>a.created-b.created);
+    $("shelfBooks").innerHTML=bs.map(spineHTML).join(""); $("shelfBooks").classList.toggle("hidden",!bs.length);
+    $("shelfEmpty").classList.toggle("hidden",!!bs.length);
+    $("shelfCount").textContent=bs.length+"冊"+(bs.filter(b=>b.final&&b.final.done).length?"（仕上げ "+bs.filter(b=>b.final&&b.final.done).length+"冊）":"");
+    $("shelfAntho").innerHTML=SH.antho.map(a=>'<div class="slot"><button class="spine antho" data-a="'+a.id+'" style="--h:186px"><span class="k">短編集</span><span class="t">'+esc(a.title||"無題")+'</span><span class="d">'+a.ids.length+'編</span></button></div>').join("");
+    $("shelfAntho").classList.toggle("hidden",!SH.antho.length);
+    $("btnNewAntho").disabled=SH.books.length<2; $("btnNewAntho").textContent=SH.books.length<2?"＋ 短編集をつくる（本が2冊たまったら）":"＋ 短編集をつくる";
+  }
+  if(view==="book"){ const b=bookById(curBook); if(!b){view="shelf";return renderShelfViews();}
+    setTheme(b.genre); $("scBook").classList.remove("hidden");
+    const t=totals(b);
+    $("bGenre").textContent="GENRE ｜ "+genreOf(b.genre).name;
+    $("bTitle").innerHTML="『"+esc(bTitle(b))+"』"+(b.final&&b.final.done?'<span class="finmark">仕上げ</span>':b.final?'<span class="finmark" style="background:rgba(255,255,255,.2);color:#fff">整え中</span>':"");
+    $("bMeta").textContent=md(b.created)+" に完成 ・ はじめの版 "+t.n+"字"+(b.final?" → 仕上げ版 "+nchars(b.final.text)+"字":"")+(bindOf(b)?" ・ しばり："+bindOf(b).text+"（"+(bindFinal(b)?"達成":"未達成")+"）":"");
+    $("bSeg").classList.toggle("hidden",!b.final);
+    if(!b.final) bookMode="orig";
+    [...$("bSeg").children].forEach(x=>x.classList.toggle("on",x.dataset.m===bookMode));
+    $("bFull").innerHTML= bookMode==="fin"&&b.final ? esc(b.final.text) : origHTML(b);
+    $("btnPolish").textContent=b.final?"✎ 続けて整える":"✎ 整える";
+    $("btnBookCopy").textContent=b.final?"📋 仕上げ版をコピー":"📋 コピーする";
+  }
+  if(view==="polish"){ const b=bookById(curBook); if(!b){view="shelf";return renderShelfViews();}
+    setTheme(b.genre); $("scPolish").classList.remove("hidden");
+    $("pTitle").value=bTitle(b); $("pBody").value=bText(b); $("pOrig").innerHTML=origHTML(b);
+    updatePolishCount(b);
+  }
+  if(view==="antho"){ const a=SH.antho.find(x=>x.id===curAntho); if(!a){view="shelf";return renderShelfViews();}
+    setTheme(null); $("scAntho").classList.remove("hidden");
+    if(document.activeElement!==$("aTitle")) $("aTitle").value=a.title||"";
+    a.ids=a.ids.filter(id=>bookById(id));
+    const row=(b,i,inIt)=>'<div class="aitem" style="--c:'+genreOf(b.genre).c+'">'+(inIt?'<span class="n">'+KAN[i]+'</span>':'<span class="dot"></span>')
+      +'<span class="tt">『'+esc(bTitle(b))+'』<small>'+genreOf(b.genre).name+'・'+nchars(bText(b))+'字'+(b.final?'・仕上げ版':'')+'</small></span>'
+      +(inIt?'<button data-up="'+i+'"'+(i===0?" disabled":"")+'>↑</button><button data-dn="'+i+'"'+(i===a.ids.length-1?" disabled":"")+'>↓</button><button data-rm="'+i+'">✕</button>'
+            :'<button data-add="'+b.id+'">＋</button>')+'</div>';
+    $("aIn").innerHTML=a.ids.length? a.ids.map((id,i)=>row(bookById(id),i,true)).join("") : '<p class="gnote" style="margin:0">まだ入っていません。下の本棚から＋で入れてください。</p>';
+    const out=SH.books.filter(b=>!a.ids.includes(b.id));
+    $("aOut").innerHTML=out.length? out.map(b=>row(b,0,false)).join("") : '<p class="gnote" style="margin:0">本棚の作品は全部入っています。</p>';
+    $("btnAnthoCopy").disabled=a.ids.length<2;
+  }
+}
+function updatePolishCount(b){ const n=nchars($("pBody").value), o=totals(b).n;
+  $("pCnt").textContent=n; $("pNote").textContent="はじめの版 "+o+"字（"+(n-o>=0?"+":"")+(n-o)+"）"; }
+function go(v,id){ if(busy) return; view=v; if(v==="book"){curBook=id;bookMode="fin";} if(v==="polish") curBook=id||curBook; if(v==="antho") curAntho=id; render(); window.scrollTo(0,0); }
 
 /* ---- イベント ---- */
 $("genres").innerHTML=GENRES.map(g=>'<button class="genre" style="--c:'+g.c+'" data-k="'+g.key+'"><span class="em">'+g.em+'</span><span class="nm">'+g.name+'</span><span class="sb">'+g.sub+'</span></button>').join("");
@@ -662,18 +972,66 @@ $("btnNext").onclick=()=>{const st=STAGES[S.stage]; if(countChars($("body").valu
 $("btnBack").onclick=()=>{ if(S.stage>0){S.bodies[STAGES[S.stage].key]=$("body").value; S.stage--; save(); $("body").blur(); render();} };
 $("btnBack2").onclick=()=>{S.stage=3; save(); render();};
 $("btnFinish").onclick=()=>{const v=$("titleIn").value.trim(); if(!v){$("titleIn").focus(); $("titleIn").placeholder="タイトルを入れてね"; return;}
-  S.title=v; S.done=true; S.finishedAt=Date.now(); save(); render(); window.scrollTo({top:0,behavior:"smooth"});};
+  S.title=v; S.done=true; S.finishedAt=Date.now(); save(); upsertBook(); render(); window.scrollTo({top:0,behavior:"smooth"});};
 $("btnEdit").onclick=()=>{S.done=false; S.stage=0; save(); render(); window.scrollTo(0,0);};
-$("btnCopy").onclick=async()=>{ const txt=plainText(); let ok=false;
+$("btnCopy").onclick=async()=>{ if(S.done) upsertBook(); const txt=plainText(); let ok=false;
   try{await navigator.clipboard.writeText(txt); ok=true;}catch(e){}
   if(!ok){const a=$("copyArea"); a.value=txt; a.select(); a.setSelectionRange(0,99999); try{ok=document.execCommand("copy");}catch(e){}}
   $("copyMsg").textContent= ok?"コピーしました！ ロイロのテキストカードに貼りつけてください。":"うまくコピーできませんでした。上の本文を長押しして選び、コピーしてください。";
   if(ok){ $("btnCopy").textContent="✓ コピーしました"; $("btnCopy").classList.add("done");
     setTimeout(()=>{ $("btnCopy").textContent="📋 小説をコピーする"; $("btnCopy").classList.remove("done"); },3000); } };
-let arm=0;
-$("btnReset").onclick=()=>{ if(Date.now()-arm<3000){ S=fresh(); save(); document.documentElement.style.setProperty("--g","#c9a8ff"); document.documentElement.style.setProperty("--g2","#7a5cff");
-    $("btnReset").textContent="最初からやり直す"; render(); window.scrollTo(0,0); }
-  else { arm=Date.now(); $("btnReset").textContent="もう一度押すと全部消えます"; setTimeout(()=>$("btnReset").textContent="最初からやり直す",3000);} };
+$("btnReset").onclick=()=>{
+  // 完成した作品は本棚に入っているので、1回で次へ。書きかけは2回押しで消す（本棚は消えない）
+  if(S.done || Date.now()-arm<3000){ if(S.done) upsertBook(); S=fresh(); save(); arm=0; setTheme(null); render(); window.scrollTo(0,0); }
+  else { arm=Date.now(); $("btnReset").textContent="もう一度押すと、書きかけの物語が消えます";
+    setTimeout(()=>{ arm=0; render(); },3000);} };
+
+/* しばり */
+$("btnBind").onclick=()=>{ if(!busy) drawBind(); };
+$("btnBindRe").onclick=()=>{ if(S.bind&&!S.bind.re) drawBind(); };
+$("btnBindOff").onclick=()=>{ S.bind=null; save(); renderBind(); };
+
+/* 本棚まわり */
+$("tabs").addEventListener("click",e=>{const t=e.target.closest(".tab"); if(t) go(t.dataset.v);});
+$("btnToShelf").onclick=()=>go("shelf");
+$("shelfBooks").addEventListener("click",e=>{const b=e.target.closest(".spine"); if(b) go("book",b.dataset.b);});
+$("shelfAntho").addEventListener("click",e=>{const b=e.target.closest(".spine"); if(b) go("antho",b.dataset.a);});
+$("btnNewAntho").onclick=()=>{ const a={id:newId(),title:"",ids:[],created:Date.now()}; SH.antho.push(a); saveShelf(); go("antho",a.id); };
+$("bSeg").addEventListener("click",e=>{const x=e.target.closest("button"); if(x){ bookMode=x.dataset.m; render(); }});
+$("btnPolish").onclick=()=>go("polish",curBook);
+$("btnBookBack").onclick=()=>go("shelf");
+$("btnBookCopy").onclick=()=>{ const b=bookById(curBook); if(b) copyText(bookText(b),$("btnBookCopy"),$("bookMsg"),$("btnBookCopy").textContent); };
+let delArm=0;
+$("btnBookDel").onclick=()=>{ if(Date.now()-delArm<3000){ SH.books=SH.books.filter(b=>b.id!==curBook); SH.antho.forEach(a=>a.ids=a.ids.filter(id=>id!==curBook));
+    if(S.bookId===curBook){ delete S.bookId; save(); } saveShelf(); delArm=0; $("btnBookDel").textContent="本棚から外す"; go("shelf"); }
+  else { delArm=Date.now(); $("btnBookDel").textContent="もう一度押すと消えます"; setTimeout(()=>$("btnBookDel").textContent="本棚から外す",3000);} };
+function polishSave(){ const b=bookById(curBook); if(!b) return;
+  const text=$("pBody").value, title=$("pTitle").value.trim()||b.title;
+  if(!b.final && text===flatText(b) && title===b.title) return;   // まだ何も変えていない
+  b.final=Object.assign(b.final||{done:false},{text,title,updated:Date.now()}); saveShelf(); }
+$("pBody").addEventListener("input",()=>{ polishSave(); const b=bookById(curBook); if(b) updatePolishCount(b); });
+$("pTitle").addEventListener("input",polishSave);
+$("btnOrig").onclick=()=>{ const o=$("pOrig"); o.classList.toggle("hidden"); $("btnOrig").textContent=o.classList.contains("hidden")?"はじめの版を見る ▼":"はじめの版をとじる ▲"; };
+$("btnPolishBack").onclick=()=>{ polishSave(); go("book",curBook); };
+$("btnPolishDone").onclick=()=>{ polishSave(); const b=bookById(curBook); if(!b) return;
+  if(!b.final) b.final={text:$("pBody").value,title:$("pTitle").value.trim()||b.title,updated:Date.now()};
+  b.final.done=true; b.final.doneAt=Date.now(); saveShelf(); go("book",curBook); };
+$("aTitle").addEventListener("input",()=>{ const a=SH.antho.find(x=>x.id===curAntho); if(a){ a.title=$("aTitle").value.trim(); saveShelf(); }});
+function anthoEdit(e){ const a=SH.antho.find(x=>x.id===curAntho), x=e.target.closest("button"); if(!a||!x) return; const d=x.dataset;
+  if(d.add) a.ids.push(d.add);
+  if(d.rm!=null) a.ids.splice(+d.rm,1);
+  if(d.up!=null&&+d.up>0){ const i=+d.up; [a.ids[i-1],a.ids[i]]=[a.ids[i],a.ids[i-1]]; }
+  if(d.dn!=null&&+d.dn<a.ids.length-1){ const i=+d.dn; [a.ids[i+1],a.ids[i]]=[a.ids[i],a.ids[i+1]]; }
+  saveShelf(); render(); }
+$("aIn").addEventListener("click",anthoEdit); $("aOut").addEventListener("click",anthoEdit);
+$("btnAnthoCopy").onclick=()=>{ const a=SH.antho.find(x=>x.id===curAntho); if(a) copyText(anthoText(a),$("btnAnthoCopy"),$("anthoMsg"),"📋 短編集をコピーする"); };
+$("btnAnthoBack").onclick=()=>{ const a=SH.antho.find(x=>x.id===curAntho); if(a&&!a.ids.length&&!a.title){ SH.antho=SH.antho.filter(x=>x!==a); saveShelf(); } go("shelf"); };
+let aDelArm=0;
+$("btnAnthoDel").onclick=()=>{ if(Date.now()-aDelArm<3000){ SH.antho=SH.antho.filter(x=>x.id!==curAntho); saveShelf(); aDelArm=0; $("btnAnthoDel").textContent="この短編集を消す"; go("shelf"); }
+  else { aDelArm=Date.now(); $("btnAnthoDel").textContent="もう一度押すと消えます（作品は本棚に残ります）"; setTimeout(()=>$("btnAnthoDel").textContent="この短編集を消す",3000);} };
+
+// 前の版で完成していた作品も、本棚に入れておく
+if(S.done) upsertBook();
 
 render();
 </script>
