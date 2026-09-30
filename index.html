@@ -266,6 +266,8 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
 .spine.antho::before,.spine.antho::after{height:3px;background:linear-gradient(90deg,#9a6d1f,#ffe39a 50%,#9a6d1f)}
 .spine.antho .k{font-size:10px;letter-spacing:.2em;color:#ffd36a;writing-mode:vertical-rl;margin-bottom:6px}
 .shelfempty{color:var(--sub);font-size:14px;line-height:1.8;text-align:center;padding:30px 10px}
+.imp textarea{min-height:200px;font-size:15px;line-height:1.8}
+.imp .msg{white-space:pre-wrap}
 .shelfnote{font-size:12px;color:var(--sub);line-height:1.7;margin:10px 4px 0}
 .finmark{display:inline-block;margin-left:8px;padding:3px 10px;border-radius:99px;font-size:11px;letter-spacing:.15em;vertical-align:middle;
   color:#1a1426;background:linear-gradient(135deg,#fff3b0,#ffc94d)}
@@ -419,6 +421,16 @@ input.ptitle{font-size:20px;margin-bottom:12px}
       <div class="shelfhead"><h2>短編集</h2><span>本棚の作品を選んで、一冊にまとめる</span></div>
       <div class="shelf hidden" id="shelfAntho"></div>
       <div class="row" style="padding:0 6px"><button class="btn" id="btnNewAntho">＋ 短編集をつくる</button></div>
+    </div>
+    <div class="shelfwrap imp">
+      <div class="shelfhead"><h2>取りこむ</h2><span>前に書いた作品を本棚に入れる</span></div>
+      <button class="btn" id="btnImpOpen">📥 書いた作品を取りこむ</button>
+      <div class="hidden" id="impBox">
+        <p class="gnote" style="margin:4px 0 10px">［📋 小説をコピーする］でコピーした文章（ロイロに出したもの）を、そのまま下に貼りつけてください。『タイトル』から、最後の「字数：…」の行までです。何作品かまとめて貼っても大丈夫です。</p>
+        <textarea id="impText" placeholder="ここに貼りつける"></textarea>
+        <div class="row"><button class="btn main" id="btnImp">本棚に入れる</button><button class="btn" id="btnImpClose">とじる</button></div>
+        <div class="msg" id="impMsg"></div>
+      </div>
     </div>
     <p class="shelfnote">背表紙に金の帯があるのは、整えて仕上げた本です。本棚はこの iPad の中だけに保存されます（Safari の履歴を消すと消えます）。提出はロイロで。</p>
   </section>
@@ -918,7 +930,7 @@ function renderShelfViews(){
     const t=totals(b);
     $("bGenre").textContent="GENRE ｜ "+genreOf(b.genre).name;
     $("bTitle").innerHTML="『"+esc(bTitle(b))+"』"+(b.final&&b.final.done?'<span class="finmark">仕上げ</span>':b.final?'<span class="finmark" style="background:rgba(255,255,255,.2);color:#fff">整え中</span>':"");
-    $("bMeta").textContent=md(b.created)+" に完成 ・ はじめの版 "+t.n+"字"+(b.final?" → 仕上げ版 "+nchars(b.final.text)+"字":"")+(bindOf(b)?" ・ しばり："+bindOf(b).text+"（"+(bindFinal(b)?"達成":"未達成")+"）":"");
+    $("bMeta").textContent=md(b.created)+(b.imported?" に取りこみ":" に完成")+" ・ はじめの版 "+t.n+"字"+(b.final?" → 仕上げ版 "+nchars(b.final.text)+"字":"")+(bindOf(b)?" ・ しばり："+bindOf(b).text+"（"+(bindFinal(b)?"達成":"未達成")+"）":"");
     $("bSeg").classList.toggle("hidden",!b.final);
     if(!b.final) bookMode="orig";
     [...$("bSeg").children].forEach(x=>x.classList.toggle("on",x.dataset.m===bookMode));
@@ -996,6 +1008,59 @@ $("tabs").addEventListener("click",e=>{const t=e.target.closest(".tab"); if(t) g
 $("btnToShelf").onclick=()=>go("shelf");
 $("shelfBooks").addEventListener("click",e=>{const b=e.target.closest(".spine"); if(b) go("book",b.dataset.b);});
 $("shelfAntho").addEventListener("click",e=>{const b=e.target.closest(".spine"); if(b) go("antho",b.dataset.a);});
+/* 取りこみ：［小説をコピーする］の形式（と、仕上げ版の形式）を読み取る */
+function parseWork(src){
+  const t=src.replace(/\r\n?/g,"\n").trim();
+  const m=t.match(/『(.+?)』/); if(!m) return null;
+  const gm=t.match(/^ジャンル[：:]\s*(.+?)\s*(（仕上げ版）)?\s*$/m);
+  const g=gm&&GENRES.find(x=>x.name===gm[1].trim());
+  const o={genre:g?g.key:"nichijo",title:m[1].trim(),lines:{},bodies:{},rar:{},used:{},hints:{},bind:null,imported:true};
+  const stat=(re)=>{const x=t.match(re);return x?+x[1]:0;};
+  const polished=gm&&gm[2];
+  if(polished){ // 仕上げ版：本文は最初の罫線と次の罫線のあいだ
+    const parts=t.split(/^[―ー─-]{4,}\s*$/m); if(parts.length<3) return null;
+    STAGES.forEach(st=>{ const x=t.match(new RegExp("^◆"+st.name+"[：:](.*)$","m")); o.lines[st.key]=x?x[1].trim():""; });
+    const text=parts[1].trim(); if(!text) return null;
+    const bodyKi=text.startsWith(o.lines.ki)? text.slice(o.lines.ki.length) : text;
+    o.bodies={ki:bodyKi,sho:"",ten:"",ketsu:""};
+    const ot=t.match(/はじめの題[：:]『(.+?)』/);
+    o.final={text,title:o.title,done:true,updated:Date.now(),doneAt:Date.now()}; if(ot) o.title=ot[1];
+  } else {
+    const secs=t.split(/^【(起|承|転|結)】\s*$/m); if(secs.length<3) return null;
+    for(let i=1;i<secs.length;i+=2){
+      const st=STAGES.find(x=>x.name===secs[i]); let chunk=secs[i+1]||"";
+      chunk=chunk.split(/^[―ー─]{4,}\s*$/m)[0];                 // 最後の罫線から下（字数など）は本文に入れない
+      const ls=chunk.replace(/^\n+/,"").split("\n"); let line="";
+      if(ls[0]&&ls[0].startsWith("◆")){ line=ls.shift().replace(/^◆(AIの展開[：:])?/,"").replace(/（AIの書き出し）\s*$/,"").trim(); }
+      o.lines[st.key]=line; o.bodies[st.key]=ls.join("\n").replace(/\n+$/,"");
+    }
+    if(!o.lines.ki&&!o.bodies.ki) return null;
+  }
+  const min=stat(/時間[：:]\s*(\d+)\s*分/), ch=stat(/チェンジ[：:]\s*(\d+)\s*回/), hn=stat(/ヒント[：:]\s*(\d+)\s*回/);
+  o.finishedAt=Date.now(); o.start=min? o.finishedAt-min*60000 : null;
+  if(ch) o.used={imported:ch}; if(hn) o.hints={ki:{used:hn,all:[],show:[]}};
+  const bm=t.match(/^しばり[：:](.+?)（(達成|未達成)）/m); const bd=bm&&BINDS.find(b=>b.text===bm[1].trim()); if(bd) o.bind={id:bd.id,re:false};
+  return o;
+}
+$("btnImpOpen").onclick=()=>{ $("impBox").classList.remove("hidden"); $("btnImpOpen").classList.add("hidden"); $("impText").focus(); };
+$("btnImpClose").onclick=()=>{ $("impBox").classList.add("hidden"); $("btnImpOpen").classList.remove("hidden"); $("impMsg").textContent=""; };
+$("btnImp").onclick=()=>{
+  const raw=$("impText").value; if(!raw.trim()) return;
+  // 何作品かまとめて貼られたときは、『タイトル』＋ジャンル行ごとに分ける
+  const works=raw.replace(/\r\n?/g,"\n").split(/\n(?=\s*『[^』\n]+』\s*\nジャンル[：:])/);
+  const ok=[], ng=[], dup=[];
+  works.forEach(w=>{ if(!w.trim()) return; const o=parseWork(w);
+    if(!o){ ng.push(w.trim().slice(0,12)); return; }
+    if(SH.books.some(b=>b.title===o.title&&(b.bodies.ki||"").trim()===(o.bodies.ki||"").trim())){ dup.push(o.title); return; }
+    SH.books.push(Object.assign({id:newId(),created:Date.now(),final:o.final||null},o)); ok.push(o.title); });
+  saveShelf();
+  let msg=""; if(ok.length) msg+="本棚に入れました："+ok.map(x=>"『"+x+"』").join("")+"\n";
+  if(dup.length) msg+="もう本棚にあります："+dup.map(x=>"『"+x+"』").join("")+"\n";
+  if(ng.length) msg+="読み取れませんでした（"+ng.length+"件）。『タイトル』の行から、コピーしたまま貼りつけてください。";
+  $("impMsg").style.color= ng.length&&!ok.length? "var(--ng)" : "var(--ok)";
+  if(ok.length){ $("impText").value=""; render(); $("impBox").classList.remove("hidden"); $("btnImpOpen").classList.add("hidden"); }
+  $("impMsg").textContent=msg.trim();
+};
 $("btnNewAntho").onclick=()=>{ const a={id:newId(),title:"",ids:[],created:Date.now()}; SH.antho.push(a); saveShelf(); go("antho",a.id); };
 $("bSeg").addEventListener("click",e=>{const x=e.target.closest("button"); if(x){ bookMode=x.dataset.m; render(); }});
 $("btnPolish").onclick=()=>go("polish",curBook);
