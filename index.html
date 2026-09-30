@@ -457,10 +457,12 @@ input.ptitle{font-size:20px;margin-bottom:12px}
     <div class="panel">
       <p class="label">整える ― 区切りをはずして、1本の文章として書き直す</p>
       <input type="text" class="ptitle" id="pTitle" maxlength="30" placeholder="タイトル">
-      <button class="btn small" id="btnOrig">はじめの版を見る ▼</button>
+      <p class="gnote" style="margin:0 0 10px">〔 〕の中は、AIが出した承・転・結の展開です。前とつながるように自分の言葉で書きかえるか、いらなければ消してください。</p>
+      <div class="row" style="margin-top:0"><button class="btn small" id="btnOrig">はじめの版を見る ▼</button><button class="btn small hidden" id="btnRestart">はじめの版から整え直す</button></div>
       <div class="full orig hidden" id="pOrig"></div>
       <textarea id="pBody" style="margin-top:12px"></textarea>
       <div class="count"><span>いま <strong id="pCnt">0</strong> 字</span><span id="pNote"></span></div>
+      <div class="msg" id="pMsg"></div>
       <div class="nav">
         <button class="btn" id="btnPolishBack">← もどる</button>
         <button class="btn main" id="btnPolishDone">✓ 仕上げた</button>
@@ -879,6 +881,13 @@ function upsertBook(){
 function flatText(b){ // 区切りをはずした1本の文章（はじめの版から）
   return [(b.lines.ki||"")+(b.bodies.ki||"").replace(/^\s+/,""),b.bodies.sho,b.bodies.ten,b.bodies.ketsu].map(x=>(x||"").trim()).filter(Boolean).join("\n\n");
 }
+// 整えるときの最初の文章：承転結のつなぎ目に、AIの展開を〔 〕で目印として残す
+const MARK=/〔[^〕\n]*〕/g;
+function seedText(b){
+  return [(b.lines.ki||"")+(b.bodies.ki||"").replace(/^\s+/,"")].concat(STAGES.slice(1).map(st=>
+    ((b.lines[st.key]?"〔"+st.name+"の展開："+b.lines[st.key]+"〕\n":"")+(b.bodies[st.key]||"").trim()).trim()))
+    .map(x=>(x||"").trim()).filter(Boolean).join("\n\n");
+}
 const bTitle=b=>(b.final&&b.final.title)||b.title;
 const bText=b=>b.final? b.final.text : flatText(b);
 function origHTML(b){
@@ -940,7 +949,8 @@ function renderShelfViews(){
   }
   if(view==="polish"){ const b=bookById(curBook); if(!b){view="shelf";return renderShelfViews();}
     setTheme(b.genre); $("scPolish").classList.remove("hidden");
-    $("pTitle").value=bTitle(b); $("pBody").value=bText(b); $("pOrig").innerHTML=origHTML(b);
+    $("pTitle").value=bTitle(b); $("pBody").value=b.final? b.final.text : seedText(b);
+    $("btnRestart").classList.toggle("hidden",!b.final); $("pOrig").innerHTML=origHTML(b);
     updatePolishCount(b);
   }
   if(view==="antho"){ const a=SH.antho.find(x=>x.id===curAntho); if(!a){view="shelf";return renderShelfViews();}
@@ -957,8 +967,8 @@ function renderShelfViews(){
     $("btnAnthoCopy").disabled=a.ids.length<2;
   }
 }
-function updatePolishCount(b){ const n=nchars($("pBody").value), o=totals(b).n;
-  $("pCnt").textContent=n; $("pNote").textContent="はじめの版 "+o+"字（"+(n-o>=0?"+":"")+(n-o)+"）"; }
+function updatePolishCount(b){ const v=$("pBody").value, n=nchars(v.replace(MARK,"")), o=nchars(seedText(b).replace(MARK,"")), mk=(v.match(MARK)||[]).length;
+  $("pCnt").textContent=n; $("pNote").textContent=(mk?"〔 〕があと "+mk+" か所 ・ ":"")+"はじめの版 "+o+"字（"+(n-o>=0?"+":"")+(n-o)+"）"; }
 function go(v,id){ if(busy) return; view=v; if(v==="book"){curBook=id;bookMode="fin";} if(v==="polish") curBook=id||curBook; if(v==="antho") curAntho=id; render(); window.scrollTo(0,0); }
 
 /* ---- イベント ---- */
@@ -1072,13 +1082,20 @@ $("btnBookDel").onclick=()=>{ if(Date.now()-delArm<3000){ SH.books=SH.books.filt
   else { delArm=Date.now(); $("btnBookDel").textContent="もう一度押すと消えます"; setTimeout(()=>$("btnBookDel").textContent="本棚から外す",3000);} };
 function polishSave(){ const b=bookById(curBook); if(!b) return;
   const text=$("pBody").value, title=$("pTitle").value.trim()||b.title;
-  if(!b.final && text===flatText(b) && title===b.title) return;   // まだ何も変えていない
+  if(!b.final && text===seedText(b) && title===b.title) return;   // まだ何も変えていない
   b.final=Object.assign(b.final||{done:false},{text,title,updated:Date.now()}); saveShelf(); }
 $("pBody").addEventListener("input",()=>{ polishSave(); const b=bookById(curBook); if(b) updatePolishCount(b); });
 $("pTitle").addEventListener("input",polishSave);
 $("btnOrig").onclick=()=>{ const o=$("pOrig"); o.classList.toggle("hidden"); $("btnOrig").textContent=o.classList.contains("hidden")?"はじめの版を見る ▼":"はじめの版をとじる ▲"; };
 $("btnPolishBack").onclick=()=>{ polishSave(); go("book",curBook); };
+let doneArm=0, restartArm=0;
+$("btnRestart").onclick=()=>{ const b=bookById(curBook); if(!b) return;
+  if(Date.now()-restartArm<3000){ b.final=null; saveShelf(); restartArm=0; $("btnRestart").textContent="はじめの版から整え直す"; render(); }
+  else { restartArm=Date.now(); $("btnRestart").textContent="もう一度押すと、いまの仕上げ版が消えます"; setTimeout(()=>$("btnRestart").textContent="はじめの版から整え直す",3000);} };
 $("btnPolishDone").onclick=()=>{ polishSave(); const b=bookById(curBook); if(!b) return;
+  const mk=($("pBody").value.match(MARK)||[]).length;
+  if(mk && Date.now()-doneArm>=3000){ doneArm=Date.now(); $("pMsg").textContent="〔 〕が "+mk+" か所残っています。このまま仕上げるなら、もう一度押してください。"; setTimeout(()=>$("pMsg").textContent="",3000); return; }
+  doneArm=0; $("pMsg").textContent="";
   if(!b.final) b.final={text:$("pBody").value,title:$("pTitle").value.trim()||b.title,updated:Date.now()};
   b.final.done=true; b.final.doneAt=Date.now(); saveShelf(); go("book",curBook); };
 $("aTitle").addEventListener("input",()=>{ const a=SH.antho.find(x=>x.id===curAntho); if(a){ a.title=$("aTitle").value.trim(); saveShelf(); }});
