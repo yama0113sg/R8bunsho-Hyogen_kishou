@@ -5,6 +5,11 @@
 //  POST {stage, genre, story, avoid}            → {line}   一行を引く
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
 //  POST {mode:"bridge", stage, genre, before, line, after}    → {bridge}   整えるときのつなぎの文
+//
+//  ── クラス文庫（/bunko/...）──
+//  KV：BUNKO（KV namespace のバインディング）
+//  Secret：CLASS_PASS（生徒の合言葉）／TEACHER_PASS（先生用の合言葉）
+//  作品も感想も、先生が［公開］するまでは他の人に見えない
 // ============================================================
 
 const MODELS = [
@@ -69,7 +74,7 @@ function cors(origin, env) {
   return {
     "Access-Control-Allow-Origin": origin === allowed ? allowed : "null",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, X-Pass, X-Teacher",
     "Content-Type": "application/json; charset=utf-8",
   };
 }
@@ -137,14 +142,136 @@ async function callGemini(env, system, user, { models = MODELS, parse = cleanLin
   throw new Error(lastErr || "no model");
 }
 
+// ============ クラス文庫 ============
+const J = (obj, headers, status = 200) => new Response(JSON.stringify(obj), { status, headers });
+const clip = (s, n) => String(s || "").slice(0, n);
+const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+async function listAll(kv, prefix) {
+  const out = []; let cursor;
+  do { const r = await kv.list({ prefix, cursor }); out.push(...r.keys); cursor = r.list_complete ? null : r.cursor; } while (cursor);
+  return out;
+}
+const workMeta = w => ({ id: w.id, pen: w.pen, title: w.title, genre: w.genre, status: w.status,
+  chars: [...w.text.replace(/\s/g, "")].length, created: w.created, updated: w.updated });
+const withoutOwner = w => { const { owner, ...rest } = w; return rest; };
+async function deleteWork(kv, id) {
+  await kv.delete("w:" + id);
+  for (const k of await listAll(kv, "c:" + id + ":")) await kv.delete(k.name);
+}
+
+async function bunko(request, env, headers, path) {
+  const kv = env.BUNKO;
+  if (!kv || !env.CLASS_PASS || !env.TEACHER_PASS) {
+    return J({ error: "setup", message: "（先生へ）Worker に BUNKO・CLASS_PASS・TEACHER_PASS の設定が必要です" }, headers, 500);
+  }
+  const url = new URL(request.url);
+  // 合言葉は日本語でもよいように、ページ側で encodeURIComponent して送っている
+  const dec = v => { try { return decodeURIComponent(v || ""); } catch { return v || ""; } };
+  const teacher = dec(request.headers.get("X-Teacher")) === env.TEACHER_PASS;
+  if (!teacher && dec(request.headers.get("X-Pass")) !== env.CLASS_PASS) return J({ error: "pass" }, headers, 401);
+  let body = {};
+  if (request.method === "POST") { try { body = await request.json(); } catch { body = {}; } }
+
+  // 公開中の作品の一覧
+  if (path === "/bunko/works") {
+    const works = (await listAll(kv, "w:")).map(k => k.metadata)
+      .filter(m => m && m.status === "public").sort((a, b) => b.updated - a.updated);
+    return J({ works }, headers);
+  }
+  // 1作品と、公開済みの感想（本人は確認待ちの自分の作品も見られる）
+  if (path === "/bunko/work") {
+    const id = url.searchParams.get("id") || "", token = url.searchParams.get("token") || "";
+    const w = await kv.get("w:" + id, { type: "json" });
+    const mine = !!(w && token && w.owner === token);
+    if (!w || (w.status !== "public" && !teacher && !mine)) return J({ error: "notfound" }, headers, 404);
+    const comments = [];
+    for (const k of await listAll(kv, "c:" + id + ":")) {
+      if (k.metadata && (k.metadata.status === "public" || teacher)) {
+        const c = await kv.get(k.name, { type: "json" }); if (c) comments.push(c);
+      }
+    }
+    comments.sort((a, b) => a.created - b.created);
+    return J({ work: withoutOwner(w), comments, mine }, headers);
+  }
+  // 作品を出す（同じ端末から同じ id で出し直すと、差し替えて確認待ちにもどる）
+  if (path === "/bunko/submit") {
+    const token = clip(body.token, 64);
+    if (token.length < 16) return J({ error: "token" }, headers, 400);
+    const text = clip(body.text, 20000).trim(), title = clip(body.title, 40).trim(), pen = clip(body.pen, 20).trim();
+    if (!text || !title || !pen) return J({ error: "empty" }, headers, 400);
+    let id = /^[a-z0-9]{6,24}$/.test(body.id || "") ? body.id : null;
+    const old = id ? await kv.get("w:" + id, { type: "json" }) : null;
+    if (old && old.owner !== token) return J({ error: "owner" }, headers, 403);
+    if (!old) id = rid();
+    const lines = {};
+    for (const k of ["ki", "sho", "ten", "ketsu"]) lines[k] = clip(body.lines && body.lines[k], 100);
+    const now = Date.now();
+    const w = { id, owner: token, pen, title, genre: clip(body.genre, 20), text, lines, bridged: !!body.bridged,
+      status: "pending", created: old ? old.created : now, updated: now };
+    await kv.put("w:" + id, JSON.stringify(w), { metadata: workMeta(w) });
+    return J({ id, status: w.status }, headers);
+  }
+  // 自分の作品を取り下げる
+  if (path === "/bunko/withdraw") {
+    const w = await kv.get("w:" + clip(body.id, 30), { type: "json" });
+    if (!w || w.owner !== body.token) return J({ error: "owner" }, headers, 403);
+    await deleteWork(kv, w.id);
+    return J({ ok: true }, headers);
+  }
+  // 感想を送る（先生が公開するまでは見えない）
+  if (path === "/bunko/comment") {
+    const w = await kv.get("w:" + clip(body.workId, 30), { type: "json" });
+    if (!w || w.status !== "public") return J({ error: "notfound" }, headers, 404);
+    const text = clip(body.text, 200).trim(), name = clip(body.name, 20).trim();
+    if (!text || !name) return J({ error: "empty" }, headers, 400);
+    const c = { id: rid(), workId: w.id, name, text, status: "pending", created: Date.now() };
+    await kv.put("c:" + w.id + ":" + c.id, JSON.stringify(c), { metadata: { status: c.status } });
+    return J({ ok: true }, headers);
+  }
+
+  // ── ここから先生用 ──
+  if (!teacher) return J({ error: "teacher" }, headers, 401);
+  if (path === "/bunko/admin") {
+    const works = (await listAll(kv, "w:")).map(k => k.metadata).filter(Boolean).sort((a, b) => b.updated - a.updated);
+    const comments = [];
+    for (const k of await listAll(kv, "c:")) {
+      if (k.metadata && k.metadata.status === "pending") { const c = await kv.get(k.name, { type: "json" }); if (c) comments.push(c); }
+    }
+    return J({ works, comments }, headers);
+  }
+  if (path === "/bunko/admin/set") {
+    const st = body.status;
+    if (body.kind === "w") {
+      const w = await kv.get("w:" + clip(body.id, 30), { type: "json" });
+      if (!w) return J({ error: "notfound" }, headers, 404);
+      if (st === "delete") await deleteWork(kv, w.id);
+      else if (["public", "pending", "hidden"].includes(st)) { w.status = st; await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) }); }
+    } else if (body.kind === "c") {
+      const key = "c:" + clip(body.workId, 30) + ":" + clip(body.id, 30);
+      const c = await kv.get(key, { type: "json" });
+      if (!c) return J({ error: "notfound" }, headers, 404);
+      if (st === "delete") await kv.delete(key);
+      else if (st === "public") { c.status = "public"; await kv.put(key, JSON.stringify(c), { metadata: { status: "public" } }); }
+    }
+    return J({ ok: true }, headers);
+  }
+  return J({ error: "path" }, headers, 404);
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "";
     const headers = cors(origin, env);
 
     if (request.method === "OPTIONS") return new Response(null, { headers });
+    const path = new URL(request.url).pathname.replace(/\/+$/, "");
+    if (path.startsWith("/bunko")) {
+      if (origin !== env.ALLOWED_ORIGIN) return J({ error: "origin" }, headers, 403);
+      try { return await bunko(request, env, headers, path); }
+      catch (e) { return J({ error: String(e.message || e) }, headers, 500); }
+    }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {

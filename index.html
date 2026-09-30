@@ -261,7 +261,7 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
 .spine.fin::before,.spine.fin::after{height:3px;background:linear-gradient(90deg,#9a6d1f,#ffe39a 50%,#9a6d1f)}
 .spine .t{writing-mode:vertical-rl;font-family:var(--mincho);font-weight:700;font-size:15px;color:#fff;letter-spacing:.1em;flex:1;overflow:hidden;
   text-shadow:0 1px 3px rgba(0,0,0,.6);line-height:1}
-.spine .d{font-size:10px;color:rgba(255,255,255,.8);margin-top:10px;font-variant-numeric:tabular-nums}
+.spine .d{font-size:10px;color:rgba(255,255,255,.8);margin-top:16px;font-variant-numeric:tabular-nums}
 .spine.antho{width:60px;background:linear-gradient(90deg,#15101f,#2b2140 20%,#3a2d55 50%,#1c1529);border:1px solid rgba(255,211,106,.35)}
 .spine.antho::before,.spine.antho::after{height:3px;background:linear-gradient(90deg,#9a6d1f,#ffe39a 50%,#9a6d1f)}
 .spine.antho .k{font-size:10px;letter-spacing:.2em;color:#ffd36a;writing-mode:vertical-rl;margin-bottom:6px}
@@ -432,6 +432,7 @@ input.ptitle{font-size:20px;margin-bottom:12px}
         <div class="msg" id="impMsg"></div>
       </div>
     </div>
+    <div class="row" style="margin:0 0 6px"><a class="btn" href="bunko.html" style="text-decoration:none;color:var(--ink)">📖 クラス文庫を読む</a></div>
     <p class="shelfnote">背表紙に金の帯があるのは、整えて仕上げた本です。本棚はこの iPad の中だけに保存されます（Safari の履歴を消すと消えます）。提出はロイロで。</p>
   </section>
 
@@ -448,6 +449,17 @@ input.ptitle{font-size:20px;margin-bottom:12px}
       <div class="cols"><button class="btn main" id="btnPolish">✎ 整える</button><button class="btn" id="btnBookCopy">📋 コピーする</button></div>
       <div class="msg" id="bookMsg" style="color:var(--ok)"></div>
       <p class="gnote" style="margin-top:4px">整えると、起承転結の区切りをはずして、1本の文章として書き直せます。はじめの版は消えずに残ります。</p>
+    </div>
+    <div class="submit" id="bunkoArea">
+      <p class="label" style="margin:0 0 8px">📖 クラス文庫</p>
+      <p class="gnote" id="bunkoState" style="margin:0 0 10px"></p>
+      <div class="hidden" id="bunkoForm">
+        <input type="text" id="bkPen" maxlength="20" placeholder="ペンネーム（実名は書かないでください）" style="font-size:17px">
+        <input type="text" id="bkPass" maxlength="40" placeholder="合言葉" autocomplete="off" autocapitalize="off" style="font-size:17px;margin-top:8px">
+        <p class="gnote" style="margin:8px 0 0">先生が確認してから、クラス文庫に並びます。出したあとも、取り下げたり、書き直した版に差し替えたりできます。</p>
+      </div>
+      <div class="row"><button class="btn main" id="btnBunko">📖 文庫に出す</button><button class="btn danger hidden" id="btnBunkoOff">取り下げる</button></div>
+      <div class="msg" id="bunkoMsg"></div>
     </div>
     <div class="nav"><button class="btn" id="btnBookBack">← 本棚へ</button><button class="btn danger" id="btnBookDel">本棚から外す</button></div>
   </section>
@@ -933,7 +945,7 @@ function anthoText(a){
 function spineHTML(b){
   const g=genreOf(b.genre), n=nchars(bText(b)), h=Math.round(150+Math.min(36,Math.max(0,(n-1000)/25)));
   return '<div class="slot"><button class="spine'+(b.final&&b.final.done?" fin":"")+'" data-b="'+b.id+'" style="--c:'+g.c+';--c2:'+g.c2+';--h:'+h+'px" title="'+esc(bTitle(b))+'">'
-    +'<span class="t">'+esc(bTitle(b))+'</span><span class="d">'+md(b.created)+'</span></button></div>';
+    +'<span class="t" style="font-size:'+(n=>n<=5?15:n<=8?12:n<=14?11:10)([...bTitle(b)].length)+'px">'+esc(bTitle(b))+'</span><span class="d">'+md(b.created)+'</span></button></div>';
 }
 function setTheme(genre){ const g=genre?genreOf(genre):{c:"#c9a8ff",c2:"#7a5cff"};
   document.documentElement.style.setProperty("--g",g.c); document.documentElement.style.setProperty("--g2",g.c2); }
@@ -967,6 +979,7 @@ function renderShelfViews(){
     $("bFull").innerHTML= bookMode==="fin"&&b.final ? esc(b.final.text) : origHTML(b);
     $("btnPolish").textContent=b.final?"✎ 続けて整える":"✎ 整える";
     $("btnBookCopy").textContent=b.final?"📋 仕上げ版をコピー":"📋 コピーする";
+    renderBunko(b);
   }
   if(view==="polish"){ const b=bookById(curBook); if(!b){view="shelf";return renderShelfViews();}
     setTheme(b.genre); $("scPolish").classList.remove("hidden");
@@ -993,9 +1006,62 @@ function renderShelfViews(){
     $("btnAnthoCopy").disabled=a.ids.length<2;
   }
 }
+/* ---- クラス文庫に出す ---- */
+const BUNKO_API=SETUP.proxyUrl.replace(/\/+$/,"")+"/bunko";
+const lsGet=k=>{try{return localStorage.getItem(k)||"";}catch(e){return "";}}, lsSet=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+function ownerToken(){ let t=lsGet("kishou_owner"); if(t.length<16){ t=(crypto.getRandomValues?[...crypto.getRandomValues(new Uint8Array(16))].map(x=>x.toString(16).padStart(2,"0")).join(""):newId()+newId()+newId()); lsSet("kishou_owner",t); } return t; }
+async function bunkoApi(path,body){
+  const r=await fetch(BUNKO_API+path,{method:body?"POST":"GET",headers:{"Content-Type":"application/json","X-Pass":encodeURIComponent(lsGet("bunko_pass"))},body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({})); if(r.status===401) throw new Error("合言葉がちがいます。");
+  if(!r.ok){ const e=new Error(j.message||"うまくいきませんでした（"+(j.error||r.status)+"）"); e.status=r.status; throw e; } return j;
+}
+const BK_LABEL={pending:"先生の確認待ちです。",public:"クラス文庫に並んでいます。",hidden:"先生が非公開にしています。"};
+let bunkoFormOpen=false, bunkoOffArm=0;
+function renderBunko(b){
+  const ready=b.final&&b.final.done, left=b.final?(b.final.text.match(MARK)||[]).length:0;
+  $("bunkoForm").classList.toggle("hidden",!bunkoFormOpen);
+  $("btnBunkoOff").classList.toggle("hidden",!b.bunko||bunkoFormOpen);
+  $("btnBunko").textContent= bunkoFormOpen? "この内容で出す" : b.bunko? "📖 いまの仕上げ版で出し直す" : "📖 文庫に出す";
+  $("btnBunko").disabled=!ready||left>0;
+  $("bunkoState").textContent= !ready? "整えて［✓ 仕上げた］を押した作品を、クラス文庫に出せます。"
+    : left? "〔 〕が "+left+" か所残っています。自分の言葉に書きかえてから出してください。"
+    : b.bunko? (BK_LABEL[b.bunko.status]||"出しました。")+(b.bunko.comments?" 感想 "+b.bunko.comments+" 件":"")
+    : "ペンネームで、受講者だけが読めるクラス文庫に出せます。";
+}
+async function refreshBunko(b){ // 本を開いたとき、文庫での状態を確かめる
+  if(!b.bunko||!lsGet("bunko_pass")) return;
+  try{ const j=await bunkoApi("/work?id="+encodeURIComponent(b.bunko.id)+"&token="+ownerToken());
+    b.bunko.status=j.work.status; b.bunko.comments=(j.comments||[]).length; }
+  catch(e){ if(e.status===404){ b.bunko=null; } else return; }
+  saveShelf(); if(view==="book"&&curBook===b.id) renderBunko(b);
+}
+$("btnBunko").onclick=async()=>{
+  const b=bookById(curBook); if(!b||!b.final) return;
+  if(!bunkoFormOpen){ bunkoFormOpen=true; $("bkPen").value=lsGet("kishou_pen"); $("bkPass").value=lsGet("bunko_pass"); renderBunko(b); $("bkPen").focus(); return; }
+  const pen=$("bkPen").value.trim(), pass=$("bkPass").value.trim();
+  if(!pen){ $("bunkoMsg").textContent="ペンネームを入れてください。"; return; }
+  if(!pass){ $("bunkoMsg").textContent="合言葉を入れてください。"; return; }
+  lsSet("kishou_pen",pen); lsSet("bunko_pass",pass);
+  $("btnBunko").disabled=true; $("bunkoMsg").style.color="var(--sub)"; $("bunkoMsg").textContent="送っています…";
+  try{ const j=await bunkoApi("/submit",{id:b.bunko&&b.bunko.id,token:ownerToken(),pen,title:bTitle(b),genre:b.genre,
+        text:b.final.text.trim(),lines:b.lines,bridged:!!b.bridges});
+    b.bunko={id:j.id,status:j.status,at:Date.now()}; saveShelf(); bunkoFormOpen=false;
+    $("bunkoMsg").style.color="var(--ok)"; $("bunkoMsg").textContent="出しました。先生が確認したら、クラス文庫に並びます。"; }
+  catch(e){ $("bunkoMsg").style.color="var(--ng)"; $("bunkoMsg").textContent=e.message.includes("fetch")?"うまくつながりませんでした。少し待ってもう一度押してください。":e.message; }
+  renderBunko(b);
+};
+$("btnBunkoOff").onclick=async()=>{
+  const b=bookById(curBook); if(!b||!b.bunko) return;
+  if(Date.now()-bunkoOffArm>=3000){ bunkoOffArm=Date.now(); $("btnBunkoOff").textContent="もう一度押すと、文庫から消えます（感想も）"; setTimeout(()=>$("btnBunkoOff").textContent="取り下げる",3000); return; }
+  bunkoOffArm=0;
+  try{ await bunkoApi("/withdraw",{id:b.bunko.id,token:ownerToken()}); b.bunko=null; saveShelf();
+    $("bunkoMsg").style.color="var(--ok)"; $("bunkoMsg").textContent="取り下げました。"; }
+  catch(e){ $("bunkoMsg").style.color="var(--ng)"; $("bunkoMsg").textContent=e.message; }
+  $("btnBunkoOff").textContent="取り下げる"; renderBunko(b);
+};
 function updatePolishCount(b){ const v=$("pBody").value, n=nchars(v.replace(MARK,"")), o=nchars(seedText(b).replace(MARK,"")), mk=(v.match(MARK)||[]).length;
   $("pCnt").textContent=n; $("pNote").textContent=(mk?"〔 〕があと "+mk+" か所 ・ ":"")+"はじめの版 "+o+"字（"+(n-o>=0?"+":"")+(n-o)+"）"; }
-function go(v,id){ if(busy) return; view=v; if(v==="book"){curBook=id;bookMode="fin";} if(v==="polish") curBook=id||curBook; if(v==="antho") curAntho=id; render(); window.scrollTo(0,0); }
+function go(v,id){ if(busy) return; view=v; if(v==="book"){curBook=id;bookMode="fin"; bunkoFormOpen=false; $("bunkoMsg").textContent=""; const b=bookById(id); if(b) refreshBunko(b);} if(v==="polish") curBook=id||curBook; if(v==="antho") curAntho=id; render(); window.scrollTo(0,0); }
 
 /* ---- イベント ---- */
 $("genres").innerHTML=GENRES.map(g=>'<button class="genre" style="--c:'+g.c+'" data-k="'+g.key+'"><span class="em">'+g.em+'</span><span class="nm">'+g.name+'</span><span class="sb">'+g.sub+'</span></button>').join("");

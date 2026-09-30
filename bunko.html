@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>クラス文庫</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#07060d; --bg1:#12101f; --glass:rgba(255,255,255,.055); --glass2:rgba(255,255,255,.09);
+  --edge:rgba(255,255,255,.12); --ink:#f4f1ff; --sub:#a39fbf; --ai:#9fe3ff; --ok:#5dffb0; --ng:#ff3d5e;
+  --g:#c9a8ff; --g2:#7a5cff; --gold:#ffd36a;
+  --mincho:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --gothic:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;color:var(--ink);font-family:var(--gothic);-webkit-text-size-adjust:100%}
+body{min-height:100vh;padding:20px 16px 70px;background:var(--bg0);overflow-x:hidden}
+body::before{content:"";position:fixed;inset:-20%;z-index:-2;
+  background:radial-gradient(60% 50% at 20% 10%,color-mix(in srgb,var(--g) 24%,transparent),transparent 70%),
+             radial-gradient(50% 45% at 90% 80%,color-mix(in srgb,var(--g2) 26%,transparent),transparent 70%),
+             linear-gradient(180deg,var(--bg1),var(--bg0));transition:background .8s}
+.wrap{max-width:860px;margin:0 auto}
+button{font:inherit;cursor:pointer;border:none;color:var(--ink);background:none}
+.hidden{display:none!important}
+.logo{text-align:center;margin:6px 0 18px}
+.logo h1{font-family:var(--mincho);font-weight:800;font-size:clamp(28px,5.6vw,40px);margin:0;letter-spacing:.24em}
+.logo p{margin:6px 0 0;color:var(--sub);font-size:13px;letter-spacing:.12em}
+.panel{background:var(--glass);border:1px solid var(--edge);border-radius:22px;padding:20px;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 20px 60px rgba(0,0,0,.35);margin-bottom:14px}
+.label{font-size:12px;letter-spacing:.2em;color:var(--sub);margin:0 0 12px}
+.btn{padding:12px 20px;border-radius:14px;font-weight:700;background:var(--glass2);border:1px solid var(--edge);transition:transform .12s}
+.btn:active{transform:scale(.96)}
+.btn:disabled{opacity:.3;cursor:default;transform:none}
+.btn.main{background:linear-gradient(135deg,#fff,var(--g));color:#15121f;border:none}
+.btn.small{padding:7px 13px;font-size:13px;border-radius:10px}
+.btn.danger{color:#ff8fa3}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.msg{min-height:1.4em;font-size:14px;color:var(--ng);margin-top:8px;white-space:pre-wrap}
+.note{font-size:13px;color:var(--sub);line-height:1.8;margin:0}
+input,textarea{width:100%;font:inherit;border-radius:14px;border:1px solid var(--edge);background:rgba(5,4,10,.55);color:#fff;padding:12px 14px}
+input:focus,textarea:focus{outline:none;border-color:var(--g)}
+input.pass{font-size:20px;text-align:center;letter-spacing:.2em}
+.fadein{animation:fi .5s ease-out}
+@keyframes fi{from{opacity:0;transform:translateY(12px)}}
+.foot{margin-top:30px;text-align:center;font-size:12px;color:var(--sub);letter-spacing:.1em}
+.foot a,.foot button{color:var(--sub);text-decoration:underline;font-size:12px}
+a.btn{color:var(--ink);text-decoration:none;display:inline-block}
+
+/* 棚 */
+.shelfhead{display:flex;justify-content:space-between;align-items:baseline;margin:0 4px 6px}
+.shelfhead h2{font-family:var(--mincho);font-size:20px;margin:0;letter-spacing:.2em}
+.shelfhead span{font-size:12px;color:var(--sub)}
+.shelf{display:flex;flex-wrap:wrap;gap:14px 5px;padding:0 10px;margin-top:6px;
+  background:repeating-linear-gradient(to bottom,transparent 0 212px,rgba(255,236,210,.22) 212px 216px,rgba(255,236,210,.1) 216px 220px,rgba(0,0,0,.4) 220px 226px)}
+.slot{height:212px;display:flex;align-items:flex-end}
+.spine{width:48px;height:var(--h);border-radius:4px 4px 2px 2px;position:relative;display:flex;flex-direction:column;align-items:center;padding:14px 0 8px;overflow:hidden;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--c2) 45%,#000) 0,color-mix(in srgb,var(--c2) 80%,#000) 16%,color-mix(in srgb,var(--c2) 85%,var(--c)) 50%,color-mix(in srgb,var(--c2) 60%,#000) 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),3px 0 8px rgba(0,0,0,.45);transition:transform .2s}
+.spine:hover,.spine:active{transform:translateY(-8px)}
+.spine::before,.spine::after{content:"";position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,#9a6d1f,#ffe39a 50%,#9a6d1f)}
+.spine::before{top:6px}.spine::after{bottom:50px}
+.spine .t{writing-mode:vertical-rl;font-family:var(--mincho);font-weight:700;font-size:15px;color:#fff;letter-spacing:.1em;flex:1;overflow:hidden;text-shadow:0 1px 3px rgba(0,0,0,.6);line-height:1}
+.spine .p{writing-mode:vertical-rl;font-size:10px;color:rgba(255,255,255,.88);margin-top:20px;height:38px;overflow:hidden;line-height:1.1;letter-spacing:.05em}
+.empty{color:var(--sub);font-size:14px;line-height:1.8;text-align:center;padding:30px 10px}
+
+/* 読む */
+.rhead{position:relative;overflow:hidden;border-radius:22px;padding:22px 22px 18px;margin-bottom:14px;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--g) 28%,#15121f),#0c0a14 75%);border:1px solid color-mix(in srgb,var(--g) 55%,transparent)}
+.rgenre{font-size:12px;letter-spacing:.3em;color:var(--g)}
+.rtitle{font-family:var(--mincho);font-weight:800;font-size:clamp(24px,4.6vw,34px);margin:6px 0 4px;line-height:1.4}
+.rpen{font-family:var(--mincho);font-size:16px;color:#d6d2ea}
+.seg{display:flex;gap:6px;margin:0 0 10px}
+.seg button{padding:7px 14px;border-radius:99px;font-size:13px;border:1px solid var(--edge);color:var(--sub)}
+.seg button.on{color:#15121f;background:#fff;border-color:transparent;font-weight:700}
+.page{background:#f6f1e7;color:#1d1a16;border-radius:10px;box-shadow:0 20px 50px rgba(0,0,0,.45),inset 0 0 60px rgba(120,90,40,.08);
+  font-family:var(--mincho);font-size:18px;line-height:2;white-space:pre-wrap;word-break:break-word}
+.page.tate{writing-mode:vertical-rl;width:100%;height:min(72vh,660px);overflow-x:auto;overflow-y:hidden;padding:36px 30px;line-break:strict}
+.page.yoko{padding:28px 26px;font-size:17px}
+.ai-note{margin-top:14px;font-size:13px;color:var(--sub);line-height:1.8}
+.ai-note summary{cursor:pointer}
+.ai-note ul{margin:6px 0 0;padding-left:1.2em;color:var(--ai);font-family:var(--mincho)}
+.cm{padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--edge);margin-bottom:8px}
+.cm b{font-size:13px;color:var(--g)} .cm p{margin:4px 0 0;font-family:var(--mincho);line-height:1.8;white-space:pre-wrap}
+.cm.pending{border-style:dashed}
+.count{font-size:12px;color:var(--sub);text-align:right;margin-top:4px}
+
+/* 先生用 */
+.item{padding:14px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--edge);margin-bottom:10px}
+.item .h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.item .h b{font-family:var(--mincho);font-size:17px}
+.item .h span{font-size:12px;color:var(--sub);white-space:nowrap}
+.item .body{margin-top:10px;font-family:var(--mincho);line-height:1.9;white-space:pre-wrap;max-height:50vh;overflow:auto;background:rgba(0,0,0,.25);border-radius:10px;padding:12px}
+.st{display:inline-block;font-size:11px;padding:2px 9px;border-radius:99px;margin-left:6px;vertical-align:middle}
+.st.public{background:rgba(93,255,176,.18);color:var(--ok)} .st.pending{background:rgba(255,211,106,.18);color:var(--gold)} .st.hidden{background:rgba(255,255,255,.1);color:var(--sub)}
+h3{font-size:14px;letter-spacing:.15em;color:var(--sub);margin:22px 0 10px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo"><h1>クラス文庫</h1><p>「起承転結」で書いて、整えた物語</p></div>
+
+  <!-- 合言葉 -->
+  <section id="scGate" class="panel fadein hidden">
+    <p class="label">合言葉を入れてください</p>
+    <input class="pass" id="passIn" autocomplete="off" autocapitalize="off" placeholder="合言葉">
+    <div class="row"><button class="btn main" id="btnEnter">入る</button></div>
+    <div class="msg" id="gateMsg"></div>
+  </section>
+
+  <!-- 棚 -->
+  <section id="scShelf" class="hidden fadein">
+    <div class="panel">
+      <div class="shelfhead"><h2>文庫の棚</h2><span id="shelfCount"></span></div>
+      <div class="shelf" id="shelf"></div>
+      <div class="empty hidden" id="empty">まだ本がありません。<br>「起承転結」の本棚で整えた作品を［文庫に出す］と、先生が確認したあとここに並びます。</div>
+    </div>
+    <div class="row" style="justify-content:space-between"><a class="btn" href="./">← 起承転結へ</a><button class="btn" id="btnReload">↻ 新しく並んだ本を見る</button></div>
+    <div class="msg" id="shelfMsg"></div>
+  </section>
+
+  <!-- 読む -->
+  <section id="scRead" class="hidden fadein">
+    <div class="row" style="margin:0 0 12px"><button class="btn" id="btnBack">← 棚へ</button></div>
+    <div class="rhead"><div class="rgenre" id="rGenre"></div><div class="rtitle" id="rTitle"></div><div class="rpen" id="rPen"></div></div>
+    <div class="seg" id="seg"><button data-m="tate" class="on">縦書き</button><button data-m="yoko">横書き</button></div>
+    <div class="page tate" id="page"></div>
+    <details class="ai-note" id="aiNote"><summary id="aiSum"></summary><ul id="aiLines"></ul></details>
+    <div class="panel" style="margin-top:18px">
+      <p class="label">感想</p>
+      <div id="cms"></div>
+      <p class="note" id="cmNone">まだ感想はありません。</p>
+      <p class="label" style="margin-top:18px">感想を送る</p>
+      <input id="cmName" maxlength="20" placeholder="ペンネーム">
+      <textarea id="cmText" maxlength="200" rows="4" style="margin-top:8px;font-family:var(--mincho);line-height:1.8" placeholder="心に残った場面や、好きな一文など（200字まで）"></textarea>
+      <div class="count"><span id="cmCnt">0</span> / 200</div>
+      <div class="row"><button class="btn main" id="btnCm">送る</button></div>
+      <p class="note" style="margin-top:8px">感想は、先生が確認してから載ります。</p>
+      <div class="msg" id="cmMsg"></div>
+    </div>
+  </section>
+
+  <!-- 先生用 -->
+  <section id="scSensei" class="hidden fadein">
+    <div class="panel">
+      <p class="label">先生用</p>
+      <div id="senseiGate">
+        <input class="pass" id="tpassIn" type="password" autocomplete="off" placeholder="先生用の合言葉">
+        <div class="row"><button class="btn main" id="btnTEnter">入る</button><button class="btn" id="btnTClose">もどる</button></div>
+      </div>
+      <div id="senseiBody" class="hidden">
+        <div class="row" style="margin-top:0"><button class="btn small" id="btnTReload">↻ 読みこみ直す</button><button class="btn small" id="btnTClose2">棚へもどる</button></div>
+        <h3>確認待ちの作品</h3><div id="tPendW"></div>
+        <h3>確認待ちの感想</h3><div id="tPendC"></div>
+        <h3>公開中・非公開の作品</h3><div id="tOther"></div>
+        <p class="note" style="margin-top:14px">公開・非公開を切りかえてから棚に反映されるまで、最大1分ほどかかることがあります。</p>
+      </div>
+      <div class="msg" id="tMsg"></div>
+    </div>
+  </section>
+
+  <div class="foot"><button id="btnSensei">先生用</button></div>
+</div>
+
+<script>
+const API = "https://kishou.ryousukey0113.workers.dev";
+const GENRES = [
+  { key:"nichijo", name:"日常",         c:"#7ee8a6", c2:"#1f9d6b" },
+  { key:"seishun", name:"青春",         c:"#ffb36b", c2:"#e0533d" },
+  { key:"renai",   name:"恋愛",         c:"#ffc2dc", c2:"#d9457f" },
+  { key:"mystery", name:"ミステリー",   c:"#9fb0ff", c2:"#3b3fd1" },
+  { key:"sf",      name:"SF",           c:"#6ff0ff", c2:"#1170c9" },
+  { key:"fantasy", name:"ファンタジー", c:"#d9a3ff", c2:"#7a3bd9" },
+  { key:"comedy",  name:"コメディ",     c:"#ffe066", c2:"#e39a12" },
+  { key:"kowai",   name:"ちょっと怖い", c:"#ff8fa8", c2:"#8c1d3d" },
+];
+const STAGE_NAMES={ki:"起",sho:"承",ten:"転",ketsu:"結"};
+const $=id=>document.getElementById(id);
+const ls={ get(k){try{return localStorage.getItem(k)||"";}catch(e){return "";}}, set(k,v){try{localStorage.setItem(k,v);}catch(e){}} };
+const ss={ get(k){try{return sessionStorage.getItem(k)||"";}catch(e){return "";}}, set(k,v){try{sessionStorage.setItem(k,v);}catch(e){}} };
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const genreOf=k=>GENRES.find(g=>g.key===k)||GENRES[0];
+const md=ts=>{const d=new Date(ts);return (d.getMonth()+1)+"/"+d.getDate();};
+function setTheme(k){ const g=k?genreOf(k):{c:"#c9a8ff",c2:"#7a5cff"};
+  document.documentElement.style.setProperty("--g",g.c); document.documentElement.style.setProperty("--g2",g.c2); }
+
+async function api(path,{method="GET",body,teacher=false}={}){
+  const h={"Content-Type":"application/json"};
+  if(teacher) h["X-Teacher"]=encodeURIComponent(ss.get("bunko_tpass")); else h["X-Pass"]=encodeURIComponent(ls.get("bunko_pass"));
+  let r,j;
+  try{ r=await fetch(API+path,{method,headers:h,body:body?JSON.stringify(body):undefined}); j=await r.json(); }
+  catch(e){ throw new Error("うまくつながりませんでした。少し待ってもう一度ためしてください。"); }
+  if(r.status===401) { const e=new Error(teacher?"先生用の合言葉がちがいます。":"合言葉がちがいます。"); e.auth=true; throw e; }
+  if(!r.ok) throw new Error(j.message||"うまくいきませんでした（"+(j.error||r.status)+"）");
+  return j;
+}
+
+let view="shelf", works=[], cur=null, mode=ls.get("bunko_mode")||"tate";
+function show(v){ view=v; ["scGate","scShelf","scRead","scSensei"].forEach(id=>$(id).classList.add("hidden")); $(v).classList.remove("hidden"); window.scrollTo(0,0); }
+
+/* ---- 入口 ---- */
+async function enter(){
+  const p=$("passIn").value.trim(); if(!p) return;
+  ls.set("bunko_pass",p); $("gateMsg").textContent="";
+  try{ await loadShelf(); }catch(e){ $("gateMsg").textContent=e.message; if(e.auth) ls.set("bunko_pass",""); }
+}
+$("btnEnter").onclick=enter;
+$("passIn").addEventListener("keydown",e=>{ if(e.key==="Enter") enter(); });
+
+/* ---- 棚 ---- */
+
+async function loadShelf(){
+  const j=await api("/bunko/works"); works=j.works||[];
+  setTheme(null); show("scShelf");
+  $("shelf").innerHTML=works.map(w=>{ const g=genreOf(w.genre), h=Math.round(186+Math.min(24,Math.max(0,(w.chars-800)/40)));
+    return '<div class="slot"><button class="spine" data-id="'+esc(w.id)+'" style="--c:'+g.c+';--c2:'+g.c2+';--h:'+h+'px" title="'+esc(w.title)+'">'
+      +'<span class="t" style="font-size:'+(n=>n<=5?15:n<=8?12:n<=14?11:10)([...w.title].length)+'px">'+esc(w.title)+'</span><span class="p">'+esc(w.pen)+'</span></button></div>'; }).join("");
+  $("shelf").classList.toggle("hidden",!works.length); $("empty").classList.toggle("hidden",!!works.length);
+  $("shelfCount").textContent=works.length+"冊";
+}
+$("shelf").addEventListener("click",e=>{ const b=e.target.closest(".spine"); if(b) openWork(b.dataset.id); });
+$("btnReload").onclick=()=>loadShelf().catch(e=>$("shelfMsg").textContent=e.message);
+
+/* ---- 読む ---- */
+async function openWork(id){
+  try{ const j=await api("/bunko/work?id="+encodeURIComponent(id)); cur=j; }
+  catch(e){ $("shelfMsg").textContent=e.message; return; }
+  const w=cur.work, g=genreOf(w.genre); setTheme(w.genre);
+  $("rGenre").textContent="GENRE ｜ "+g.name; $("rTitle").textContent="『"+w.title+"』"; $("rPen").textContent=w.pen;
+  $("page").textContent=w.text; applyMode();
+  const lines=Object.keys(STAGE_NAMES).filter(k=>w.lines&&w.lines[k]);
+  $("aiNote").classList.toggle("hidden",!lines.length); $("aiNote").open=false;
+  $("aiSum").textContent="この物語は、AIが出したきっかけの一行から書かれました"+(w.bridged?"（場面のつなぎ目の下書きにもAIを使っています）":"")+"。▸ きっかけを見る";
+  $("aiLines").innerHTML=lines.map(k=>"<li>"+STAGE_NAMES[k]+"："+esc(w.lines[k])+"</li>").join("");
+  renderComments();
+  $("cmName").value=$("cmName").value||ls.get("kishou_pen"); $("cmMsg").textContent="";
+  show("scRead");
+}
+function applyMode(){
+  $("page").className="page "+mode; [...$("seg").children].forEach(b=>b.classList.toggle("on",b.dataset.m===mode));
+  if(mode==="tate") $("page").scrollLeft=0;
+}
+$("seg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; mode=b.dataset.m; ls.set("bunko_mode",mode); applyMode(); });
+function renderComments(){
+  const cs=cur.comments||[];
+  $("cms").innerHTML=cs.map(c=>'<div class="cm"><b>'+esc(c.name)+'</b> <span class="note" style="font-size:11px">'+md(c.created)+'</span><p>'+esc(c.text)+'</p></div>').join("");
+  $("cmNone").classList.toggle("hidden",!!cs.length);
+}
+$("cmText").addEventListener("input",()=>$("cmCnt").textContent=[...$("cmText").value].length);
+$("btnCm").onclick=async()=>{
+  const name=$("cmName").value.trim(), text=$("cmText").value.trim();
+  if(!name){ $("cmMsg").textContent="ペンネームを入れてください。"; return; }
+  if(!text){ $("cmMsg").textContent="感想を書いてください。"; return; }
+  $("btnCm").disabled=true;
+  try{ await api("/bunko/comment",{method:"POST",body:{workId:cur.work.id,name,text}});
+    ls.set("kishou_pen",name); $("cmText").value=""; $("cmCnt").textContent="0";
+    $("cmMsg").style.color="var(--ok)"; $("cmMsg").textContent="送りました。先生が確認してから載ります。"; }
+  catch(e){ $("cmMsg").style.color="var(--ng)"; $("cmMsg").textContent=e.message; }
+  $("btnCm").disabled=false;
+};
+$("btnBack").onclick=()=>{ setTheme(null); show("scShelf"); };
+
+/* ---- 先生用 ---- */
+$("btnSensei").onclick=()=>{ show("scSensei"); if(ss.get("bunko_tpass")) loadAdmin(); };
+async function tEnter(){ ss.set("bunko_tpass",$("tpassIn").value.trim()); await loadAdmin(); }
+$("btnTEnter").onclick=tEnter;
+$("tpassIn").addEventListener("keydown",e=>{ if(e.key==="Enter") tEnter(); });
+const closeSensei=()=>{ if(ls.get("bunko_pass")) loadShelf().catch(()=>show("scGate")); else show("scGate"); };
+$("btnTClose").onclick=closeSensei; $("btnTClose2").onclick=closeSensei;
+$("btnTReload").onclick=()=>loadAdmin();
+let admin={works:[],comments:[]};
+const stLabel={public:"公開中",pending:"確認待ち",hidden:"非公開"};
+async function loadAdmin(){
+  $("tMsg").textContent="";
+  try{ admin=await api("/bunko/admin",{teacher:true}); }
+  catch(e){ $("tMsg").textContent=e.message; $("senseiGate").classList.remove("hidden"); $("senseiBody").classList.add("hidden"); return; }
+  $("senseiGate").classList.add("hidden"); $("senseiBody").classList.remove("hidden");
+  const workRow=w=>'<div class="item" data-id="'+esc(w.id)+'"><div class="h"><b>『'+esc(w.title)+'』<span class="st '+w.status+'">'+stLabel[w.status]+'</span></b><span>'+esc(w.pen)+'・'+genreOf(w.genre).name+'・'+w.chars+'字・'+md(w.updated)+'</span></div>'
+    +'<div class="body hidden"></div><div class="row">'
+    +'<button class="btn small" data-act="read">読む</button>'
+    +(w.status!=="public"?'<button class="btn small main" data-act="public">公開する</button>':'')
+    +(w.status!=="hidden"?'<button class="btn small" data-act="hidden">非公開にする</button>':'')
+    +'<button class="btn small danger" data-act="delete">削除</button></div></div>';
+  const pw=admin.works.filter(w=>w.status==="pending"), ow=admin.works.filter(w=>w.status!=="pending");
+  $("tPendW").innerHTML=pw.length? pw.map(workRow).join("") : '<p class="note">ありません。</p>';
+  $("tOther").innerHTML=ow.length? ow.map(workRow).join("") : '<p class="note">ありません。</p>';
+  const titleOf=id=>{const w=admin.works.find(x=>x.id===id); return w?w.title:"（消えた作品）";};
+  $("tPendC").innerHTML=admin.comments.length? admin.comments.map(c=>'<div class="item" data-cid="'+esc(c.id)+'" data-wid="'+esc(c.workId)+'"><div class="h"><b style="font-size:14px">『'+esc(titleOf(c.workId))+'』への感想</b><span>'+esc(c.name)+'・'+md(c.created)+'</span></div>'
+    +'<div class="cm pending" style="margin:10px 0 0"><p>'+esc(c.text)+'</p></div><div class="row"><button class="btn small main" data-act="cpublic">公開する</button><button class="btn small danger" data-act="cdelete">削除</button></div></div>').join("")
+    : '<p class="note">ありません。</p>';
+}
+let delArm={};
+$("scSensei").addEventListener("click",async e=>{
+  const b=e.target.closest("button[data-act]"); if(!b) return; const it=b.closest(".item"), act=b.dataset.act;
+  try{
+    if(act==="read"){ const box=it.querySelector(".body");
+      if(box.classList.toggle("hidden")) return;
+      const j=await api("/bunko/work?id="+encodeURIComponent(it.dataset.id),{teacher:true}); box.textContent=j.work.text; return; }
+    if(act==="delete"||act==="cdelete"){ const k=act+(it.dataset.id||it.dataset.cid);
+      if(!(Date.now()-(delArm[k]||0)<3000)){ delArm[k]=Date.now(); b.textContent="もう一度押すと消えます"; setTimeout(()=>b.textContent="削除",3000); return; } }
+    b.disabled=true;
+    if(act==="cpublic"||act==="cdelete") await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"c",workId:it.dataset.wid,id:it.dataset.cid,status:act==="cpublic"?"public":"delete"}});
+    else await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"w",id:it.dataset.id,status:act}});
+    await loadAdmin();
+  }catch(err){ $("tMsg").textContent=err.message; b.disabled=false; }
+});
+
+/* ---- はじめ ---- */
+if(location.hash==="#sensei") $("btnSensei").click();
+else if(ls.get("bunko_pass")) loadShelf().catch(e=>{ show("scGate"); $("gateMsg").textContent=e.auth?"":e.message; });
+else show("scGate");
+</script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 // Cloudflare の Worker「kishou」を、このフォルダから自動で更新するための設定
-// GEMINI_API_KEY は Cloudflare 側の Secret に置いたまま（ここには書かない）
+// GEMINI_API_KEY・CLASS_PASS・TEACHER_PASS は Cloudflare 側の Secret に置いたまま（ここには書かない）
+// ※ GitHub と自動連携するときは、クラス文庫の KV を消さないよう、ここに
+//   "kv_namespaces": [{ "binding": "BUNKO", "id": "（KV の ID）" }] を足すこと
 {
   "name": "kishou",
   "main": "worker_kishou.js",
