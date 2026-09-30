@@ -457,7 +457,7 @@ input.ptitle{font-size:20px;margin-bottom:12px}
     <div class="panel">
       <p class="label">整える ― 区切りをはずして、1本の文章として書き直す</p>
       <input type="text" class="ptitle" id="pTitle" maxlength="30" placeholder="タイトル">
-      <p class="gnote" style="margin:0 0 10px">〔 〕の中は、AIが出した承・転・結の展開です。前とつながるように自分の言葉で書きかえるか、いらなければ消してください。</p>
+      <p class="gnote" style="margin:0 0 10px">〔 〕の中は、AIが書いたつなぎの文（またはAIが出した展開）です。自分の言葉に書きかえて、〔 〕をはずしてください。</p>
       <div class="row" style="margin-top:0"><button class="btn small" id="btnOrig">はじめの版を見る ▼</button><button class="btn small hidden" id="btnRestart">はじめの版から整え直す</button></div>
       <div class="full orig hidden" id="pOrig"></div>
       <textarea id="pBody" style="margin-top:12px"></textarea>
@@ -883,10 +883,29 @@ function flatText(b){ // 区切りをはずした1本の文章（はじめの版
 }
 // 整えるときの最初の文章：承転結のつなぎ目に、AIの展開を〔 〕で目印として残す
 const MARK=/〔[^〕\n]*〕/g;
+// AIがつなぎの文を書けたときは、それを〔 〕に入れる（生徒が書きかえて〔 〕をはずす）
 function seedText(b){
+  const br=b.bridges||{};
   return [(b.lines.ki||"")+(b.bodies.ki||"").replace(/^\s+/,"")].concat(STAGES.slice(1).map(st=>
-    ((b.lines[st.key]?"〔"+st.name+"の展開："+b.lines[st.key]+"〕\n":"")+(b.bodies[st.key]||"").trim()).trim()))
+    (br[st.key]? "〔"+br[st.key]+"〕"+(b.bodies[st.key]||"").trim()
+      : (b.lines[st.key]?"〔"+st.name+"の展開："+b.lines[st.key]+"〕\n":"")+(b.bodies[st.key]||"").trim()).trim()))
     .map(x=>(x||"").trim()).filter(Boolean).join("\n\n");
+}
+const bridgeTried=new Set(); let bridging=false;
+async function prepareBridges(b){
+  const q=quota(), jobs=[];
+  STAGES.forEach((st,i)=>{ if(i===0||!b.lines[st.key]||!(b.bodies[st.key]||"").trim()) return;
+    const prev=STAGES[i-1].key, before=(i===1?(b.lines.ki||""):"")+(b.bodies[prev]||"");
+    jobs.push({key:st.key,before,line:b.lines[st.key],after:b.bodies[st.key]}); });
+  const out={};
+  await Promise.all(jobs.map(async j=>{
+    if(!SETUP.proxyUrl||q.n>=LIMITS.perDay) return;
+    try{ const r=await fetch(SETUP.proxyUrl,{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({mode:"bridge",stage:j.key,genre:b.genre,before:j.before.slice(-600),line:j.line,after:j.after.slice(0,400)})});
+      const x=await r.json(); if(r.ok&&x.bridge){ out[j.key]=String(x.bridge); q.n++; } }catch(e){}
+  }));
+  store.set(QKEY,q); showQuota();
+  if(Object.keys(out).length){ b.bridges=out; saveShelf(); }
 }
 const bTitle=b=>(b.final&&b.final.title)||b.title;
 const bText=b=>b.final? b.final.text : flatText(b);
@@ -899,7 +918,9 @@ function bookText(b){
   const g=genreOf(b.genre);
   let s="『"+bTitle(b)+"』\nジャンル："+g.name+"（仕上げ版）\n――――――――\n\n"+b.final.text.trim()+"\n\n――――――――\n";
   s+="はじめの版 "+totals(b).n+"字 → 仕上げ版 "+nchars(b.final.text)+"字"+(b.final.title&&b.final.title!==b.title?"（はじめの題：『"+b.title+"』）":"")+"\n";
-  s+="AIが出したきっかけ：\n"+STAGES.map(st=>"◆"+st.name+"："+(b.lines[st.key]||"")).join("\n")+"\n"+bindLine(b);
+  s+="AIが出したきっかけ：\n"+STAGES.map(st=>"◆"+st.name+"："+(b.lines[st.key]||"")).join("\n")+"\n";
+  if(b.bridges) s+="AIが書いたつなぎの文（整える前）：\n"+STAGES.filter(st=>b.bridges[st.key]).map(st=>"◆"+st.name+"の前："+b.bridges[st.key]).join("\n")+"\n";
+  s+=bindLine(b);
   return s;
 }
 function anthoText(a){
@@ -949,7 +970,12 @@ function renderShelfViews(){
   }
   if(view==="polish"){ const b=bookById(curBook); if(!b){view="shelf";return renderShelfViews();}
     setTheme(b.genre); $("scPolish").classList.remove("hidden");
-    $("pTitle").value=bTitle(b); $("pBody").value=b.final? b.final.text : seedText(b);
+    if(!b.final&&!b.bridges&&!bridgeTried.has(b.id)){ // 初めて整えるとき：AIにつなぎ目を書いてもらう
+      bridgeTried.add(b.id); bridging=true;
+      prepareBridges(b).finally(()=>{ bridging=false; if(view==="polish"&&curBook===b.id) render(); });
+    }
+    $("pBody").disabled=bridging; $("btnPolishDone").disabled=bridging;
+    $("pTitle").value=bTitle(b); $("pBody").value=bridging? "AIが、場面と場面のつなぎ目を書いています…" : b.final? b.final.text : seedText(b);
     $("btnRestart").classList.toggle("hidden",!b.final); $("pOrig").innerHTML=origHTML(b);
     updatePolishCount(b);
   }
@@ -1080,7 +1106,7 @@ let delArm=0;
 $("btnBookDel").onclick=()=>{ if(Date.now()-delArm<3000){ SH.books=SH.books.filter(b=>b.id!==curBook); SH.antho.forEach(a=>a.ids=a.ids.filter(id=>id!==curBook));
     if(S.bookId===curBook){ delete S.bookId; save(); } saveShelf(); delArm=0; $("btnBookDel").textContent="本棚から外す"; go("shelf"); }
   else { delArm=Date.now(); $("btnBookDel").textContent="もう一度押すと消えます"; setTimeout(()=>$("btnBookDel").textContent="本棚から外す",3000);} };
-function polishSave(){ const b=bookById(curBook); if(!b) return;
+function polishSave(){ const b=bookById(curBook); if(!b||bridging) return;
   const text=$("pBody").value, title=$("pTitle").value.trim()||b.title;
   if(!b.final && text===seedText(b) && title===b.title) return;   // まだ何も変えていない
   b.final=Object.assign(b.final||{done:false},{text,title,updated:Date.now()}); saveShelf(); }

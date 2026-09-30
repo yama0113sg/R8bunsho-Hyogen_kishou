@@ -4,6 +4,7 @@
 //  変数：GEMINI_API_KEY（Secret）／ALLOWED_ORIGIN = https://yama0113sg.github.io
 //  POST {stage, genre, story, avoid}            → {line}   一行を引く
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
+//  POST {mode:"bridge", stage, genre, before, line, after}    → {bridge}   整えるときのつなぎの文
 // ============================================================
 
 const MODELS = [
@@ -73,6 +74,28 @@ function cors(origin, env) {
   };
 }
 
+const BRIDGE_BASE = `あなたは高校3年生の創作の授業で、生徒が書いた短い物語の「つなぎ目」をなめらかにする係です。
+物語は場面ごとに書かれていて、場面と場面のあいだに、その場面で起きることが書かれていません。
+前の場面の終わりと次の場面の書き出しのあいだに入れる、短いつなぎの文を書いてください。
+生徒はこのあと、あなたの文を自分の言葉に書き直します。
+守ること：
+・出力はつなぎの文だけ。前置き、説明、記号、番号、改行は付けない。
+・1〜2文、80字以内。
+・「次の場面で起きること」を、前の場面の終わりから自然に続くように書き、次の場面の書き出しにそのままつながるようにする。
+・生徒の文体（一人称、「だ・である」か「です・ます」か、語り口）に合わせる。
+・前後の文をくり返さない。次の場面の書き出しにすでに書いてあることは書かない。
+・新しい人物や設定を足さない。
+・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。`;
+
+function parseBridge(t) {
+  if (!t) return "";
+  let s = t.replace(/\*\*/g, "").split("\n").map(x => x.trim()).filter(Boolean).join("");
+  s = s.replace(/^(つなぎ(の文)?[：:])/, "").replace(/[〔〕]/g, "").trim();
+  if (/^「[^「」]*」$/.test(s) === false) s = s.replace(/^[『"“]+|[』"”]+$/g, "");
+  const n = [...s].length;
+  return n >= 5 && n <= 120 ? s : "";
+}
+
 function cleanLine(t) {
   if (!t) return "";
   let line = t.split("\n").map(s => s.trim()).filter(Boolean)[0] || "";
@@ -121,7 +144,7 @@ export default {
 
     if (request.method === "OPTIONS") return new Response(null, { headers });
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
@@ -136,6 +159,16 @@ export default {
     const avoid = (Array.isArray(body.avoid) ? body.avoid : []).slice(-6).map(s => String(s).slice(0, 100));
 
     try {
+      if (body.mode === "bridge") {
+        const before = String(body.before || "").slice(-600);
+        const after = String(body.after || "").slice(0, 400);
+        const line = String(body.line || "").slice(0, 100);
+        const system = `${BRIDGE_BASE}\n\nジャンル：${genre}`;
+        const user = `前の場面の終わり：\n${before || "（なし）"}\n\n次の場面で起きること：${line}\n\n次の場面の書き出し：\n${after || "（なし）"}\n\nつなぎの文を出してください。`;
+        const { result, model } = await callGemini(env, system, user, { models: HINT_MODELS, parse: parseBridge, temperature: 0.7 });
+        return new Response(JSON.stringify({ bridge: result, model }), { headers });
+      }
+
       if (body.mode === "hint") {
         const line = String(body.line || "").slice(0, 100);
         const draft = String(body.body || "").slice(-1500);
