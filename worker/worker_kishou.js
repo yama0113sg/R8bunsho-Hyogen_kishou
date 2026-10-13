@@ -10,6 +10,7 @@
 //  KV：BUNKO（KV namespace のバインディング）
 //  Secret：CLASS_PASS（生徒の合言葉）／TEACHER_PASS（先生用の合言葉）
 //  作品も感想も、先生が［公開］するまでは他の人に見えない
+//  AIの感想：先生が作品を公開すると「AIの読み手」の感想を1つ作り、7〜14分後（ランダム）に見えるようにする
 // ============================================================
 
 const MODELS = [
@@ -92,6 +93,43 @@ const BRIDGE_BASE = `あなたは高校3年生の創作の授業で、生徒が�
 ・新しい人物や設定を足さない。
 ・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。`;
 
+// ── AIの感想（クラス文庫）──
+// 公開してすぐ付くと不自然なので、AI_DELAY_MIN〜AI_DELAY_MAX 分のあいだ（秒までランダム）は見せない
+const AI_DELAY_MIN = 7;
+const AI_DELAY_MAX = 14;
+const AI_NAME = "AIの読み手";
+const AI_COMMENT_BASE = `あなたは、高校3年生が書いた短い物語を読んだ、ひとりの読み手です。作者に届く感想を書いてください。
+守ること：
+・120〜180字。です・ます調の、やわらかい言葉で書く。改行、記号、絵文字、見出し、前置きは付けない。
+・作品の具体的な場面か一文に触れる。短く引用するなら20字以内にする。
+・「ここがよかった」と感じたところを一つと、読み手として気になったこと・想像がふくらんだことを一つ書く。
+・点数や評価のことば、「〜するともっとよくなる」などの助言、あらすじの要約、作者へのお説教は書かない。
+・次の言い回しは使わない：「素晴らしい」「見事」「印象的でした」「心温まる」「感動しました」「〜が光っています」「作者さん」。「！」はできるだけ使わない。
+・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。作品がこれらに触れていても、感想では掘り下げない。`;
+
+function parseAiComment(t) {
+  if (!t) return "";
+  let s = t.replace(/\*\*/g, "").split("\n").map(x => x.trim()).filter(Boolean).join("");
+  s = s.replace(/^(AIの読み手の)?感想[：:]\s*/, "").replace(/^[「『]([\s\S]*)[」』]$/, "$1").trim();
+  const n = [...s].length;
+  return n >= 60 && n <= 220 ? s : "";
+}
+
+// 作品にAIの感想を作って保存する（時限つき）。できたら true
+async function makeAiComment(env, w) {
+  const text = clip(w.text, 6000);
+  const g = GENRES[w.genre] ? GENRES[w.genre].split("（")[0] : "";
+  const user = `タイトル：『${w.title}』\nジャンル：${g}\n\n本文：\n${text}\n\n感想を書いてください。`;
+  let result;
+  try { ({ result } = await callGemini(env, AI_COMMENT_BASE, user, { models: HINT_MODELS, parse: parseAiComment, temperature: 0.8 })); }
+  catch { return false; }
+  const now = Date.now();
+  const showAt = now + Math.round((AI_DELAY_MIN + Math.random() * (AI_DELAY_MAX - AI_DELAY_MIN)) * 60000);
+  const c = { id: "ai", workId: w.id, name: AI_NAME, text: result, ai: true, status: "public", showAt, created: now, forUpdated: w.updated };
+  await env.BUNKO.put("c:" + w.id + ":ai", JSON.stringify(c), { metadata: { status: "public", ai: true, showAt } });
+  return true;
+}
+
 function parseBridge(t) {
   if (!t) return "";
   let s = t.replace(/\*\*/g, "").split("\n").map(x => x.trim()).filter(Boolean).join("");
@@ -159,7 +197,8 @@ async function deleteWork(kv, id) {
   for (const k of await listAll(kv, "c:" + id + ":")) await kv.delete(k.name);
 }
 
-async function bunko(request, env, headers, path) {
+async function bunko(request, env, headers, path, ctx) {
+  const later = p => (ctx && ctx.waitUntil) ? ctx.waitUntil(p) : p;   // 先生の操作は待たせずに、裏でAIの感想を作る
   const kv = env.BUNKO;
   if (!kv || !env.CLASS_PASS || !env.TEACHER_PASS) {
     return J({ error: "setup", message: "（先生へ）Worker に BUNKO・CLASS_PASS・TEACHER_PASS の設定が必要です" }, headers, 500);
@@ -184,13 +223,14 @@ async function bunko(request, env, headers, path) {
     const w = await kv.get("w:" + id, { type: "json" });
     const mine = !!(w && token && w.owner === token);
     if (!w || (w.status !== "public" && !teacher && !mine)) return J({ error: "notfound" }, headers, 404);
-    const comments = [];
+    const comments = [], now = Date.now();
     for (const k of await listAll(kv, "c:" + id + ":")) {
-      if (k.metadata && (k.metadata.status === "public" || teacher)) {
-        const c = await kv.get(k.name, { type: "json" }); if (c) comments.push(c);
-      }
+      const m = k.metadata;
+      if (!m || (m.status !== "public" && !teacher)) continue;
+      if (!teacher && m.ai && m.showAt > now) continue;           // AIの感想は時限まで見せない
+      const c = await kv.get(k.name, { type: "json" }); if (c) comments.push(c);
     }
-    comments.sort((a, b) => a.created - b.created);
+    comments.sort((a, b) => (a.showAt || a.created) - (b.showAt || b.created));
     return J({ work: withoutOwner(w), comments, mine }, headers);
   }
   // 作品を出す（同じ端末から同じ id で出し直すと、差し替えて確認待ちにもどる）
@@ -203,6 +243,7 @@ async function bunko(request, env, headers, path) {
     const old = id ? await kv.get("w:" + id, { type: "json" }) : null;
     if (old && old.owner !== token) return J({ error: "owner" }, headers, 403);
     if (!old) id = rid();
+    else await kv.delete("c:" + id + ":ai");   // 出し直したら、前の版へのAIの感想は消す（再公開のときに作り直す）
     const lines = {};
     for (const k of ["ki", "sho", "ten", "ketsu"]) lines[k] = clip(body.lines && body.lines[k], 100);
     const now = Date.now();
@@ -245,7 +286,13 @@ async function bunko(request, env, headers, path) {
       const w = await kv.get("w:" + clip(body.id, 30), { type: "json" });
       if (!w) return J({ error: "notfound" }, headers, 404);
       if (st === "delete") await deleteWork(kv, w.id);
-      else if (["public", "pending", "hidden"].includes(st)) { w.status = st; await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) }); }
+      else if (["public", "pending", "hidden"].includes(st)) {
+        w.status = st; await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) });
+        if (st === "public") {
+          const ai = await kv.get("c:" + w.id + ":ai", { type: "json" });
+          if (!ai || ai.forUpdated !== w.updated) await later(makeAiComment(env, w));
+        }
+      }
     } else if (body.kind === "c") {
       const key = "c:" + clip(body.workId, 30) + ":" + clip(body.id, 30);
       const c = await kv.get(key, { type: "json" });
@@ -255,11 +302,29 @@ async function bunko(request, env, headers, path) {
     }
     return J({ ok: true }, headers);
   }
+  // AIの感想：{id} があればその作品だけ作り直す。なければ、公開中でAIの感想がない作品すべてに作る
+  if (path === "/bunko/admin/ai") {
+    if (body.id) {
+      const w = await kv.get("w:" + clip(body.id, 30), { type: "json" });
+      if (!w) return J({ error: "notfound" }, headers, 404);
+      const ok = await makeAiComment(env, w);
+      return J({ made: ok ? 1 : 0, failed: ok ? 0 : 1 }, headers);
+    }
+    let made = 0, failed = 0;
+    for (const k of await listAll(kv, "w:")) {
+      if (!k.metadata || k.metadata.status !== "public") continue;
+      const ai = await kv.get("c:" + k.metadata.id + ":ai", { type: "json" });
+      if (ai && ai.forUpdated === k.metadata.updated) continue;
+      const w = await kv.get(k.name, { type: "json" }); if (!w) continue;
+      if (await makeAiComment(env, w)) made++; else failed++;   // Gemini の RPM に配慮して1件ずつ
+    }
+    return J({ made, failed }, headers);
+  }
   return J({ error: "path" }, headers, 404);
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get("Origin") || "";
     const headers = cors(origin, env);
 
@@ -267,11 +332,11 @@ export default {
     const path = new URL(request.url).pathname.replace(/\/+$/, "");
     if (path.startsWith("/bunko")) {
       if (origin !== env.ALLOWED_ORIGIN) return J({ error: "origin" }, headers, 403);
-      try { return await bunko(request, env, headers, path); }
+      try { return await bunko(request, env, headers, path, ctx); }
       catch (e) { return J({ error: String(e.message || e) }, headers, 500); }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {

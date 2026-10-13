@@ -86,6 +86,11 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .cm{padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--edge);margin-bottom:8px}
 .cm b{font-size:13px;color:var(--g)} .cm p{margin:4px 0 0;font-family:var(--mincho);line-height:1.8;white-space:pre-wrap}
 .cm.pending{border-style:dashed}
+.cm.ai{border-color:rgba(159,227,255,.3);background:linear-gradient(150deg,rgba(159,227,255,.07),rgba(0,0,0,.28) 60%)}
+.cm.ai b{color:var(--ai)}
+.aitag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.12em;padding:1px 7px;border-radius:99px;border:1px solid rgba(159,227,255,.45);color:var(--ai);margin-left:4px;vertical-align:1px}
+.aibox{margin-top:10px}
+.aibox .when{font-size:12px;color:var(--sub);margin-top:6px}
 .count{font-size:12px;color:var(--sub);text-align:right;margin-top:4px}
 
 /* 先生用 */
@@ -153,6 +158,8 @@ h3{font-size:14px;letter-spacing:.15em;color:var(--sub);margin:22px 0 10px;font-
       </div>
       <div id="senseiBody" class="hidden">
         <div class="row" style="margin-top:0"><button class="btn small" id="btnTReload">↻ 読みこみ直す</button><button class="btn small" id="btnTClose2">棚へもどる</button></div>
+        <div class="row"><button class="btn small" id="btnAiAll">AIの感想をまだない作品に付ける</button></div>
+        <p class="note" id="aiAllMsg" style="margin-top:6px">公開中の作品には、公開してから7〜14分後に「AIの読み手」の感想が1つ届きます。</p>
         <h3>確認待ちの作品</h3><div id="tPendW"></div>
         <h3>確認待ちの感想</h3><div id="tPendC"></div>
         <h3>公開中・非公開の作品</h3><div id="tOther"></div>
@@ -244,9 +251,12 @@ function applyMode(){
   if(mode==="tate") $("page").scrollLeft=0;
 }
 $("seg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; mode=b.dataset.m; ls.set("bunko_mode",mode); applyMode(); });
+// AIの感想は「AIの読み手」として、少しだけ見た目を変える（人のふりはしない）
+const cmHTML=c=>'<div class="cm'+(c.ai?" ai":"")+'"><b>'+esc(c.name)+'</b>'+(c.ai?'<span class="aitag">AI</span>':'')
+  +' <span class="note" style="font-size:11px">'+md(c.showAt||c.created)+'</span><p>'+esc(c.text)+'</p></div>';
 function renderComments(){
   const cs=cur.comments||[];
-  $("cms").innerHTML=cs.map(c=>'<div class="cm"><b>'+esc(c.name)+'</b> <span class="note" style="font-size:11px">'+md(c.created)+'</span><p>'+esc(c.text)+'</p></div>').join("");
+  $("cms").innerHTML=cs.map(cmHTML).join("");
   $("cmNone").classList.toggle("hidden",!!cs.length);
 }
 $("cmText").addEventListener("input",()=>$("cmCnt").textContent=[...$("cmText").value].length);
@@ -279,7 +289,7 @@ async function loadAdmin(){
   catch(e){ $("tMsg").textContent=e.message; $("senseiGate").classList.remove("hidden"); $("senseiBody").classList.add("hidden"); return; }
   $("senseiGate").classList.add("hidden"); $("senseiBody").classList.remove("hidden");
   const workRow=w=>'<div class="item" data-id="'+esc(w.id)+'"><div class="h"><b>『'+esc(w.title)+'』<span class="st '+w.status+'">'+stLabel[w.status]+'</span></b><span>'+esc(w.pen)+'・'+genreOf(w.genre).name+'・'+w.chars+'字・'+md(w.updated)+'</span></div>'
-    +'<div class="body hidden"></div><div class="row">'
+    +'<div class="body hidden"></div><div class="aibox hidden"></div><div class="row">'
     +'<button class="btn small" data-act="read">読む</button>'
     +(w.status!=="public"?'<button class="btn small main" data-act="public">公開する</button>':'')
     +(w.status!=="hidden"?'<button class="btn small" data-act="hidden">非公開にする</button>':'')
@@ -293,12 +303,35 @@ async function loadAdmin(){
     : '<p class="note">ありません。</p>';
 }
 let delArm={};
+const hm=ts=>{const d=new Date(ts);return (d.getMonth()+1)+"/"+d.getDate()+" "+d.getHours()+"時"+String(d.getMinutes()).padStart(2,"0")+"分";};
+async function showRead(it){ // 先生用：本文と、AIの感想（時限前でも見える）
+  const j=await api("/bunko/work?id="+encodeURIComponent(it.dataset.id),{teacher:true});
+  it.querySelector(".body").textContent=j.work.text; it.querySelector(".body").classList.remove("hidden");
+  const ai=(j.comments||[]).find(c=>c.ai), box=it.querySelector(".aibox"); box.classList.remove("hidden");
+  box.innerHTML= ai ? cmHTML(ai)+'<div class="when">'+hm(ai.showAt)+(ai.showAt>Date.now()?" に表示されます":" から表示中")+'</div>'
+      +'<div class="row" style="margin-top:6px"><button class="btn small" data-act="aire">AIの感想を作り直す</button><button class="btn small danger" data-act="aidel">AIの感想を削除</button></div>'
+    : j.work.status==="public" ? '<p class="note">AIの感想はまだありません。</p><div class="row" style="margin-top:6px"><button class="btn small" data-act="aire">AIの感想を作る</button></div>' : '';
+}
+$("btnAiAll").onclick=async()=>{ const b=$("btnAiAll"); b.disabled=true; $("aiAllMsg").textContent="作っています…（1冊に数秒かかります。このままお待ちください）";
+  try{ const r=await api("/bunko/admin/ai",{method:"POST",teacher:true,body:{}});
+    $("aiAllMsg").textContent= r.made||r.failed ? r.made+"冊に付けました。それぞれ7〜14分後に届きます。"+(r.failed?"（"+r.failed+"冊はうまく作れませんでした。もう一度押すと、その分だけ作り直します）":"")
+      : "AIの感想のない公開中の作品は、ありませんでした。"; }
+  catch(e){ $("aiAllMsg").textContent=e.message; }
+  b.disabled=false; };
 $("scSensei").addEventListener("click",async e=>{
   const b=e.target.closest("button[data-act]"); if(!b) return; const it=b.closest(".item"), act=b.dataset.act;
   try{
     if(act==="read"){ const box=it.querySelector(".body");
-      if(box.classList.toggle("hidden")) return;
-      const j=await api("/bunko/work?id="+encodeURIComponent(it.dataset.id),{teacher:true}); box.textContent=j.work.text; return; }
+      if(box.classList.toggle("hidden")){ it.querySelector(".aibox").classList.add("hidden"); return; }
+      await showRead(it); return; }
+    if(act==="aire"){ b.disabled=true; b.textContent="作っています…";
+      const r=await api("/bunko/admin/ai",{method:"POST",teacher:true,body:{id:it.dataset.id}});
+      if(!r.made) $("tMsg").textContent="AIの感想をうまく作れませんでした。少し待ってもう一度押してください。";
+      await showRead(it); return; }
+    if(act==="aidel"){ const k="aidel"+it.dataset.id;
+      if(!(Date.now()-(delArm[k]||0)<3000)){ delArm[k]=Date.now(); b.textContent="もう一度押すと消えます"; setTimeout(()=>b.textContent="AIの感想を削除",3000); return; }
+      b.disabled=true; await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"c",workId:it.dataset.id,id:"ai",status:"delete"}});
+      await showRead(it); return; }
     if(act==="delete"||act==="cdelete"){ const k=act+(it.dataset.id||it.dataset.cid);
       if(!(Date.now()-(delArm[k]||0)<3000)){ delArm[k]=Date.now(); b.textContent="もう一度押すと消えます"; setTimeout(()=>b.textContent="削除",3000); return; } }
     b.disabled=true;
