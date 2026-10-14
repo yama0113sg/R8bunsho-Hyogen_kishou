@@ -11,7 +11,7 @@
 //  KV：BUNKO（KV namespace のバインディング）
 //  Secret：CLASS_PASS（生徒の合言葉）／TEACHER_PASS（先生用の合言葉）
 //  作品も感想も、先生が［公開］するまでは他の人に見えない
-//  AIの感想：先生が作品を公開すると「AIの読み手」の感想を1つ作り、7〜14分後（ランダム）に見えるようにする
+//  AIの感想：先生が作品を公開すると、3人の「AIの読み手」（シオリ・ハグルマ・ソラ）の感想を作り、時間をずらして見せる
 // ============================================================
 
 const MODELS = [
@@ -94,40 +94,71 @@ const BRIDGE_BASE = `あなたは高校3年生の創作の授業で、生徒が�
 ・新しい人物や設定を足さない。
 ・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。`;
 
-// ── AIの感想（クラス文庫）──
-// 公開してすぐ付くと不自然なので、AI_DELAY_MIN〜AI_DELAY_MAX 分のあいだ（秒までランダム）は見せない
-const AI_DELAY_MIN = 7;
-const AI_DELAY_MAX = 14;
-const AI_NAME = "AIの読み手";
-const AI_COMMENT_BASE = `あなたは、高校3年生が書いた短い物語を読んだ、ひとりの読み手です。作者に届く感想を書いてください。
+// ── AIの感想（クラス文庫）：3人の「AIの読み手」──
+// 読み方のちがう3人が、短く、くだけた言葉で感想を返す。人のふりはしない（画面では「AI」の印が付く）。
+// 公開してすぐ付くと不自然なので、1人目・2人目・3人目を時間をずらして見せる（分。秒までランダム）。
+const AI_SLOTS = [[7, 14], [20, 40], [50, 90]];
+const AI_READERS = [
+  { key: "shiori",   name: "シオリ",   desc: "ことばに目がいく読み手。好きな一文や言い回しを、15字以内で短く引いて触れる。口調は静かで少しそっけない常体（「〜だった。」「〜が好き。」）。" },
+  { key: "haguruma", name: "ハグルマ", desc: "話の仕組みに目がいく読み手。場面と場面のつながり、転の効き方、伏線などに触れる。口調は少し理屈っぽく、えらそうだけど憎めない（「〜なわけだ。」「〜と見た。」）。" },
+  { key: "sora",     name: "ソラ",     desc: "気持ちが先に動く読み手。登場人物の気持ちに寄りそって、思ったことをそのまま言う。口調はくだけた話し言葉（「え、」「〜じゃん」「〜すぎる」）。" },
+];
+const AI_COMMENT_BASE = `あなたは、高校3年生が書いた短い物語を読む、3人の「AIの読み手」です。3人それぞれの感想を書いてください。
+3人：
+${AI_READERS.map(r => `・${r.key}（${r.name}）：${r.desc}`).join("\n")}
 守ること：
-・120〜180字。です・ます調の、やわらかい言葉で書く。改行、記号、絵文字、見出し、前置きは付けない。
-・作品の具体的な場面か一文に触れる。短く引用するなら20字以内にする。
-・「ここがよかった」と感じたところを一つと、読み手として気になったこと・想像がふくらんだことを一つ書く。
-・点数や評価のことば、「〜するともっとよくなる」などの助言、あらすじの要約、作者へのお説教は書かない。
-・次の言い回しは使わない：「素晴らしい」「見事」「印象的でした」「心温まる」「感動しました」「〜が光っています」「作者さん」。「！」はできるだけ使わない。
-・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。作品がこれらに触れていても、感想では掘り下げない。`;
+・それぞれ40〜80字。高校生どうしの感想と同じくらいの短さ・くだけ方にする。ていねいすぎる言葉や、長い前置きは使わない。
+・3人とも、作品の具体的な場面か一文に触れる。3人で同じところに触れない。
+・点数や評価のことば、「〜するともっとよくなる」などの助言、あらすじの要約、お説教は書かない。
+・次の言い回しは使わない：「素晴らしい」「見事」「印象的でした」「心温まる」「感動しました」「〜が光っています」「作者さん」。「！」は使うとしても1回まで。
+・改行、絵文字、見出しは付けない。
+・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。作品がこれらに触れていても、感想では掘り下げない。
+出力は次の形の JSON だけ：{"shiori":"…","haguruma":"…","sora":"…"}`;
 
-function parseAiComment(t) {
-  if (!t) return "";
-  let s = t.replace(/\*\*/g, "").split("\n").map(x => x.trim()).filter(Boolean).join("");
-  s = s.replace(/^(AIの読み手の)?感想[：:]\s*/, "").replace(/^[「『]([\s\S]*)[」』]$/, "$1").trim();
-  const n = [...s].length;
-  return n >= 60 && n <= 220 ? s : "";
+function parseAiComments(t) {
+  if (!t) return null;
+  let o;
+  try { o = JSON.parse(t.replace(/^\s*```(json)?/i, "").replace(/```\s*$/, "").trim()); } catch { return null; }
+  const out = {};
+  for (const r of AI_READERS) {
+    let s = String((o && o[r.key]) || "").replace(/\*\*/g, "").replace(/\s*\n\s*/g, "").trim();
+    s = s.replace(new RegExp("^(" + r.name + "|" + r.key + ")[：:]\\s*"), "");
+    const n = [...s].length;
+    if (n < 15 || n > 110) return null;
+    out[r.key] = s;
+  }
+  return out;
 }
 
-// 作品にAIの感想を作って保存する（時限つき）。できたら true
+// 作品のAIの感想を、すべて消す（前の「AIの読み手」1人版もふくむ）
+async function deleteAiComments(kv, id) {
+  for (const k of await listAll(kv, "c:" + id + ":ai")) await kv.delete(k.name);
+}
+// いまの版への3人の感想が、もうあるか（1人版の「AIの読み手」だけなら、3人版に置きかえる）
+async function hasAiComments(kv, w) {
+  for (const k of await listAll(kv, "c:" + w.id + ":ai-")) {
+    const c = await kv.get(k.name, { type: "json" });
+    if (c && c.persona && c.forUpdated === w.updated) return true;
+  }
+  return false;
+}
+// 3人の感想を1回の問い合わせでまとめて作り、時間をずらして保存する。できたら true
 async function makeAiComment(env, w) {
   const text = clip(w.text, 6000);
   const g = GENRES[w.genre] ? GENRES[w.genre].split("（")[0] : "";
-  const user = `タイトル：『${w.title}』\nジャンル：${g}\n\n本文：\n${text}\n\n感想を書いてください。`;
+  const user = `タイトル：『${w.title}』\nジャンル：${g}\n\n本文：\n${text}\n\n3人の感想を JSON で出してください。`;
   let result;
-  try { ({ result } = await callGemini(env, AI_COMMENT_BASE, user, { models: HINT_MODELS, parse: parseAiComment, temperature: 0.8 })); }
+  try { ({ result } = await callGemini(env, AI_COMMENT_BASE, user, { models: HINT_MODELS, parse: parseAiComments, temperature: 0.9, json: true })); }
   catch { return false; }
+  await deleteAiComments(env.BUNKO, w.id);
   const now = Date.now();
-  const showAt = now + Math.round((AI_DELAY_MIN + Math.random() * (AI_DELAY_MAX - AI_DELAY_MIN)) * 60000);
-  const c = { id: "ai", workId: w.id, name: AI_NAME, text: result, ai: true, status: "public", showAt, created: now, forUpdated: w.updated };
-  await env.BUNKO.put("c:" + w.id + ":ai", JSON.stringify(c), { metadata: { status: "public", ai: true, showAt } });
+  const order = AI_READERS.slice().sort(() => Math.random() - 0.5);   // だれが先に届くかも毎回ちがう
+  for (let i = 0; i < order.length; i++) {
+    const r = order[i], [lo, hi] = AI_SLOTS[i] || AI_SLOTS[AI_SLOTS.length - 1];
+    const showAt = now + Math.round((lo + Math.random() * (hi - lo)) * 60000);
+    const c = { id: "ai-" + r.key, workId: w.id, name: r.name, persona: r.key, text: result[r.key], ai: true, status: "public", showAt, created: now, forUpdated: w.updated };
+    await env.BUNKO.put("c:" + w.id + ":ai-" + r.key, JSON.stringify(c), { metadata: { status: "public", ai: true, showAt } });
+  }
   return true;
 }
 
@@ -158,7 +189,7 @@ function parseHints(t) {
   return out.length ? out : null;
 }
 
-async function callGemini(env, system, user, { models = MODELS, parse = cleanLine, temperature = 1.1 } = {}) {
+async function callGemini(env, system, user, { models = MODELS, parse = cleanLine, temperature = 1.1, json = false } = {}) {
   let lastErr = "";
   for (const model of models) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
@@ -168,14 +199,14 @@ async function callGemini(env, system, user, { models = MODELS, parse = cleanLin
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: user }] }],
-        generationConfig: { temperature, maxOutputTokens: 1024 },
+        generationConfig: Object.assign({ temperature, maxOutputTokens: 1024 }, json ? { responseMimeType: "application/json" } : {}),
       }),
     });
     if (!res.ok) { lastErr = `${model}:${res.status}`; continue; }
     const data = await res.json();
     const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
     const result = parse(text);
-    if (result && result.length) return { result, model };
+    if (result && (typeof result !== "string" || result.length)) return { result, model };
     lastErr = `${model}:empty`;
   }
   throw new Error(lastErr || "no model");
@@ -244,7 +275,7 @@ async function bunko(request, env, headers, path, ctx) {
     const old = id ? await kv.get("w:" + id, { type: "json" }) : null;
     if (old && old.owner !== token) return J({ error: "owner" }, headers, 403);
     if (!old) id = rid();
-    else await kv.delete("c:" + id + ":ai");   // 出し直したら、前の版へのAIの感想は消す（再公開のときに作り直す）
+    else await deleteAiComments(kv, id);   // 出し直したら、前の版へのAIの感想は消す（再公開のときに作り直す）
     const lines = {};
     for (const k of ["ki", "sho", "ten", "ketsu"]) lines[k] = clip(body.lines && body.lines[k], 100);
     const now = Date.now();
@@ -290,8 +321,7 @@ async function bunko(request, env, headers, path, ctx) {
       else if (["public", "pending", "hidden"].includes(st)) {
         w.status = st; await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) });
         if (st === "public") {
-          const ai = await kv.get("c:" + w.id + ":ai", { type: "json" });
-          if (!ai || ai.forUpdated !== w.updated) await later(makeAiComment(env, w));
+          if (!(await hasAiComments(kv, w))) await later(makeAiComment(env, w));
         }
       }
     } else if (body.kind === "c") {
@@ -314,9 +344,8 @@ async function bunko(request, env, headers, path, ctx) {
     let made = 0, failed = 0;
     for (const k of await listAll(kv, "w:")) {
       if (!k.metadata || k.metadata.status !== "public") continue;
-      const ai = await kv.get("c:" + k.metadata.id + ":ai", { type: "json" });
-      if (ai && ai.forUpdated === k.metadata.updated) continue;
       const w = await kv.get(k.name, { type: "json" }); if (!w) continue;
+      if (await hasAiComments(kv, w)) continue;
       if (await makeAiComment(env, w)) made++; else failed++;   // Gemini の RPM に配慮して1件ずつ
     }
     return J({ made, failed }, headers);
