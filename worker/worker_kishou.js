@@ -208,6 +208,58 @@ async function makeAiComment(env, w, R) {
   return true;
 }
 
+// ── 推敲の相棒（ブラッシュアップ）──
+// AIは「見つける・たずねる・見本を見せる」。書きかえ案は最終手段（アプリ側でスタミナを使う）。
+const POLISH_RULES = `・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。
+・ほめ言葉、点数、評価、お説教は書かない。高校生にわかる、やさしい言葉で書く。`;
+const POINTS_BASE = `あなたは高校3年生の創作の授業で、生徒が自分の物語を推敲するのを手伝う係です。
+文章を直すのは生徒です。あなたは書きかえた文を出しません。
+本文の中から「ここを直すと、もっと場面が見えてくる」という文を3つ選び、それぞれに短い問いを付けてください。
+守ること：
+・quote は、本文からそのまま抜き出した一文（または一文の一部）。40字以内。本文と一字でもちがってはいけない。
+・q は、生徒が自分で直し方を考えられる問い。40字以内。「？」で終わる。答えや書きかえた文は書かない。
+・よく効く問いの例：気持ちを「悲しかった」と言うかわりに、体の動きや目に入ったもので見せられる？／ここで何の音がしていた？／この台詞、言ったあと相手はどうした？／この一文、二つに分けたらどうなる？
+・3つは別々の場面から選ぶ。
+${POLISH_RULES}
+出力は JSON だけ：{"points":[{"quote":"…","q":"…"},{"quote":"…","q":"…"},{"quote":"…","q":"…"}]}`;
+const ADVICE_BASE = `あなたは高校3年生の創作の授業で、生徒が推敲で困っている一文について、直し方の方向を教える係です。
+文章を直すのは生徒です。生徒の一文を書きかえた文は出しません。
+直し方の方向を3つ出し、それぞれに「別の文」で作った短い見本を付けてください。
+守ること：
+・name は直し方の名前（例：音を足す、短く切る、台詞にする、体の動きで見せる、たとえを使う、順番を入れかえる）。10字以内。
+・how は、生徒の一文にどう当てはめるかのヒント。40字以内。書きかえた文は書かない。
+・before と after は、生徒の一文とは関係のない、あなたが作った別の短い例文。生徒の文の言葉を使わない。それぞれ30字以内。
+${POLISH_RULES}
+出力は JSON だけ：{"tips":[{"name":"…","how":"…","before":"…","after":"…"},…3つ]}`;
+const REWRITE_BASE = `あなたは高校3年生の創作の授業で、生徒の推敲を手伝う係です。
+生徒は、自分で直そうとしてもどうしても手が止まった一文について、最後の手段として書きかえ案を1つだけ求めています。
+守ること：
+・書きかえ案を1つだけ出す。前置きや説明は付けない。
+・生徒の文の内容と人物はそのままにして、場面が目に浮かぶように直す。
+・元の文の1.5倍より長くしない。80字以内。
+・前後の文と、生徒の文体（一人称、「だ・である」か「です・ます」か）に合わせる。
+・新しい人物や出来事を足さない。
+${POLISH_RULES}
+出力は JSON だけ：{"rewrite":"…"}`;
+const jsonOf = t => { try { return JSON.parse(String(t || "").replace(/^\s*```(json)?/i, "").replace(/```\s*$/, "").trim()); } catch { return null; } };
+const len = s => [...String(s || "")].length;
+const parsePoints = text => t => {
+  const o = jsonOf(t); if (!o || !Array.isArray(o.points)) return null;
+  const out = o.points.map(p => ({ quote: String(p.quote || "").trim(), q: String(p.q || "").trim() }))
+    .filter(p => p.quote && len(p.quote) <= 60 && text.includes(p.quote) && p.q && len(p.q) <= 60);   // 本文にない引用は捨てる
+  return out.length ? out.slice(0, 3) : null;
+};
+const parseTips = sentence => t => {
+  const o = jsonOf(t); if (!o || !Array.isArray(o.tips)) return null;
+  const out = o.tips.map(x => ({ name: String(x.name || "").trim(), how: String(x.how || "").trim(), before: String(x.before || "").trim(), after: String(x.after || "").trim() }))
+    .filter(x => x.name && len(x.name) <= 16 && x.how && len(x.how) <= 70 && x.before && x.after && len(x.after) <= 50 && !sentence.includes(x.after));
+  return out.length >= 2 ? out.slice(0, 3) : null;
+};
+const parseRewrite = sentence => t => {
+  const o = jsonOf(t); const r = o && String(o.rewrite || "").replace(/[〔〕]/g, "").replace(/\s*\n\s*/g, "").trim();
+  return r && len(r) >= 2 && len(r) <= Math.max(80, len(sentence) * 2) && r !== sentence ? r : null;
+};
+
 function parseBridge(t) {
   if (!t) return "";
   let s = t.replace(/\*\*/g, "").split("\n").map(x => x.trim()).filter(Boolean).join("");
@@ -426,7 +478,7 @@ export default {
       catch (e) { return J({ error: String(e.message || e) }, headers, 500); }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
@@ -441,6 +493,25 @@ export default {
     const avoid = (Array.isArray(body.avoid) ? body.avoid : []).slice(-6).map(s => String(s).slice(0, 100));
 
     try {
+      if (body.mode === "polish_points") {
+        const text = String(body.text || "").slice(0, 8000);
+        const user = `タイトル：『${clip(body.title, 40)}』\nジャンル：${genre}\n\n本文：\n${text}\n\n直しどころを3つ、JSON で出してください。`;
+        const { result, model } = await callGemini(env, POINTS_BASE, user, { models: HINT_MODELS, parse: parsePoints(text), temperature: 0.7, json: true });
+        return new Response(JSON.stringify({ points: result, model }), { headers });
+      }
+      if (body.mode === "polish_advice" || body.mode === "polish_rewrite") {
+        const sentence = String(body.sentence || "").trim().slice(0, 200);
+        if (!sentence) return new Response(JSON.stringify({ error: "empty" }), { status: 400, headers });
+        const context = String(body.context || "").slice(0, 600);
+        const user = `ジャンル：${genre}\n\n前後の文章：\n${context}\n\n困っている一文：${sentence}\n\nJSON で出してください。`;
+        if (body.mode === "polish_advice") {
+          const { result, model } = await callGemini(env, ADVICE_BASE, user, { models: HINT_MODELS, parse: parseTips(sentence), temperature: 0.8, json: true });
+          return new Response(JSON.stringify({ tips: result, model }), { headers });
+        }
+        const { result, model } = await callGemini(env, REWRITE_BASE, user, { models: HINT_MODELS, parse: parseRewrite(sentence), temperature: 0.7, json: true });
+        return new Response(JSON.stringify({ rewrite: result, model }), { headers });
+      }
+
       if (body.mode === "bridge") {
         const before = String(body.before || "").slice(-600);
         const after = String(body.after || "").slice(0, 400);
