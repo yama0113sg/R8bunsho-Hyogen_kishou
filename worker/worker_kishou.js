@@ -210,6 +210,42 @@ async function makeAiComment(env, w, R) {
 
 // ── 推敲の相棒（ブラッシュアップ）──
 // AIは「見つける・たずねる・見本を見せる」。書きかえ案は最終手段（アプリ側でスタミナを使う）。
+// ── 文庫の編集部（AIの掲載前チェック）──
+// 出された作品は全部、AIが掲載前に読んで、気になる点を書きとめる。生徒に見せるのは、先生が［本人に返す］を押したときだけ。
+const REVIEW_BASE = `あなたは、高校3年生のクラスの「文庫の編集部」です。受講者全員が読むクラス文庫に、生徒の短い物語を載せる前に読んで、気になる点を書き出します。
+作品のおもしろさを決めるのではなく、「同じ学校の、いろいろな事情をかかえた生徒が読んでも、だれかを傷つけないか」だけを見ます。
+見るところ：
+・実在の人物や、この学校・この学校の先生・部活をはっきり思わせる人物が、殺される、犯人になる、ばかにされるなどしていないか（「うちの学校」「〇〇先生」「美術部の顧問」など）
+・家庭の事情（施設で暮らしていること、親がいないこと、病気、貧しさなど）を、笑いや悪口の材料にしていないか
+・いじめ、暴力、死を「されて当然」「よかった」と読める書き方になっていないか
+・性的な内容、自傷をすすめるような内容、差別、だれかの個人情報
+怖い話、事件の話、人が死ぬ話そのものは問題にしない。書き方だけを見る。
+返し方：
+・ok：気になる点がなければ true、あれば false。
+・good：この作品のよいところを、具体的に一つ。40字以内。です・ます調。
+・notes：気になる点（ok が true なら空）。多くても3つ。
+　quote は本文からそのまま抜き出した部分（30字以内、一字もちがえない）。why はなぜ気になるか（50字以内）。how はどう直せば載せられるかの方向（50字以内）。書きかえた文は書かない。
+・責める言い方をしない。編集者が書き手に返すメモのように、やわらかい、です・ます調で書く。
+出力は JSON だけ：{"ok":true,"good":"…","notes":[{"quote":"…","why":"…","how":"…"}]}`;
+const parseReview = text => t => {
+  const o = jsonOf(t); if (!o || typeof o.ok !== "boolean") return null;
+  const notes = (Array.isArray(o.notes) ? o.notes : []).map(n => ({ quote: String(n.quote || "").trim(), why: String(n.why || "").trim(), how: String(n.how || "").trim() }))
+    .filter(n => n.why && len(n.why) <= 90 && n.how && len(n.how) <= 90).map(n => ({ ...n, quote: text.includes(n.quote) ? n.quote : "" })).slice(0, 3);
+  const good = String(o.good || "").trim().slice(0, 80);
+  return { ok: o.ok && !notes.length, good, notes };
+};
+async function makeReview(env, id) {
+  const kv = env.BUNKO;
+  const w = await kv.get("w:" + id, { type: "json" }); if (!w) return false;
+  let result;
+  try { ({ result } = await callGemini(env, REVIEW_BASE, `タイトル：『${w.title}』\n\n本文：\n${clip(w.text, 8000)}\n\nJSON で出してください。`, { models: HINT_MODELS, parse: parseReview(w.text), temperature: 0.2, json: true })); }
+  catch { return false; }
+  const cur = await kv.get("w:" + id, { type: "json" }); if (!cur || cur.updated !== w.updated) return false;   // そのあいだに出し直されていたら捨てる
+  cur.review = { ...result, at: Date.now() };
+  await kv.put("w:" + id, JSON.stringify(cur), { metadata: workMeta(cur) });
+  return true;
+}
+
 const POLISH_RULES = `・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。
 ・ほめ言葉、点数、評価、お説教は書かない。高校生にわかる、やさしい言葉で書く。`;
 const POINTS_BASE = `あなたは高校3年生の創作の授業で、生徒が自分の物語を推敲するのを手伝う係です。
@@ -320,8 +356,11 @@ async function listAll(kv, prefix) {
   return out;
 }
 const workMeta = w => ({ id: w.id, pen: w.pen, title: w.title, genre: w.genre, status: w.status,
+  rv: w.review ? (w.review.ok ? "ok" : "ng") : null,
   chars: [...w.text.replace(/\s/g, "")].length, created: w.created, updated: w.updated });
 const withoutOwner = w => { const { owner, ...rest } = w; return rest; };
+// 査読のメモは、先生と、返却された本人にだけ見せる
+const workView = (w, teacher, mine) => { const v = withoutOwner(w); if (!teacher && !(mine && w.status === "returned")) { delete v.review; delete v.returnNote; } return v; };
 async function deleteWork(kv, id) {
   await kv.delete("w:" + id);
   for (const k of await listAll(kv, "c:" + id + ":")) await kv.delete(k.name);
@@ -361,7 +400,7 @@ async function bunko(request, env, headers, path, ctx) {
       const c = await kv.get(k.name, { type: "json" }); if (c) comments.push(c);
     }
     comments.sort((a, b) => (a.showAt || a.created) - (b.showAt || b.created));
-    return J({ work: withoutOwner(w), comments, mine }, headers);
+    return J({ work: workView(w, teacher, mine), comments, mine }, headers);
   }
   // 作品を出す（同じ端末から同じ id で出し直すと、差し替えて確認待ちにもどる）
   if (path === "/bunko/submit") {
@@ -380,6 +419,7 @@ async function bunko(request, env, headers, path, ctx) {
     const w = { id, owner: token, pen, title, genre: clip(body.genre, 20), text, lines, bridged: !!body.bridged,
       status: "pending", created: old ? old.created : now, updated: now };
     await kv.put("w:" + id, JSON.stringify(w), { metadata: workMeta(w) });
+    await later(makeReview(env, id));   // 文庫の編集部（AI）が掲載前に読む
     return J({ id, status: w.status }, headers);
   }
   // 自分の作品を取り下げる
@@ -416,8 +456,10 @@ async function bunko(request, env, headers, path, ctx) {
       const w = await kv.get("w:" + clip(body.id, 30), { type: "json" });
       if (!w) return J({ error: "notfound" }, headers, 404);
       if (st === "delete") await deleteWork(kv, w.id);
-      else if (["public", "pending", "hidden"].includes(st)) {
-        w.status = st; await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) });
+      else if (["public", "pending", "hidden", "returned"].includes(st)) {
+        w.status = st;
+        if (st === "returned") { w.returnNote = clip(body.note, 300).trim(); w.returnedAt = Date.now(); }   // 本人に査読を見せて、書き直してもらう
+        await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) });
         if (st === "public") {
           const R = await getReaders(kv);
           if (!(await hasAiComments(kv, w, R.ver))) await later(makeAiComment(env, w, R));
@@ -448,6 +490,12 @@ async function bunko(request, env, headers, path, ctx) {
       if (await makeAiComment(env, w, R)) made++; else failed++;   // Gemini の RPM に配慮して1件ずつ
     }
     return J({ made, failed }, headers);
+  }
+  // 編集部（AI）の査読をやり直す
+  if (path === "/bunko/admin/review") {
+    const ok = await makeReview(env, clip(body.id, 30));
+    const w = await kv.get("w:" + clip(body.id, 30), { type: "json" });
+    return J({ ok, review: w && w.review }, headers);
   }
   // AIの読み手の顔ぶれ：GET で読む／POST {readers} で保存／POST {reset:true} ではじめの3人にもどす
   if (path === "/bunko/admin/readers") {

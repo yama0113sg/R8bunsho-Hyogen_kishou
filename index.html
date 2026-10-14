@@ -285,6 +285,10 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
 input.ptitle{font-size:20px;margin-bottom:12px}
 
 /* 推敲の相棒 */
+.rvback{margin:0 0 12px;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,211,106,.45);background:rgba(255,211,106,.07);font-size:14px;line-height:1.8}
+.rvback b{color:#ffd36a}
+.rvback .q{font-family:var(--mincho);color:var(--ai)}
+.rvback ol{margin:6px 0 0;padding-left:1.3em}
 .buddy{margin:14px 0 4px;padding:14px 16px;border-radius:16px;background:rgba(0,0,0,.25);border:1px solid color-mix(in srgb,var(--g) 40%,transparent)}
 .buddy .bh{display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:700}
 .buddy .stam{font-size:13px;color:#ffd36a;letter-spacing:.1em;white-space:nowrap}
@@ -470,6 +474,7 @@ input.ptitle{font-size:20px;margin-bottom:12px}
     <div class="submit" id="bunkoArea">
       <p class="label" style="margin:0 0 8px">📖 クラス文庫</p>
       <p class="gnote" id="bunkoState" style="margin:0 0 10px"></p>
+      <div class="hidden" id="bunkoReview"></div>
       <div class="hidden" id="bunkoForm">
         <input type="text" id="bkPen" maxlength="20" placeholder="ペンネーム（実名は書かないでください）" style="font-size:17px">
         <input type="text" id="bkPass" maxlength="40" placeholder="合言葉" autocomplete="off" autocapitalize="off" style="font-size:17px;margin-top:8px">
@@ -1045,7 +1050,7 @@ async function bunkoApi(path,body){
   const j=await r.json().catch(()=>({})); if(r.status===401) throw new Error("合言葉がちがいます。");
   if(!r.ok){ const e=new Error(j.message||"うまくいきませんでした（"+(j.error||r.status)+"）"); e.status=r.status; throw e; } return j;
 }
-const BK_LABEL={pending:"先生の確認待ちです。",public:"クラス文庫に並んでいます。",hidden:"先生が非公開にしています。"};
+const BK_LABEL={pending:"先生の確認待ちです。",public:"クラス文庫に並んでいます。",hidden:"先生が非公開にしています。",returned:"文庫の編集部から返ってきました。下のメモを見て直し、［✎ 続けて整える］→［✓ 仕上げた］のあと、出し直してください。"};
 let bunkoFormOpen=false, bunkoOffArm=0;
 function renderBunko(b){
   const ready=b.final&&b.final.done, left=b.final?(b.final.text.match(MARK)||[]).length:0;
@@ -1057,11 +1062,18 @@ function renderBunko(b){
     : left? "〔 〕が "+left+" か所残っています。自分の言葉に書きかえてから出してください。"
     : b.bunko? (BK_LABEL[b.bunko.status]||"出しました。")+(b.bunko.comments?" 感想 "+b.bunko.comments+" 件":"")
     : "ペンネームで、受講者だけが読めるクラス文庫に出せます。";
+  const rv=b.bunko&&b.bunko.status==="returned"&&b.bunko.review;
+  $("bunkoReview").classList.toggle("hidden",!rv);
+  $("bunkoReview").innerHTML= !rv? "" : '<div class="rvback"><b>📮 文庫の編集部（AI）より</b>'
+    +(rv.good?'<div>いいところ：'+esc(rv.good)+'</div>':'')
+    +(rv.notes&&rv.notes.length?'<div style="margin-top:6px">載せる前に、ここだけ直してください。</div><ol>'+rv.notes.map(n=>'<li>'+(n.quote?'<span class="q">「'+esc(n.quote)+'」</span><br>':'')+esc(n.why)+'<br>→ '+esc(n.how)+'</li>').join("")+'</ol>':'')
+    +(b.bunko.returnNote?'<div style="margin-top:6px">先生から：'+esc(b.bunko.returnNote)+'</div>':'')+'</div>';
 }
 async function refreshBunko(b){ // 本を開いたとき、文庫での状態を確かめる
   if(!b.bunko||!lsGet("bunko_pass")) return;
   try{ const j=await bunkoApi("/work?id="+encodeURIComponent(b.bunko.id)+"&token="+ownerToken());
-    b.bunko.status=j.work.status; b.bunko.comments=(j.comments||[]).length; }
+    b.bunko.status=j.work.status; b.bunko.comments=(j.comments||[]).length;
+    b.bunko.review=j.work.review||null; b.bunko.returnNote=j.work.returnNote||""; }
   catch(e){ if(e.status===404){ b.bunko=null; } else return; }
   saveShelf(); if(view==="book"&&curBook===b.id) renderBunko(b);
 }

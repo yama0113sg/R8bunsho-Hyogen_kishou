@@ -110,6 +110,13 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .item .body{margin-top:10px;font-family:var(--mincho);line-height:1.9;white-space:pre-wrap;max-height:50vh;overflow:auto;background:rgba(0,0,0,.25);border-radius:10px;padding:12px}
 .st{display:inline-block;font-size:11px;padding:2px 9px;border-radius:99px;margin-left:6px;vertical-align:middle}
 .st.public{background:rgba(93,255,176,.18);color:var(--ok)} .st.pending{background:rgba(255,211,106,.18);color:var(--gold)} .st.hidden{background:rgba(255,255,255,.1);color:var(--sub)}
+.st.returned{background:rgba(255,143,163,.16);color:#ff8fa3}
+.rv{font-size:12px;margin-left:6px;color:var(--sub)} .rv.ng{color:#ff8fa3} .rv.ok{color:var(--ok)}
+.rvbox{margin-top:10px;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,143,163,.35);background:rgba(255,143,163,.06);font-size:14px;line-height:1.75}
+.rvbox.ok{border-color:rgba(93,255,176,.3);background:rgba(93,255,176,.05)}
+.rvbox .q{font-family:var(--mincho);color:var(--ai)}
+.rvbox ol{margin:6px 0 0;padding-left:1.3em}
+.rvbox textarea{margin-top:8px;font-size:14px}
 h3{font-size:14px;letter-spacing:.15em;color:var(--sub);margin:22px 0 10px;font-weight:700}
 </style>
 </head>
@@ -297,13 +304,13 @@ const closeSensei=()=>{ if(ls.get("bunko_pass")) loadShelf().catch(()=>show("scG
 $("btnTClose").onclick=closeSensei; $("btnTClose2").onclick=closeSensei;
 $("btnTReload").onclick=()=>loadAdmin();
 let admin={works:[],comments:[]};
-const stLabel={public:"公開中",pending:"確認待ち",hidden:"非公開"};
+const stLabel={public:"公開中",pending:"確認待ち",hidden:"非公開",returned:"返却中"};
 async function loadAdmin(){
   $("tMsg").textContent="";
   try{ admin=await api("/bunko/admin",{teacher:true}); }
   catch(e){ $("tMsg").textContent=e.message; $("senseiGate").classList.remove("hidden"); $("senseiBody").classList.add("hidden"); return; }
   $("senseiGate").classList.add("hidden"); $("senseiBody").classList.remove("hidden");
-  const workRow=w=>'<div class="item" data-id="'+esc(w.id)+'"><div class="h"><b>『'+esc(w.title)+'』<span class="st '+w.status+'">'+stLabel[w.status]+'</span></b><span>'+esc(w.pen)+'・'+genreOf(w.genre).name+'・'+w.chars+'字・'+md(w.updated)+'</span></div>'
+  const workRow=w=>'<div class="item" data-id="'+esc(w.id)+'"><div class="h"><b>『'+esc(w.title)+'』<span class="st '+w.status+'">'+stLabel[w.status]+'</span>'+(w.rv?'<span class="rv '+w.rv+'">'+(w.rv==="ok"?"編集部：気になる点なし":"編集部：気になる点あり")+'</span>':'')+'</b><span>'+esc(w.pen)+'・'+genreOf(w.genre).name+'・'+w.chars+'字・'+md(w.updated)+'</span></div>'
     +'<div class="body hidden"></div><div class="aibox hidden"></div><div class="row">'
     +'<button class="btn small" data-act="read">読む</button>'
     +(w.status!=="public"?'<button class="btn small main" data-act="public">公開する</button>':'')
@@ -319,11 +326,24 @@ async function loadAdmin(){
 }
 let delArm={};
 const hm=ts=>{const d=new Date(ts);return (d.getMonth()+1)+"/"+d.getDate()+" "+d.getHours()+"時"+String(d.getMinutes()).padStart(2,"0")+"分";};
+// 文庫の編集部（AI）の査読。先生が［本人に返す］を押したときだけ、生徒のアプリに届く
+function reviewHTML(w){
+  const r=w.review;
+  const head=!r? '<p class="note" style="margin:0">編集部（AI）の査読はまだです。</p>'
+    : r.ok? '<b>編集部（AI）：気になる点はありませんでした。</b>'+(r.good?'<div>よいところ：'+esc(r.good)+'</div>':'')
+    : '<b>編集部（AI）：気になる点があります。</b>'+(r.good?'<div>よいところ：'+esc(r.good)+'</div>':'')
+      +'<ol>'+r.notes.map(n=>'<li>'+(n.quote?'<span class="q">「'+esc(n.quote)+'」</span><br>':'')+esc(n.why)+'<br>→ '+esc(n.how)+'</li>').join("")+'</ol>';
+  return '<div class="rvbox'+(r&&r.ok?" ok":"")+'">'+head
+    +(w.status==="returned"? '<p class="note" style="margin:8px 0 0">本人に返しています。'+(w.returnNote?'先生からのひとこと：'+esc(w.returnNote):'')+'</p>'
+      : '<textarea class="rnote" rows="2" maxlength="300" placeholder="先生からのひとこと（なくてもよい）"></textarea>'
+        +'<div class="row" style="margin-top:6px"><button class="btn small" data-act="return">本人に返す（査読を見せる）</button><button class="btn small" data-act="rerev">査読をやり直す</button></div>')
+    +'</div>';
+}
 async function showRead(it){ // 先生用：本文と、AIの感想（時限前でも見える）
   const j=await api("/bunko/work?id="+encodeURIComponent(it.dataset.id),{teacher:true});
   it.querySelector(".body").textContent=j.work.text; it.querySelector(".body").classList.remove("hidden");
   const ais=(j.comments||[]).filter(c=>c.ai), box=it.querySelector(".aibox"); box.classList.remove("hidden");
-  box.innerHTML= ais.map(c=>cmHTML(c)+'<div class="when" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span>'+hm(c.showAt)+(c.showAt>Date.now()?" に表示されます":" から表示中")+'</span>'
+  box.innerHTML= reviewHTML(j.work) + ais.map(c=>cmHTML(c)+'<div class="when" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span>'+hm(c.showAt)+(c.showAt>Date.now()?" に表示されます":" から表示中")+'</span>'
       +'<button class="btn small danger" data-act="aidel" data-cid="'+esc(c.id)+'">この感想を削除</button></div>').join("")
     +(j.work.status==="public"? '<div class="row" style="margin-top:6px"><button class="btn small" data-act="aire">'+(ais.length?"AIの感想を全員分作り直す":"AIの感想を作る")+'</button></div>' : '');
 }
@@ -367,6 +387,13 @@ $("scSensei").addEventListener("click",async e=>{
   try{
     if(act==="read"){ const box=it.querySelector(".body");
       if(box.classList.toggle("hidden")){ it.querySelector(".aibox").classList.add("hidden"); return; }
+      await showRead(it); return; }
+    if(act==="return"){ const note=(it.querySelector(".rnote")||{}).value||"";
+      b.disabled=true; await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"w",id:it.dataset.id,status:"returned",note}});
+      await loadAdmin(); return; }
+    if(act==="rerev"){ b.disabled=true; b.textContent="読んでいます…";
+      const r=await api("/bunko/admin/review",{method:"POST",teacher:true,body:{id:it.dataset.id}});
+      if(!r.ok) $("tMsg").textContent="うまく査読できませんでした。少し待ってもう一度押してください。";
       await showRead(it); return; }
     if(act==="aire"){ b.disabled=true; b.textContent="作っています…";
       const r=await api("/bunko/admin/ai",{method:"POST",teacher:true,body:{id:it.dataset.id}});
