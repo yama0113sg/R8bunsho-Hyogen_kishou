@@ -54,7 +54,7 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .shelfhead{display:flex;justify-content:space-between;align-items:baseline;margin:0 4px 6px}
 .shelfhead h2{font-family:var(--mincho);font-size:20px;margin:0;letter-spacing:.2em}
 .shelfhead span{font-size:12px;color:var(--sub)}
-.shelf{display:flex;flex-wrap:wrap;gap:14px 5px;padding:0 10px;margin-top:6px;
+.shelf{display:flex;flex-wrap:wrap;gap:14px 5px;padding:0 10px 14px;margin-top:6px;
   background:repeating-linear-gradient(to bottom,transparent 0 212px,rgba(255,236,210,.22) 212px 216px,rgba(255,236,210,.1) 216px 220px,rgba(0,0,0,.4) 220px 226px)}
 .slot{height:212px;display:flex;align-items:flex-end}
 .spine{width:48px;height:var(--h);border-radius:4px 4px 2px 2px;position:relative;display:flex;flex-direction:column;align-items:center;padding:14px 0 8px;overflow:hidden;
@@ -241,7 +241,7 @@ async function loadShelf(){
     return '<div class="slot"><button class="spine" data-id="'+esc(w.id)+'" style="--c:'+g.c+';--c2:'+g.c2+';--h:'+h+'px" title="'+esc(w.title)+'">'
       +'<span class="t" style="font-size:'+(n=>n<=5?15:n<=8?12:n<=14?11:10)([...w.title].length)+'px">'+esc(w.title)+'</span><span class="p">'+esc(w.pen)+'</span></button></div>'; }).join("");
   $("shelf").classList.toggle("hidden",!works.length); $("empty").classList.toggle("hidden",!!works.length);
-  $("shelfCount").textContent=works.length+"冊";
+  $("shelfCount").textContent=works.length+"冊"+(j.pending?"（ほかに先生の確認待ち "+j.pending+"冊）":"");
 }
 $("shelf").addEventListener("click",e=>{ const b=e.target.closest(".spine"); if(b) openWork(b.dataset.id); });
 $("btnReload").onclick=()=>loadShelf().catch(e=>$("shelfMsg").textContent=e.message);

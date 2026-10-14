@@ -343,9 +343,9 @@ async function bunko(request, env, headers, path, ctx) {
 
   // 公開中の作品の一覧
   if (path === "/bunko/works") {
-    const works = (await listAll(kv, "w:")).map(k => k.metadata)
-      .filter(m => m && m.status === "public").sort((a, b) => b.updated - a.updated);
-    return J({ works }, headers);
+    const all = (await listAll(kv, "w:")).map(k => k.metadata).filter(Boolean);
+    const works = all.filter(m => m.status === "public").sort((a, b) => b.updated - a.updated);
+    return J({ works, pending: all.filter(m => m.status === "pending").length }, headers);
   }
   // 1作品と、公開済みの感想（本人は確認待ちの自分の作品も見られる）
   if (path === "/bunko/work") {
