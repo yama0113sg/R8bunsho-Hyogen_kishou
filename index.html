@@ -284,6 +284,23 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
 .orig{max-height:40vh;overflow:auto;margin:10px 0 14px;font-size:15px}
 input.ptitle{font-size:20px;margin-bottom:12px}
 
+/* 推敲の相棒 */
+.buddy{margin:14px 0 4px;padding:14px 16px;border-radius:16px;background:rgba(0,0,0,.25);border:1px solid color-mix(in srgb,var(--g) 40%,transparent)}
+.buddy .bh{display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:700}
+.buddy .stam{font-size:13px;color:#ffd36a;letter-spacing:.1em;white-space:nowrap}
+.buddy .stam i{font-style:normal;opacity:.25}
+.pcard{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--edge)}
+.pcard .qt{font-family:var(--mincho);color:var(--ai)}
+.pcard .qq{margin-top:4px;font-size:14px;line-height:1.7}
+.pcard.done{opacity:.55}
+.pcard.done .qt::before{content:"✓ ";color:var(--ok)}
+.pcard .row{margin-top:8px}
+.tip{margin-top:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--edge);font-size:14px;line-height:1.7}
+.tip b{color:var(--g)}
+.tip .ex{margin-top:4px;font-family:var(--mincho);color:#cfcbe6}
+.tip .ex span{color:var(--sub);font-family:var(--gothic);font-size:12px}
+.rw{margin-top:10px;padding:12px;border-radius:12px;border:1px dashed #ffd36a;background:rgba(255,211,106,.08);font-family:var(--mincho);line-height:1.8}
+
 /* 短編集 */
 .alist{display:flex;flex-direction:column;gap:8px;margin:8px 0 16px}
 .aitem{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--edge)}
@@ -472,8 +489,18 @@ input.ptitle{font-size:20px;margin-bottom:12px}
       <p class="gnote" style="margin:0 0 10px">〔 〕の中は、AIが書いたつなぎの文（またはAIが出した展開）です。自分の言葉に書きかえて、〔 〕をはずしてください。</p>
       <div class="row" style="margin-top:0"><button class="btn small" id="btnOrig">はじめの版を見る ▼</button><button class="btn small hidden" id="btnRestart">はじめの版から整え直す</button></div>
       <div class="full orig hidden" id="pOrig"></div>
+      <div class="buddy" id="buddy">
+        <div class="bh"><span>🤝 推敲の相棒（AI）</span><span class="stam" id="stam"></span></div>
+        <p class="gnote" style="margin:6px 0 0">AIが直しどころを見つけて、直し方の見本を見せます。直すのは自分です。</p>
+        <div class="row"><button class="btn small" id="btnPoints">① 直しどころを見つけてもらう</button><button class="btn small" id="btnAdvice">② この一文を相談する</button></div>
+        <p class="gnote" style="margin:6px 0 0;font-size:12px">②は、本文の中の困っている一文をタップ（またはなぞって選んで）から押してください。</p>
+        <div id="pointList"></div>
+        <div id="adviceBox"></div>
+        <div class="msg" id="buddyMsg"></div>
+      </div>
       <textarea id="pBody" style="margin-top:12px"></textarea>
       <div class="count"><span>いま <strong id="pCnt">0</strong> 字</span><span id="pNote"></span></div>
+      <p class="gnote" style="margin:6px 0 0">仕上げる前に：題名と、最後の一文を、もう一度だけ見てみよう。</p>
       <div class="msg" id="pMsg"></div>
       <div class="nav">
         <button class="btn" id="btnPolishBack">← もどる</button>
@@ -529,7 +556,8 @@ const SETUP = {
   proxyUrl: "https://kishou.ryousukey0113.workers.dev",   // ← 新しく作る Worker の URL
 };
 const LIMITS = { perDay: 40, cooldown: 4 };
-const HINT = { perStage: 2, idleSec: 30 };   // ヒント：各段階の回数／手が止まってから出るまでの秒数
+const HINT = { perStage: 2, idleSec: 30 };
+const BRUSH = { stamina: 3 };   // 推敲の相棒：書きかえ案（最終手段）を使える回数（1冊につき）   // ヒント：各段階の回数／手が止まってから出るまでの秒数
 const STAGES = [
   { key:"ki", name:"起", target:200, changes:3, tag:"書き出しの一文", btn:"一行目を引く",
     guide:"物語のはじまり。だれが、どこにいるのかを見せる",
@@ -933,6 +961,8 @@ function bookText(b){
   s+="AIが出したきっかけ：\n"+STAGES.map(st=>"◆"+st.name+"："+(b.lines[st.key]||"")).join("\n")+"\n";
   if(b.bridges) s+="AIが書いたつなぎの文（整える前）：\n"+STAGES.filter(st=>b.bridges[st.key]).map(st=>"◆"+st.name+"の前："+b.bridges[st.key]).join("\n")+"\n";
   s+=bindLine(b);
+  const br=b.brush; if(br&&(br.pointsN||br.adviceN||br.rewriteN)) s+="推敲の相棒：直しどころ "+(br.pointsN||0)+"回／相談 "+(br.adviceN||0)+"回／書きかえ案 "+(br.rewriteN||0)+"回\n";
+  if(br&&br.rewrites&&br.rewrites.length) s+="AIの書きかえ案（使ったもの）：\n"+br.rewrites.map(x=>"◆"+x).join("\n")+"\n";
   return s;
 }
 function anthoText(a){
@@ -990,7 +1020,7 @@ function renderShelfViews(){
     $("pBody").disabled=bridging; $("btnPolishDone").disabled=bridging;
     $("pTitle").value=bTitle(b); $("pBody").value=bridging? "AIが、場面と場面のつなぎ目を書いています…" : b.final? b.final.text : seedText(b);
     $("btnRestart").classList.toggle("hidden",!b.final); $("pOrig").innerHTML=origHTML(b);
-    updatePolishCount(b);
+    updatePolishCount(b); renderBuddy(b);
   }
   if(view==="antho"){ const a=SH.antho.find(x=>x.id===curAntho); if(!a){view="shelf";return renderShelfViews();}
     setTheme(null); $("scAntho").classList.remove("hidden");
@@ -1059,6 +1089,76 @@ $("btnBunkoOff").onclick=async()=>{
   catch(e){ $("bunkoMsg").style.color="var(--ng)"; $("bunkoMsg").textContent=e.message; }
   $("btnBunkoOff").textContent="取り下げる"; renderBunko(b);
 };
+/* ---- 推敲の相棒 ---- */
+const brushOf=b=>b.brush||(b.brush={stamina:BRUSH.stamina,points:[],pointsN:0,adviceN:0,rewriteN:0,rewrites:[],advice:null,rewrite:null});
+let buddyBusy=false;
+async function buddyApi(body){
+  const q=quota();
+  if(q.n>=LIMITS.perDay) throw new Error("今日のAIの回数を使い切りました。先生に声をかけてください。");
+  const wait=LIMITS.cooldown*1000-(Date.now()-lastCall);
+  if(wait>0) throw new Error("あと "+Math.ceil(wait/1000)+" 秒まってね");
+  lastCall=Date.now(); let r,j;
+  try{ r=await fetch(SETUP.proxyUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); j=await r.json(); }
+  catch(e){ throw new Error("うまく届きませんでした。少し待ってもう一度押してください。"); }
+  if(!r.ok||j.error) throw new Error("うまく考えられませんでした。少し待ってもう一度押してください。");
+  q.n++; store.set(QKEY,q); showQuota(); return j;
+}
+function renderBuddy(b){
+  const br=brushOf(b), v=$("pBody").value;
+  $("stam").innerHTML="書きかえ案 "+"⚡".repeat(br.stamina)+"<i>"+"⚡".repeat(Math.max(0,BRUSH.stamina-br.stamina))+"</i>";
+  ["btnPoints","btnAdvice"].forEach(id=>$(id).disabled=buddyBusy||bridging);
+  $("pointList").innerHTML=(br.points||[]).map((p,i)=>'<div class="pcard'+(v.includes(p.quote)?"":" done")+'"><div class="qt">「'+esc(p.quote)+'」</div><div class="qq">'+esc(p.q)+'</div>'
+    +(v.includes(p.quote)?'<div class="row"><button class="btn small" data-find="'+i+'">本文で探す</button><button class="btn small" data-ask="'+i+'">この文を相談する</button></div>':'')+'</div>').join("");
+  const a=br.advice;
+  $("adviceBox").innerHTML= !a? "" : '<div class="pcard"><div class="qt">「'+esc(a.sentence)+'」の直し方</div>'
+    +a.tips.map(t=>'<div class="tip"><b>'+esc(t.name)+'</b>：'+esc(t.how)+'<div class="ex"><span>見本</span> '+esc(t.before)+' → '+esc(t.after)+'</div></div>').join("")
+    +(br.rewrite&&br.rewrite.sentence===a.sentence
+      ? '<div class="rw">〔'+esc(br.rewrite.text)+'〕</div><div class="row"><button class="btn small main" id="btnRwIn"'+(v.includes(a.sentence)?"":" disabled")+'>本文に〔 〕付きで入れる</button></div><p class="gnote" style="margin:6px 0 0;font-size:12px">入れたら、〔 〕の中を自分の言葉に直してから、〔 〕をはずしてね。</p>'
+      : '<div class="row"><button class="btn small" id="btnRw"'+(br.stamina<=0||buddyBusy?" disabled":"")+'>③ どうしても無理なら：書きかえ案を見る（⚡1つ使う）</button></div>'
+        +(br.stamina<=0?'<p class="gnote" style="margin:6px 0 0;font-size:12px">書きかえ案は使い切りました。見本をまねして、自分で直してみよう。</p>':''))
+    +'</div>';
+}
+function caretSentence(){ // 選んだ部分、またはカーソルのある一文
+  const ta=$("pBody"), v=ta.value, s=ta.selectionStart, e=ta.selectionEnd;
+  if(e>s) return v.slice(s,e).trim();
+  let a=s; while(a>0&&!/[。！？!?\n]/.test(v[a-1])) a--;
+  let z=s; while(z<v.length&&!/[。！？!?\n]/.test(v[z])) z++; if(z<v.length&&v[z]!=="\n") z++;
+  return v.slice(a,z).trim();
+}
+async function askAdvice(sentence){
+  const b=bookById(curBook); if(!b||!sentence) return; const br=brushOf(b), v=$("pBody").value, i=v.indexOf(sentence);
+  buddyBusy=true; $("buddyMsg").style.color="var(--sub)"; $("buddyMsg").textContent="考えています…"; renderBuddy(b);
+  try{ const j=await buddyApi({mode:"polish_advice",genre:b.genre,sentence,context:v.slice(Math.max(0,i-300),i+sentence.length+300)});
+    br.advice={sentence,tips:j.tips}; br.adviceN=(br.adviceN||0)+1; saveShelf(); $("buddyMsg").textContent=""; }
+  catch(e){ $("buddyMsg").style.color="var(--ng)"; $("buddyMsg").textContent=e.message; }
+  buddyBusy=false; renderBuddy(b); $("adviceBox").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+$("btnPoints").onclick=async()=>{
+  const b=bookById(curBook); if(!b) return; const br=brushOf(b), v=$("pBody").value;
+  buddyBusy=true; $("buddyMsg").style.color="var(--sub)"; $("buddyMsg").textContent="読んでいます…"; renderBuddy(b);
+  try{ const j=await buddyApi({mode:"polish_points",genre:b.genre,title:$("pTitle").value,text:v});
+    br.points=j.points; br.pointsN=(br.pointsN||0)+1; saveShelf(); $("buddyMsg").textContent=""; }
+  catch(e){ $("buddyMsg").style.color="var(--ng)"; $("buddyMsg").textContent=e.message; }
+  buddyBusy=false; renderBuddy(b);
+};
+$("btnAdvice").onclick=()=>{ const s=caretSentence();
+  if(!s){ $("buddyMsg").style.color="var(--ng)"; $("buddyMsg").textContent="本文の中の、相談したい一文をタップしてから押してね。"; return; }
+  askAdvice(s.slice(0,200)); };
+$("pointList").addEventListener("click",e=>{ const x=e.target.closest("button"); if(!x) return; const b=bookById(curBook); const p=brushOf(b).points[+(x.dataset.find??x.dataset.ask)]; if(!p) return;
+  if(x.dataset.find!=null){ const ta=$("pBody"), i=ta.value.indexOf(p.quote); if(i>=0){ ta.focus(); ta.setSelectionRange(i,i+p.quote.length); } }
+  else askAdvice(p.quote); });
+$("adviceBox").addEventListener("click",async e=>{ const x=e.target.closest("button"); if(!x) return; const b=bookById(curBook); if(!b) return; const br=brushOf(b), a=br.advice; if(!a) return;
+  if(x.id==="btnRw"){ if(br.stamina<=0) return; const v=$("pBody").value, i=v.indexOf(a.sentence);
+    buddyBusy=true; $("buddyMsg").style.color="var(--sub)"; $("buddyMsg").textContent="考えています…"; renderBuddy(b);
+    try{ const j=await buddyApi({mode:"polish_rewrite",genre:b.genre,sentence:a.sentence,context:v.slice(Math.max(0,i-300),i+a.sentence.length+300)});
+      br.rewrite={sentence:a.sentence,text:j.rewrite}; br.stamina--; br.rewriteN=(br.rewriteN||0)+1; saveShelf(); $("buddyMsg").textContent=""; }
+    catch(err){ $("buddyMsg").style.color="var(--ng)"; $("buddyMsg").textContent=err.message; }
+    buddyBusy=false; renderBuddy(b); }
+  if(x.id==="btnRwIn"){ const ta=$("pBody"), v=ta.value, i=v.indexOf(a.sentence); if(i<0) return;
+    ta.value=v.slice(0,i)+"〔"+br.rewrite.text+"〕"+v.slice(i+a.sentence.length);
+    (br.rewrites=br.rewrites||[]).push(br.rewrite.text); br.rewrite=null; br.advice=null; saveShelf(); polishSave(); updatePolishCount(b); renderBuddy(b);
+    ta.focus(); ta.setSelectionRange(i,i+br.rewrites[br.rewrites.length-1].length+2); }
+});
 function updatePolishCount(b){ const v=$("pBody").value, n=nchars(v.replace(MARK,"")), o=nchars(seedText(b).replace(MARK,"")), mk=(v.match(MARK)||[]).length;
   $("pCnt").textContent=n; $("pNote").textContent=(mk?"〔 〕があと "+mk+" か所 ・ ":"")+"はじめの版 "+o+"字（"+(n-o>=0?"+":"")+(n-o)+"）"; }
 function go(v,id){ if(busy) return; view=v; if(v==="book"){curBook=id;bookMode="fin"; bunkoFormOpen=false; $("bunkoMsg").textContent=""; const b=bookById(id); if(b) refreshBunko(b);} if(v==="polish") curBook=id||curBook; if(v==="antho") curAntho=id; render(); window.scrollTo(0,0); }
@@ -1176,7 +1276,7 @@ function polishSave(){ const b=bookById(curBook); if(!b||bridging) return;
   const text=$("pBody").value, title=$("pTitle").value.trim()||b.title;
   if(!b.final && text===seedText(b) && title===b.title) return;   // まだ何も変えていない
   b.final=Object.assign(b.final||{done:false},{text,title,updated:Date.now()}); saveShelf(); }
-$("pBody").addEventListener("input",()=>{ polishSave(); const b=bookById(curBook); if(b) updatePolishCount(b); });
+$("pBody").addEventListener("input",()=>{ polishSave(); const b=bookById(curBook); if(b){ updatePolishCount(b); renderBuddy(b); } });
 $("pTitle").addEventListener("input",polishSave);
 $("btnOrig").onclick=()=>{ const o=$("pOrig"); o.classList.toggle("hidden"); $("btnOrig").textContent=o.classList.contains("hidden")?"はじめの版を見る ▼":"はじめの版をとじる ▲"; };
 $("btnPolishBack").onclick=()=>{ polishSave(); go("book",curBook); };
