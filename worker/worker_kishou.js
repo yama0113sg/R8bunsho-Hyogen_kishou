@@ -111,76 +111,97 @@ const AI_READERS = [
     desc: "気持ち派。読んでいて思ったことがそのまま口に出る。語彙が少なくて、テンションで話す。登場人物に話しかけることもある。",
     ex: ["え、まって、ここで終わるの", "主人公、それは言っちゃだめだって笑", "屋上のとこ、なんか泣きそうになった"] },
 ];
-const AI_COMMENT_BASE = `高校3年生のクラスで、生徒が書いた短い物語をみんなで読み合っています。
-あなたはそこに混ざっている3人の「AIの読み手」として、読んだあとのひとことを書きます。
+// 読み手の顔ぶれ（名前・性格・書きぶり）は、先生用の画面から変えられる（KV の cfg:readers）。
+// 学校のキャラクターなど、公開リポジトリに書きたくない名前は、ここではなく先生用の画面で入れる。
+async function getReaders(kv) {
+  const cfg = await kv.get("cfg:readers", { type: "json" });
+  if (cfg && Array.isArray(cfg.readers) && cfg.readers.length) return { readers: cfg.readers, ver: AI_STYLE + ":" + cfg.updated, custom: true };
+  return { readers: AI_READERS, ver: String(AI_STYLE), custom: false };
+}
+function cleanReaders(list) { // 先生が入れた設定を整える（1〜3人）
+  const out = [];
+  for (const r of (Array.isArray(list) ? list : []).slice(0, 3)) {
+    const name = clip(r && r.name, 16).trim(), desc = clip(r && r.desc, 400).trim();
+    if (!name || !desc) continue;
+    const ex = (Array.isArray(r.ex) ? r.ex : []).map(x => clip(x, 80).trim()).filter(Boolean).slice(0, 4);
+    out.push({ key: "r" + (out.length + 1), name, desc, ex });
+  }
+  return out;
+}
+function commentPrompt(readers) {
+  const n = readers.length;
+  return `高校3年生のクラスで、生徒が書いた短い物語をみんなで読み合っています。
+あなたはそこに混ざっている${n}人の「AIの読み手」として、読んだあとのひとことを書きます。
 国語の先生や本の評論家のような感想ではなく、同じ教室の高校生が感想欄にさっと書くひとことにしてください。
 
-3人：
-${AI_READERS.map(r => `・${r.key}（${r.name}）：${r.desc}\n　書きぶりの例：${r.ex.map(x => "「" + x + "」").join("")}`).join("\n")}
+${n}人：
+${readers.map(r => `・${r.key}（${r.name}）：${r.desc}` + (r.ex && r.ex.length ? `\n　書きぶりの例：${r.ex.map(x => "「" + x + "」").join("")}` : "")).join("\n")}
 
 守ること：
 ・書きぶりの例は、口調をつかむためだけのもの。例の言い回しをそのまま使わず、この作品に合わせて言う。
-・それぞれ10〜60字。長くしない。3人の長さもばらばらにする。
+・それぞれ10〜60字。長くしない。${n > 1 ? n + "人の長さもばらばらにする。" : ""}
 ・きちんとした文にまとめなくてよい。言いさし、体言止め、話し言葉のままでよい。
 ・「よかったところ＋気になったところ」のような、整った型にしない。思ったことを一つだけ言う。
-・3人で、同じ場面・同じ一文に触れない。言い回しや語尾もかぶらせない。
-・作品に出てくる具体的なもの（人物、物、場面、一文）を一つは入れる。ただし、あらすじの説明はしない。
+${n > 1 ? `・${n}人で、同じ場面・同じ一文に触れない。言い回しや語尾もかぶらせない。\n` : ""}・作品に出てくる具体的なもの（人物、物、場面、一文）を一つは入れる。ただし、あらすじの説明はしない。
 ・ほめる言葉、点数、助言、まとめ、お説教は書かない。
 ・次の言葉は使わない：素晴らしい、見事、印象的、心温まる、感動、光って、作者、描写、表現、世界観、心情、引き込まれ、伝わって、余韻、絶妙、巧み、秀逸、共感、ですね、ました。
 ・改行、絵文字、見出しは付けない。「！」は使わない。
 ・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。作品がこれらに触れていても、感想では掘り下げない。
-出力は次の形の JSON だけ：{"shiori":"…","haguruma":"…","sora":"…"}`;
+出力は次の形の JSON だけ：{${readers.map(r => `"${r.key}":"…"`).join(",")}}`;
+}
 const AI_NG = /素晴らし|見事|印象的|心温ま|感動|光って|作者|描写|世界観|心情|引き込ま|伝わって|余韻|絶妙|巧み|秀逸|共感/;
 
-function parseAiComments(t) {
+const parseAiComments = readers => t => {
   if (!t) return null;
   let o;
   try { o = JSON.parse(t.replace(/^\s*```(json)?/i, "").replace(/```\s*$/, "").trim()); } catch { return null; }
   const out = {};
-  for (const r of AI_READERS) {
+  for (const r of readers) {
     let s = String((o && o[r.key]) || "").replace(/\*\*/g, "").replace(/\s*\n\s*/g, "").trim();
-    s = s.replace(new RegExp("^(" + r.name + "|" + r.key + ")[：:]\\s*"), "");
+    s = s.split(r.name + "：").join("").split(r.name + ":").join("").replace(new RegExp("^" + r.key + "[：:]\\s*"), "");
     s = s.replace(/！/g, "");
     const n = [...s].length;
     if (n < 6 || n > 90 || AI_NG.test(s)) return null;   // 長すぎ・AIっぽい言葉は、次のモデルで作り直す
     out[r.key] = s;
   }
   return out;
-}
+};
 
 // 作品のAIの感想を、すべて消す（前の「AIの読み手」1人版もふくむ）
 async function deleteAiComments(kv, id) {
   for (const k of await listAll(kv, "c:" + id + ":ai")) await kv.delete(k.name);
 }
-// いまの版への3人の感想が、もうあるか（1人版の「AIの読み手」だけなら、3人版に置きかえる）
-async function hasAiComments(kv, w) {
+// いまの版・いまの読み手への感想が、もうあるか（文体や顔ぶれを変えたら、一括のボタンで作り直される）
+async function hasAiComments(kv, w, ver) {
   for (const k of await listAll(kv, "c:" + w.id + ":ai-")) {
     const c = await kv.get(k.name, { type: "json" });
-    if (c && c.persona && c.forUpdated === w.updated && c.style === AI_STYLE) return true;
+    if (c && c.persona && c.forUpdated === w.updated && String(c.style) === ver) return true;
   }
   return false;
 }
-// 3人の感想を1回の問い合わせでまとめて作り、時間をずらして保存する。できたら true
-async function makeAiComment(env, w) {
+// 読み手全員の感想を1回の問い合わせでまとめて作り、時間をずらして保存する。できたら true
+async function makeAiComment(env, w, R) {
+  R = R || await getReaders(env.BUNKO);
   const text = clip(w.text, 6000);
   const g = GENRES[w.genre] ? GENRES[w.genre].split("（")[0] : "";
-  const user = `タイトル：『${w.title}』\nジャンル：${g}\n\n本文：\n${text}\n\n3人の感想を JSON で出してください。`;
+  const user = `タイトル：『${w.title}』\nジャンル：${g}\n\n本文：\n${text}\n\n${R.readers.length}人の感想を JSON で出してください。`;
   let result;
-  try { ({ result } = await callGemini(env, AI_COMMENT_BASE, user, { models: HINT_MODELS, parse: parseAiComments, temperature: 1.0, json: true })); }
+  try { ({ result } = await callGemini(env, commentPrompt(R.readers), user, { models: HINT_MODELS, parse: parseAiComments(R.readers), temperature: 1.0, json: true })); }
   catch { return false; }
   // もう届いていた感想は、作り直しても同じ時刻に届いた扱いにする（消えてから出直さないように）
-  const old = {};
+  const oldTimes = [];
   for (const k of await listAll(env.BUNKO, "c:" + w.id + ":ai-")) {
     const c = await env.BUNKO.get(k.name, { type: "json" });
-    if (c && c.persona && c.forUpdated === w.updated) old[c.persona] = c.showAt;
+    if (c && c.persona && c.forUpdated === w.updated) oldTimes.push(c.showAt);
   }
+  oldTimes.sort((a, b) => a - b);
   await deleteAiComments(env.BUNKO, w.id);
   const now = Date.now();
-  const order = AI_READERS.slice().sort(() => Math.random() - 0.5);   // だれが先に届くかも毎回ちがう
+  const order = R.readers.slice().sort(() => Math.random() - 0.5);   // だれが先に届くかも毎回ちがう
   for (let i = 0; i < order.length; i++) {
     const r = order[i], [lo, hi] = AI_SLOTS[i] || AI_SLOTS[AI_SLOTS.length - 1];
-    const showAt = old[r.key] || now + Math.round((lo + Math.random() * (hi - lo)) * 60000);
-    const c = { id: "ai-" + r.key, workId: w.id, name: r.name, persona: r.key, text: result[r.key], ai: true, status: "public", showAt, created: now, forUpdated: w.updated, style: AI_STYLE };
+    const showAt = oldTimes[i] || now + Math.round((lo + Math.random() * (hi - lo)) * 60000);
+    const c = { id: "ai-" + r.key, workId: w.id, name: r.name, persona: r.key, text: result[r.key], ai: true, status: "public", showAt, created: now, forUpdated: w.updated, style: R.ver };
     await env.BUNKO.put("c:" + w.id + ":ai-" + r.key, JSON.stringify(c), { metadata: { status: "public", ai: true, showAt } });
   }
   return true;
@@ -345,7 +366,8 @@ async function bunko(request, env, headers, path, ctx) {
       else if (["public", "pending", "hidden"].includes(st)) {
         w.status = st; await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) });
         if (st === "public") {
-          if (!(await hasAiComments(kv, w))) await later(makeAiComment(env, w));
+          const R = await getReaders(kv);
+          if (!(await hasAiComments(kv, w, R.ver))) await later(makeAiComment(env, w, R));
         }
       }
     } else if (body.kind === "c") {
@@ -365,14 +387,27 @@ async function bunko(request, env, headers, path, ctx) {
       const ok = await makeAiComment(env, w);
       return J({ made: ok ? 1 : 0, failed: ok ? 0 : 1 }, headers);
     }
-    let made = 0, failed = 0;
+    let made = 0, failed = 0; const R = await getReaders(kv);
     for (const k of await listAll(kv, "w:")) {
       if (!k.metadata || k.metadata.status !== "public") continue;
       const w = await kv.get(k.name, { type: "json" }); if (!w) continue;
-      if (await hasAiComments(kv, w)) continue;
-      if (await makeAiComment(env, w)) made++; else failed++;   // Gemini の RPM に配慮して1件ずつ
+      if (await hasAiComments(kv, w, R.ver)) continue;
+      if (await makeAiComment(env, w, R)) made++; else failed++;   // Gemini の RPM に配慮して1件ずつ
     }
     return J({ made, failed }, headers);
+  }
+  // AIの読み手の顔ぶれ：GET で読む／POST {readers} で保存／POST {reset:true} ではじめの3人にもどす
+  if (path === "/bunko/admin/readers") {
+    if (request.method === "POST") {
+      if (body.reset) await kv.delete("cfg:readers");
+      else {
+        const readers = cleanReaders(body.readers);
+        if (!readers.length) return J({ error: "empty", message: "読み手を1人以上入れてください（名前と性格・話し方は必須）" }, headers, 400);
+        await kv.put("cfg:readers", JSON.stringify({ readers, updated: Date.now() }));
+      }
+    }
+    const R = await getReaders(kv);
+    return J({ readers: R.readers, custom: R.custom }, headers);
   }
   return J({ error: "path" }, headers, 404);
 }

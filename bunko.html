@@ -91,6 +91,12 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .cm.ai.p-shiori{--pc:255,211,140}      /* シオリ：ことば */
 .cm.ai.p-haguruma{--pc:184,196,255}    /* ハグルマ：しくみ */
 .cm.ai.p-sora{--pc:140,232,255}        /* ソラ：きもち */
+.cm.ai.p-r1{--pc:255,183,213} .cm.ai.p-r2{--pc:184,196,255} .cm.ai.p-r3{--pc:255,211,140}
+.rd{padding:14px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--edge);margin-bottom:10px}
+.rd label{display:block;font-size:12px;color:var(--sub);margin:8px 0 4px}
+.rd .on{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);margin:0}
+.rd input[type=checkbox]{width:auto}
+.rd textarea{font-size:14px;line-height:1.7}
 .aitag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.12em;padding:1px 7px;border-radius:99px;border:1px solid rgba(var(--pc,159,227,255),.45);color:rgb(var(--pc,159,227,255));margin-left:4px;vertical-align:1px}
 .aibox{margin-top:10px}
 .aibox .when{font-size:12px;color:var(--sub);margin-top:6px}
@@ -162,7 +168,13 @@ h3{font-size:14px;letter-spacing:.15em;color:var(--sub);margin:22px 0 10px;font-
       <div id="senseiBody" class="hidden">
         <div class="row" style="margin-top:0"><button class="btn small" id="btnTReload">↻ 読みこみ直す</button><button class="btn small" id="btnTClose2">棚へもどる</button></div>
         <div class="row"><button class="btn small" id="btnAiAll">AIの感想をまだない作品に付ける</button></div>
-        <p class="note" id="aiAllMsg" style="margin-top:6px">公開中の作品には、AIの読み手（シオリ・ハグルマ・ソラ）の感想が、公開してから7分後〜1時間半ほどのあいだに、1人ずつ届きます。</p>
+        <p class="note" id="aiAllMsg" style="margin-top:6px">公開中の作品には、AIの読み手の感想が、公開してから7分後〜1時間半ほどのあいだに、1人ずつ届きます。</p>
+        <details style="margin-top:14px" id="rdBox"><summary class="note" style="cursor:pointer">AIの読み手の顔ぶれ（名前・性格・話し方）を変える</summary>
+          <p class="note" style="margin:10px 0">ここに入れた名前や性格は、Cloudflare の保存場所にしまわれます（公開リポジトリには残りません）。1〜3人まで。使わない読み手は「使う」をはずしてください。保存したあと［AIの感想をまだない作品に付ける］を押すと、全部の作品の感想が新しい顔ぶれで作り直されます。</p>
+          <div id="rdList"></div>
+          <div class="row"><button class="btn small main" id="btnRdSave">保存する</button><button class="btn small" id="btnRdReset">はじめの3人にもどす</button></div>
+          <div class="msg" id="rdMsg"></div>
+        </details>
         <h3>確認待ちの作品</h3><div id="tPendW"></div>
         <h3>確認待ちの感想</h3><div id="tPendC"></div>
         <h3>公開中・非公開の作品</h3><div id="tOther"></div>
@@ -313,11 +325,40 @@ async function showRead(it){ // 先生用：本文と、AIの感想（時限前�
   const ais=(j.comments||[]).filter(c=>c.ai), box=it.querySelector(".aibox"); box.classList.remove("hidden");
   box.innerHTML= ais.map(c=>cmHTML(c)+'<div class="when" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span>'+hm(c.showAt)+(c.showAt>Date.now()?" に表示されます":" から表示中")+'</span>'
       +'<button class="btn small danger" data-act="aidel" data-cid="'+esc(c.id)+'">この感想を削除</button></div>').join("")
-    +(j.work.status==="public"? '<div class="row" style="margin-top:6px"><button class="btn small" data-act="aire">'+(ais.length?"AIの感想を3人とも作り直す":"AIの感想を作る")+'</button></div>' : '');
+    +(j.work.status==="public"? '<div class="row" style="margin-top:6px"><button class="btn small" data-act="aire">'+(ais.length?"AIの感想を全員分作り直す":"AIの感想を作る")+'</button></div>' : '');
 }
+/* AIの読み手の顔ぶれ */
+async function loadReaders(){
+  const j=await api("/bunko/admin/readers",{teacher:true}); const rs=j.readers||[];
+  $("rdList").innerHTML=[0,1,2].map(i=>{ const r=rs[i]||{name:"",desc:"",ex:[]};
+    return '<div class="rd" data-i="'+i+'"><label class="on"><input type="checkbox" class="use"'+(rs[i]?" checked":"")+'> '+(i+1)+'人目を使う</label>'
+      +'<label>名前</label><input class="nm" maxlength="16" value="'+esc(r.name)+'">'
+      +'<label>性格・話し方</label><textarea class="ds" rows="4" maxlength="400">'+esc(r.desc)+'</textarea>'
+      +'<label>書きぶりの例（1行に1つ。口調をつかませるためのもので、そのまま使われることはありません）</label><textarea class="ex" rows="3">'+esc((r.ex||[]).join("\n"))+'</textarea></div>'; }).join("");
+}
+$("rdBox").addEventListener("toggle",()=>{ if($("rdBox").open) loadReaders().catch(e=>$("rdMsg").textContent=e.message); });
+$("btnRdSave").onclick=async()=>{
+  const readers=[...document.querySelectorAll("#rdList .rd")].filter(d=>d.querySelector(".use").checked).map(d=>({
+    name:d.querySelector(".nm").value.trim(), desc:d.querySelector(".ds").value.trim(),
+    ex:d.querySelector(".ex").value.split("\n").map(x=>x.trim()).filter(Boolean) }));
+  $("rdMsg").style.color="var(--ng)";
+  if(!readers.length){ $("rdMsg").textContent="1人以上「使う」にしてください。"; return; }
+  if(readers.some(r=>!r.name||!r.desc)){ $("rdMsg").textContent="使う読み手には、名前と性格・話し方を入れてください。"; return; }
+  try{ await api("/bunko/admin/readers",{method:"POST",teacher:true,body:{readers}}); await loadReaders();
+    $("rdMsg").style.color="var(--ok)"; $("rdMsg").textContent="保存しました。上の［AIの感想をまだない作品に付ける］を押すと、新しい顔ぶれで作り直します。"; }
+  catch(e){ $("rdMsg").textContent=e.message; }
+};
+let rdResetArm=0;
+$("btnRdReset").onclick=async()=>{
+  if(Date.now()-rdResetArm>=3000){ rdResetArm=Date.now(); $("btnRdReset").textContent="もう一度押すと、はじめの3人にもどります"; setTimeout(()=>$("btnRdReset").textContent="はじめの3人にもどす",3000); return; }
+  rdResetArm=0; $("btnRdReset").textContent="はじめの3人にもどす";
+  try{ await api("/bunko/admin/readers",{method:"POST",teacher:true,body:{reset:true}}); await loadReaders();
+    $("rdMsg").style.color="var(--ok)"; $("rdMsg").textContent="はじめの3人（シオリ・ハグルマ・ソラ）にもどしました。"; }
+  catch(e){ $("rdMsg").textContent=e.message; }
+};
 $("btnAiAll").onclick=async()=>{ const b=$("btnAiAll"); b.disabled=true; $("aiAllMsg").textContent="作っています…（1冊に数秒かかります。このままお待ちください）";
   try{ const r=await api("/bunko/admin/ai",{method:"POST",teacher:true,body:{}});
-    $("aiAllMsg").textContent= r.made||r.failed ? r.made+"冊に付けました。3人の感想が、7分後から1時間半ほどのあいだに1人ずつ届きます。"+(r.failed?"（"+r.failed+"冊はうまく作れませんでした。もう一度押すと、その分だけ作り直します）":"")
+    $("aiAllMsg").textContent= r.made||r.failed ? r.made+"冊に付けました（作り直しをふくむ）。まだ届いていない分は、1人ずつ時間をおいて届きます。"+(r.failed?"（"+r.failed+"冊はうまく作れませんでした。もう一度押すと、その分だけ作り直します）":"")
       : "AIの感想のない公開中の作品は、ありませんでした。"; }
   catch(e){ $("aiAllMsg").textContent=e.message; }
   b.disabled=false; };
