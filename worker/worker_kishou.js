@@ -1,6 +1,7 @@
 // ============================================================
 //  起承転結 用 中継 Worker（worker_kishou.js）
 //  いま動いている tsukutte の Worker とは別物です。
+//  GitHub の main とつないであり（Cloudflare Workers Builds・Path /worker）、push すると自動でデプロイされる。
 //  変数：GEMINI_API_KEY（Secret）／ALLOWED_ORIGIN = https://yama0113sg.github.io
 //  POST {stage, genre, story, avoid}            → {line}   一行を引く
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
