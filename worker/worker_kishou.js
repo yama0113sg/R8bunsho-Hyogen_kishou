@@ -98,22 +98,39 @@ const BRIDGE_BASE = `あなたは高校3年生の創作の授業で、生徒が�
 // 読み方のちがう3人が、短く、くだけた言葉で感想を返す。人のふりはしない（画面では「AI」の印が付く）。
 // 公開してすぐ付くと不自然なので、1人目・2人目・3人目を時間をずらして見せる（分。秒までランダム）。
 const AI_SLOTS = [[7, 14], [20, 40], [50, 90]];
+// 文体を変えたら AI_STYLE を上げる。一括のボタンで、古い文体の感想が作り直される
+const AI_STYLE = 2;
 const AI_READERS = [
-  { key: "shiori",   name: "シオリ",   desc: "ことばに目がいく読み手。好きな一文や言い回しを、15字以内で短く引いて触れる。口調は静かで少しそっけない常体（「〜だった。」「〜が好き。」）。" },
-  { key: "haguruma", name: "ハグルマ", desc: "話の仕組みに目がいく読み手。場面と場面のつながり、転の効き方、伏線などに触れる。口調は少し理屈っぽく、えらそうだけど憎めない（「〜なわけだ。」「〜と見た。」）。" },
-  { key: "sora",     name: "ソラ",     desc: "気持ちが先に動く読み手。登場人物の気持ちに寄りそって、思ったことをそのまま言う。口調はくだけた話し言葉（「え、」「〜じゃん」「〜すぎる」）。" },
+  { key: "shiori", name: "シオリ",
+    desc: "ことば派。気に入った一文や言葉だけを、ぽつっと言う。短い。説明しない。体言止めや言いさしが多い。ほめ言葉をあまり使わない。",
+    ex: ["「まだ少し温かい」のとこ、ずっと残ってる。", "鍵の言い方、ちょっと笑った。", "最後の一文、声に出して読んだ。"] },
+  { key: "haguruma", name: "ハグルマ",
+    desc: "考察派。ひとりでぶつぶつ考えている。気づいたことや疑問をそのまま言う。決めつけずに「〜かな」「〜では」で終わることが多い。話の仕組みや、前の場面とのつながりが気になる。",
+    ex: ["フクロウ、最初の場面からいたよね。読み返したらいた。", "鍵の持ち主、結局だれなんだろう。先生では？", "転で一回ひっくり返ったのに、結で静かに戻るのがいい。"] },
+  { key: "sora", name: "ソラ",
+    desc: "気持ち派。読んでいて思ったことがそのまま口に出る。語彙が少なくて、テンションで話す。登場人物に話しかけることもある。",
+    ex: ["え、まって、ここで終わるの", "主人公、それは言っちゃだめだって笑", "屋上のとこ、なんか泣きそうになった"] },
 ];
-const AI_COMMENT_BASE = `あなたは、高校3年生が書いた短い物語を読む、3人の「AIの読み手」です。3人それぞれの感想を書いてください。
+const AI_COMMENT_BASE = `高校3年生のクラスで、生徒が書いた短い物語をみんなで読み合っています。
+あなたはそこに混ざっている3人の「AIの読み手」として、読んだあとのひとことを書きます。
+国語の先生や本の評論家のような感想ではなく、同じ教室の高校生が感想欄にさっと書くひとことにしてください。
+
 3人：
-${AI_READERS.map(r => `・${r.key}（${r.name}）：${r.desc}`).join("\n")}
+${AI_READERS.map(r => `・${r.key}（${r.name}）：${r.desc}\n　書きぶりの例：${r.ex.map(x => "「" + x + "」").join("")}`).join("\n")}
+
 守ること：
-・それぞれ40〜80字。高校生どうしの感想と同じくらいの短さ・くだけ方にする。ていねいすぎる言葉や、長い前置きは使わない。
-・3人とも、作品の具体的な場面か一文に触れる。3人で同じところに触れない。
-・点数や評価のことば、「〜するともっとよくなる」などの助言、あらすじの要約、お説教は書かない。
-・次の言い回しは使わない：「素晴らしい」「見事」「印象的でした」「心温まる」「感動しました」「〜が光っています」「作者さん」。「！」は使うとしても1回まで。
-・改行、絵文字、見出しは付けない。
+・書きぶりの例は、口調をつかむためだけのもの。例の言い回しをそのまま使わず、この作品に合わせて言う。
+・それぞれ10〜60字。長くしない。3人の長さもばらばらにする。
+・きちんとした文にまとめなくてよい。言いさし、体言止め、話し言葉のままでよい。
+・「よかったところ＋気になったところ」のような、整った型にしない。思ったことを一つだけ言う。
+・3人で、同じ場面・同じ一文に触れない。言い回しや語尾もかぶらせない。
+・作品に出てくる具体的なもの（人物、物、場面、一文）を一つは入れる。ただし、あらすじの説明はしない。
+・ほめる言葉、点数、助言、まとめ、お説教は書かない。
+・次の言葉は使わない：素晴らしい、見事、印象的、心温まる、感動、光って、作者、描写、表現、世界観、心情、引き込まれ、伝わって、余韻、絶妙、巧み、秀逸、共感、ですね、ました。
+・改行、絵文字、見出しは付けない。「！」は使わない。
 ・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。作品がこれらに触れていても、感想では掘り下げない。
 出力は次の形の JSON だけ：{"shiori":"…","haguruma":"…","sora":"…"}`;
+const AI_NG = /素晴らし|見事|印象的|心温ま|感動|光って|作者|描写|世界観|心情|引き込ま|伝わって|余韻|絶妙|巧み|秀逸|共感/;
 
 function parseAiComments(t) {
   if (!t) return null;
@@ -123,8 +140,9 @@ function parseAiComments(t) {
   for (const r of AI_READERS) {
     let s = String((o && o[r.key]) || "").replace(/\*\*/g, "").replace(/\s*\n\s*/g, "").trim();
     s = s.replace(new RegExp("^(" + r.name + "|" + r.key + ")[：:]\\s*"), "");
+    s = s.replace(/！/g, "");
     const n = [...s].length;
-    if (n < 15 || n > 110) return null;
+    if (n < 6 || n > 90 || AI_NG.test(s)) return null;   // 長すぎ・AIっぽい言葉は、次のモデルで作り直す
     out[r.key] = s;
   }
   return out;
@@ -138,7 +156,7 @@ async function deleteAiComments(kv, id) {
 async function hasAiComments(kv, w) {
   for (const k of await listAll(kv, "c:" + w.id + ":ai-")) {
     const c = await kv.get(k.name, { type: "json" });
-    if (c && c.persona && c.forUpdated === w.updated) return true;
+    if (c && c.persona && c.forUpdated === w.updated && c.style === AI_STYLE) return true;
   }
   return false;
 }
@@ -148,15 +166,21 @@ async function makeAiComment(env, w) {
   const g = GENRES[w.genre] ? GENRES[w.genre].split("（")[0] : "";
   const user = `タイトル：『${w.title}』\nジャンル：${g}\n\n本文：\n${text}\n\n3人の感想を JSON で出してください。`;
   let result;
-  try { ({ result } = await callGemini(env, AI_COMMENT_BASE, user, { models: HINT_MODELS, parse: parseAiComments, temperature: 0.9, json: true })); }
+  try { ({ result } = await callGemini(env, AI_COMMENT_BASE, user, { models: HINT_MODELS, parse: parseAiComments, temperature: 1.0, json: true })); }
   catch { return false; }
+  // もう届いていた感想は、作り直しても同じ時刻に届いた扱いにする（消えてから出直さないように）
+  const old = {};
+  for (const k of await listAll(env.BUNKO, "c:" + w.id + ":ai-")) {
+    const c = await env.BUNKO.get(k.name, { type: "json" });
+    if (c && c.persona && c.forUpdated === w.updated) old[c.persona] = c.showAt;
+  }
   await deleteAiComments(env.BUNKO, w.id);
   const now = Date.now();
   const order = AI_READERS.slice().sort(() => Math.random() - 0.5);   // だれが先に届くかも毎回ちがう
   for (let i = 0; i < order.length; i++) {
     const r = order[i], [lo, hi] = AI_SLOTS[i] || AI_SLOTS[AI_SLOTS.length - 1];
-    const showAt = now + Math.round((lo + Math.random() * (hi - lo)) * 60000);
-    const c = { id: "ai-" + r.key, workId: w.id, name: r.name, persona: r.key, text: result[r.key], ai: true, status: "public", showAt, created: now, forUpdated: w.updated };
+    const showAt = old[r.key] || now + Math.round((lo + Math.random() * (hi - lo)) * 60000);
+    const c = { id: "ai-" + r.key, workId: w.id, name: r.name, persona: r.key, text: result[r.key], ai: true, status: "public", showAt, created: now, forUpdated: w.updated, style: AI_STYLE };
     await env.BUNKO.put("c:" + w.id + ":ai-" + r.key, JSON.stringify(c), { metadata: { status: "public", ai: true, showAt } });
   }
   return true;
