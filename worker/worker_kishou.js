@@ -479,7 +479,7 @@ async function bunko(request, env, headers, path, ctx) {
     if (!w || w.status !== "public") return J({ error: "notfound" }, headers, 404);
     const token = clip(body.token, 64), pen = clip(body.pen, 20).trim(), cat = clip(body.catch, 24).trim(), txt = clip(body.body, 100).trim();
     const style = [0, 1, 2].includes(body.style) ? body.style : 0;
-    if (token.length < 16 || !pen || !cat) return J({ error: "empty" }, headers, 400);
+    if (token.length < 16 || !pen || !cat || !txt) return J({ error: "empty", message: "キャッチコピーと推薦文を書いてください。" }, headers, 400);
     const R = await getReaders(kv);
     let check = null;
     try { ({ result: check } = await callGemini(env, obiPrompt(R.readers), `タイトル：『${w.title}』\nジャンル：${GENRES[w.genre] ? GENRES[w.genre].split("（")[0] : ""}\n\nキャッチコピー：${cat}\n推薦文：${txt}\n推薦者：${pen}\n\nJSON で出してください。`, { models: HINT_MODELS, parse: parseObi(R.readers), temperature: 0.8, json: true })); } catch { check = null; }

@@ -209,7 +209,7 @@ h3{font-size:14px;letter-spacing:.15em;color:var(--sub);margin:22px 0 10px;font-
       <p class="label" style="margin-top:16px">キャッチコピー（大きい字・24字まで）</p>
       <input id="obCatch" maxlength="24" placeholder="例：その鍵、どの扉に合う？" style="font-family:var(--mincho);font-size:19px;font-weight:700">
       <div class="count"><span id="obCatchN">0</span> / 24</div>
-      <p class="label" style="margin-top:6px">推薦文（小さい字・100字まで。なくてもよい）</p>
+      <p class="label" style="margin-top:6px">推薦文（小さい字・100字まで）</p>
       <textarea id="obBody" maxlength="100" rows="3" style="font-family:var(--mincho);line-height:1.8" placeholder="どこが好きか、だれに読んでほしいか"></textarea>
       <div class="count"><span id="obBodyN">0</span> / 100</div>
       <p class="label" style="margin-top:6px">推薦者（ペンネーム）</p>
@@ -379,6 +379,7 @@ $("btnObiQ").onclick=async()=>{ const b=$("btnObiQ"); b.disabled=true; $("obMsg"
 $("btnObiSend").onclick=async()=>{ const d=obiDraft();
   $("obMsg").style.color="var(--ng)";
   if(!d.catch){ $("obMsg").textContent="キャッチコピーを書いてください。"; return; }
+  if(!d.body){ $("obMsg").textContent="推薦文を書いてください。"; return; }
   if(!d.pen){ $("obMsg").textContent="推薦者のペンネームを入れてください。"; return; }
   $("btnObiSend").disabled=true; $("obMsg").style.color="var(--sub)"; $("obMsg").textContent="編集部が読んでいます…";
   try{ const j=await api("/bunko/obi",{method:"POST",body:{workId:cur.work.id,token:ownerToken(),...d}}); const o=j.obi;
