@@ -116,10 +116,15 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .band.s0{background:linear-gradient(180deg,rgba(0,0,0,.06),transparent 18%),linear-gradient(90deg,#e4dccb,#efe8da 12%,#ebe3d3 88%,#d9d0bd);color:#2a2620} .band.s0 .bc{color:#a3271f}
 .band.s1{background:linear-gradient(90deg,#120f19,#1d1828 12%,#191523 88%,#0e0b14);color:#e8e2d0;border-top:2px solid #c9a24a} .band.s1 .bc{color:#ffd36a}
 .band.s2{background:linear-gradient(180deg,rgba(255,255,255,.12),transparent 30%),linear-gradient(90deg,color-mix(in srgb,var(--c) 70%,#000) 0%,var(--c) 12%,var(--c) 88%,color-mix(in srgb,var(--c) 70%,#000));color:#1d1a26} .band.s2 .bc{color:#1d1a26}
-.obilist{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 12px;margin-bottom:6px}
-.obilist .oc{flex:0 0 min(78%,260px);scroll-snap-align:center}
-.obilist .bookcover{width:100%}
-.obilist .oc .row{margin-top:8px;justify-content:center}
+.obilist{padding:4px 0 6px;margin-bottom:6px;touch-action:pan-y}
+.obilist .bookcover{width:min(100%,280px)}
+.obilist .band{animation:bandin .35s ease-out}
+@keyframes bandin{from{opacity:0;transform:translateY(8px)}}
+.obnav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:12px}
+.obnav button{width:40px;height:40px;border-radius:50%;background:var(--glass2);border:1px solid var(--edge);font-size:18px}
+.obnav button:disabled{opacity:.25}
+.obnav span{font-size:13px;color:var(--sub);letter-spacing:.1em;min-width:5.5em;text-align:center}
+.obilist .mine{display:flex;justify-content:center;margin-top:8px}
 .spine .ob{position:absolute;left:0;right:0;bottom:0;height:42px;z-index:1;box-shadow:0 -2px 5px rgba(0,0,0,.35)}
 .spine .ob::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.5) 0,rgba(0,0,0,.14) 16%,rgba(255,255,255,.08) 50%,rgba(0,0,0,.2) 84%,rgba(0,0,0,.5) 100%)}
 .spine.ob0::after,.spine.ob1::after,.spine.ob2::after{bottom:42px}   /* 金の線を、帯のすぐ上にそろえる */
@@ -354,12 +359,23 @@ function coverHTML(w,o){ // 本の表紙に帯を巻いた姿
 }
 function guessHTML(o){ const gs=Object.values(o.guess||{}); if(!gs.length) return "";
   return '<div class="guess"><p class="label" style="margin:0 0 6px">帯だけ読んだAIの読み手の予想</p>'+gs.map(g=>'<div class="cm ai"><b>'+esc(g.name)+'</b><span class="aitag">AI</span><p>'+esc(g.text)+'</p></div>').join("")+'</div>'; }
-function renderObis(){
+// 表紙は1枚。帯が何本もあるときは、‹ › で巻きかえる（はじめは、いちばん新しい帯）
+let obIdx=0;
+function renderObis(keep){
   const os=cur.obis||[], mine=myObis();
-  $("obiList").innerHTML=os.map(o=>'<div class="oc">'+coverHTML(cur.work,o)+(mine.includes(o.id)?'<div class="row"><button class="btn small danger" data-unobi="'+esc(o.id)+'">自分の帯をはずす</button></div>':'')+'</div>').join("");
-  $("obiList").classList.toggle("hidden",!os.length);
+  $("obiList").classList.toggle("hidden",!os.length); if(!os.length) return;
+  if(!keep) obIdx=os.length-1; obIdx=Math.max(0,Math.min(os.length-1,obIdx));
+  const o=os[obIdx];
+  $("obiList").innerHTML=coverHTML(cur.work,o)
+    +(os.length>1?'<div class="obnav"><button data-obmove="-1" aria-label="前の帯"'+(obIdx===0?" disabled":"")+'>‹</button><span>帯 '+(obIdx+1)+' ／ '+os.length+'</span><button data-obmove="1" aria-label="次の帯"'+(obIdx===os.length-1?" disabled":"")+'>›</button></div>':'')
+    +(mine.includes(o.id)?'<div class="mine"><button class="btn small danger" data-unobi="'+esc(o.id)+'">自分の帯をはずす</button></div>':'');
 }
-$("obiList").addEventListener("click",async e=>{ const b=e.target.closest("button[data-unobi]"); if(!b) return;
+function moveObi(d){ const n=(cur.obis||[]).length; const i=obIdx+d; if(i<0||i>=n) return; obIdx=i; renderObis(true); }
+let obTouchX=null;
+$("obiList").addEventListener("touchstart",e=>{ obTouchX=e.touches[0].clientX; },{passive:true});
+$("obiList").addEventListener("touchend",e=>{ if(obTouchX==null) return; const dx=e.changedTouches[0].clientX-obTouchX; obTouchX=null; if(Math.abs(dx)>40) moveObi(dx<0?1:-1); });
+$("obiList").addEventListener("click",async e=>{ const m=e.target.closest("button[data-obmove]"); if(m){ moveObi(+m.dataset.obmove); return; }
+  const b=e.target.closest("button[data-unobi]"); if(!b) return;
   if(b.dataset.arm!=="1"){ b.dataset.arm="1"; b.textContent="もう一度押すと、はずします"; setTimeout(()=>{b.dataset.arm="";b.textContent="自分の帯をはずす";},3000); return; }
   try{ await api("/bunko/obi/delete",{method:"POST",body:{workId:cur.work.id,id:b.dataset.unobi,token:ownerToken()}}); await openWork(cur.work.id); }catch(err){ $("cmMsg").textContent=err.message; } });
 let obStyle=0;
@@ -387,7 +403,7 @@ $("btnObiSend").onclick=async()=>{ const d=obiDraft();
   try{ const j=await api("/bunko/obi",{method:"POST",body:{workId:cur.work.id,token:ownerToken(),...d}}); const o=j.obi;
     ls.set("kishou_pen",d.pen); ls.set("bunko_myobi",JSON.stringify(myObis().concat(o.id).slice(-200)));
     $("obMsg").style.color="var(--ok)";
-    $("obMsg").textContent= o.status==="public"? "帯を巻きました。本の表紙に並んでいます。" : "先生が確認してから、本に巻かれます。";
+    $("obMsg").textContent= o.status==="public"? "帯を巻きました。本を開くと、いちばん上に巻かれています。" : "先生が確認してから、本に巻かれます。";
     $("obResult").innerHTML=guessHTML(o)+'<div class="row"><button class="btn" id="btnObiDone">本にもどる</button></div>';
     $("btnObiDone").onclick=()=>openWork(cur.work.id); }
   catch(e){ $("obMsg").style.color="var(--ng)"; $("obMsg").textContent=e.message; $("btnObiSend").disabled=false; }
