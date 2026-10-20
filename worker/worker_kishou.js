@@ -356,7 +356,7 @@ async function listAll(kv, prefix) {
   return out;
 }
 const workMeta = w => ({ id: w.id, pen: w.pen, title: w.title, genre: w.genre, status: w.status,
-  rv: w.review ? (w.review.ok ? "ok" : "ng") : null,
+  rv: w.review ? (w.review.ok ? "ok" : "ng") : null, obi: w.obi == null ? null : w.obi,
   chars: [...w.text.replace(/\s/g, "")].length, created: w.created, updated: w.updated });
 const withoutOwner = w => { const { owner, ...rest } = w; return rest; };
 // 査読のメモは、先生と、返却された本人にだけ見せる
@@ -364,6 +364,43 @@ const workView = (w, teacher, mine) => { const v = withoutOwner(w); if (!teacher
 async function deleteWork(kv, id) {
   await kv.delete("w:" + id);
   for (const k of await listAll(kv, "c:" + id + ":")) await kv.delete(k.name);
+  for (const k of await listAll(kv, "o:" + id + ":")) await kv.delete(k.name);
+}
+
+// ── 帯（おすすめの帯）──
+// 帯は、文庫の編集部（AI）が読んで気になる点がなければそのまま載る。気になる点があれば先生の確認待ち。
+// あわせて、AIの読み手が「帯だけ」を読んで、どんな話かを予想する（帯の手ごたえ）。
+function obiPrompt(readers) {
+  return `高校3年生のクラス文庫で、生徒が友だちの作品（または自分の作品）に「本の帯」を書きました。帯には、キャッチコピーと短い推薦文が書かれています。
+次の2つをしてください。
+1. 文庫の編集部として、帯がだれかを傷つけないかだけを見る。悪口・からかい、実在の人物や先生をばかにする内容、性的な内容、差別、個人情報があれば ok を false にして、why に理由を40字以内で書く。なければ ok は true、why は空。ネタバレや、帯のうまい・へたは問題にしない。
+2. 次の読み手が、本文を読まずに「タイトルと帯だけ」を見て、どんな話だと思うかを、それぞれの口調で予想する。1人20〜60字。「〜な話かな」「〜っぽい」のように、予想として言う。ほめたり、帯の出来を評価したりしない。
+読み手：
+${readers.map(r => `・${r.key}（${r.name}）：${r.desc}`).join("\n")}
+出力は JSON だけ：{"ok":true,"why":"","guess":{${readers.map(r => `"${r.key}":"…"`).join(",")}}}`;
+}
+const parseObi = readers => t => {
+  const o = jsonOf(t); if (!o || typeof o.ok !== "boolean") return null;
+  const guess = {};
+  for (const r of readers) { const g = String((o.guess && o.guess[r.key]) || "").replace(/\s*\n\s*/g, "").trim(); if (g && len(g) <= 100) guess[r.key] = { name: r.name, text: g }; }
+  return { ok: o.ok, why: String(o.why || "").slice(0, 80), guess };
+};
+const OBIQ_BASE = `高校3年生が、クラス文庫の作品に「本の帯」（キャッチコピーと短い推薦文）を書こうとしています。
+あなたは帯を書きません。かわりに、帯の材料になる「推しどころ」を引き出す問いを3つ出してください。
+・作品の中身に合わせた、具体的な問いにする（場面、人物、物、一文などに触れる）。
+・1つ40字以内。「？」で終わる。答えや帯の例は書かない。
+・3つは、「一番心が動いた場面」「だれに読んでほしいか」「読む前の人に伝えたいこと」の方向でばらけさせる。
+・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。
+出力は JSON だけ：{"qs":["…","…","…"]}`;
+const parseQs = t => { const o = jsonOf(t); const qs = (o && Array.isArray(o.qs) ? o.qs : []).map(x => String(x).trim()).filter(x => x && len(x) <= 60 && /[？?]$/.test(x)); return qs.length >= 2 ? qs.slice(0, 3) : null; };
+const obiView = o => { const { owner, ...rest } = o; return rest; };
+// その作品の、いちばん新しい公開中の帯の色を、作品の metadata に写す（棚の背表紙に帯を描くため）
+async function syncObi(kv, workId) {
+  const w = await kv.get("w:" + workId, { type: "json" }); if (!w) return;
+  let latest = null;
+  for (const k of await listAll(kv, "o:" + workId + ":")) if (k.metadata && k.metadata.status === "public" && (!latest || k.metadata.created > latest.created)) latest = k.metadata;
+  const style = latest ? latest.style : null;
+  if (w.obi !== style) { w.obi = style; await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) }); }
 }
 
 async function bunko(request, env, headers, path, ctx) {
@@ -400,7 +437,13 @@ async function bunko(request, env, headers, path, ctx) {
       const c = await kv.get(k.name, { type: "json" }); if (c) comments.push(c);
     }
     comments.sort((a, b) => (a.showAt || a.created) - (b.showAt || b.created));
-    return J({ work: workView(w, teacher, mine), comments, mine }, headers);
+    const obis = [];
+    for (const k of await listAll(kv, "o:" + id + ":")) {
+      if (!k.metadata || (k.metadata.status !== "public" && !teacher)) continue;
+      const o = await kv.get(k.name, { type: "json" }); if (o) obis.push(obiView(o));
+    }
+    obis.sort((a, b) => a.created - b.created);
+    return J({ work: workView(w, teacher, mine), comments, obis, mine }, headers);
   }
   // 作品を出す（同じ端末から同じ id で出し直すと、差し替えて確認待ちにもどる）
   if (path === "/bunko/submit") {
@@ -430,6 +473,38 @@ async function bunko(request, env, headers, path, ctx) {
     return J({ ok: true }, headers);
   }
   // 感想を送る（先生が公開するまでは見えない）
+  // 帯を巻く
+  if (path === "/bunko/obi") {
+    const w = await kv.get("w:" + clip(body.workId, 30), { type: "json" });
+    if (!w || w.status !== "public") return J({ error: "notfound" }, headers, 404);
+    const token = clip(body.token, 64), pen = clip(body.pen, 20).trim(), cat = clip(body.catch, 24).trim(), txt = clip(body.body, 100).trim();
+    const style = [0, 1, 2].includes(body.style) ? body.style : 0;
+    if (token.length < 16 || !pen || !cat) return J({ error: "empty" }, headers, 400);
+    const R = await getReaders(kv);
+    let check = null;
+    try { ({ result: check } = await callGemini(env, obiPrompt(R.readers), `タイトル：『${w.title}』\nジャンル：${GENRES[w.genre] ? GENRES[w.genre].split("（")[0] : ""}\n\nキャッチコピー：${cat}\n推薦文：${txt}\n推薦者：${pen}\n\nJSON で出してください。`, { models: HINT_MODELS, parse: parseObi(R.readers), temperature: 0.8, json: true })); } catch { check = null; }
+    const now = Date.now();
+    const o = { id: rid(), workId: w.id, owner: token, pen, catch: cat, body: txt, style, status: check && check.ok ? "public" : "pending",
+      review: check ? { ok: check.ok, why: check.why } : null, guess: check ? check.guess : {}, created: now };
+    await kv.put("o:" + w.id + ":" + o.id, JSON.stringify(o), { metadata: { status: o.status, style, created: now } });
+    if (o.status === "public") await syncObi(kv, w.id);
+    return J({ obi: obiView(o) }, headers);
+  }
+  // 自分の巻いた帯をはずす
+  if (path === "/bunko/obi/delete") {
+    const key = "o:" + clip(body.workId, 30) + ":" + clip(body.id, 30);
+    const o = await kv.get(key, { type: "json" });
+    if (!o || (o.owner !== body.token && !teacher)) return J({ error: "owner" }, headers, 403);
+    await kv.delete(key); await syncObi(kv, o.workId);
+    return J({ ok: true }, headers);
+  }
+  // 帯の相棒：推しどころを引き出す問い
+  if (path === "/bunko/obi/questions") {
+    const w = await kv.get("w:" + clip(body.workId, 30), { type: "json" });
+    if (!w || w.status !== "public") return J({ error: "notfound" }, headers, 404);
+    const { result } = await callGemini(env, OBIQ_BASE, `タイトル：『${w.title}』\n\n本文：\n${clip(w.text, 6000)}\n\nJSON で出してください。`, { models: HINT_MODELS, parse: parseQs, temperature: 0.8, json: true });
+    return J({ qs: result }, headers);
+  }
   if (path === "/bunko/comment") {
     const w = await kv.get("w:" + clip(body.workId, 30), { type: "json" });
     if (!w || w.status !== "public") return J({ error: "notfound" }, headers, 404);
@@ -448,7 +523,11 @@ async function bunko(request, env, headers, path, ctx) {
     for (const k of await listAll(kv, "c:")) {
       if (k.metadata && k.metadata.status === "pending") { const c = await kv.get(k.name, { type: "json" }); if (c) comments.push(c); }
     }
-    return J({ works, comments }, headers);
+    const obis = [];
+    for (const k of await listAll(kv, "o:")) {
+      if (k.metadata && k.metadata.status === "pending") { const o = await kv.get(k.name, { type: "json" }); if (o) obis.push(obiView(o)); }
+    }
+    return J({ works, comments, obis }, headers);
   }
   if (path === "/bunko/admin/set") {
     const st = body.status;
@@ -465,6 +544,13 @@ async function bunko(request, env, headers, path, ctx) {
           if (!(await hasAiComments(kv, w, R.ver))) await later(makeAiComment(env, w, R));
         }
       }
+    } else if (body.kind === "o") {
+      const key = "o:" + clip(body.workId, 30) + ":" + clip(body.id, 30);
+      const o = await kv.get(key, { type: "json" });
+      if (!o) return J({ error: "notfound" }, headers, 404);
+      if (st === "delete") await kv.delete(key);
+      else if (st === "public") { o.status = "public"; await kv.put(key, JSON.stringify(o), { metadata: { status: "public", style: o.style, created: o.created } }); }
+      await syncObi(kv, o.workId);
     } else if (body.kind === "c") {
       const key = "c:" + clip(body.workId, 30) + ":" + clip(body.id, 30);
       const c = await kv.get(key, { type: "json" });
@@ -526,7 +612,7 @@ export default {
       catch (e) { return J({ error: String(e.message || e) }, headers, 500); }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
