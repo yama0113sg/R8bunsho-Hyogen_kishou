@@ -349,6 +349,11 @@ async function callGemini(env, system, user, { models = MODELS, parse = cleanLin
 }
 
 // ============ クラス文庫 ============
+// ふっかつのじゅもん
+const SPELL_WORDS = ["あさひ","いずみ","うみべ","えがお","おかし","かえで","きつね","くじら","けやき","こだま","さくら","しずく","すずめ","せせらぎ","そよかぜ","たぬき","ちどり","つばめ","てまり","ともしび","なぎさ","にじいろ","ぬくもり","のはら","はるかぜ","ひなた","ふくろう","へいわ","ほしぞら","まつり","みかん","むささび","めだか","もみじ","やまびこ","ゆうき","ゆきみ","よぞら","らくだ","りんご","るりいろ","れんげ","ろうそく","わかば","こはる","かもめ","ほたる","すいか"];
+const makeSpell = () => { const r = n => crypto.getRandomValues(new Uint32Array(1))[0] % n;
+  return [0, 1, 2, 3].map(() => SPELL_WORDS[r(SPELL_WORDS.length)]).join(" ") + " " + String(r(100)).padStart(2, "0"); };
+const normSpell = s => String(s || "").replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60)).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[\s　・、,.]/g, "").slice(0, 60);
 const J = (obj, headers, status = 200) => new Response(JSON.stringify(obj), { status, headers });
 const clip = (s, n) => String(s || "").slice(0, n);
 const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -470,6 +475,28 @@ async function bunko(request, env, headers, path, ctx) {
     }
     await kv.put("idx:w", JSON.stringify(widx));
     return J({ ok: true, works: Object.keys(widx.items).length, subs, usedList }, headers);
+  }
+  // ── ふっかつのじゅもん：本棚をまるごと預ける ──
+  // じゅもんは「ひらがな4語＋数字2けた」。キーは sp:<空白をのぞいたじゅもん>。list() は使わない。
+  if (path === "/bunko/spell/save") {
+    const token = clip(body.token, 64);
+    if (token.length < 16 || !body.shelf || !Array.isArray(body.shelf.books)) return J({ error: "empty" }, headers, 400);
+    const raw = JSON.stringify(body.shelf);
+    if (raw.length > 3000000) return J({ error: "big", message: "本棚が大きすぎて預けられませんでした。" }, headers, 400);
+    let code = normSpell(body.code || ""), cur = code ? await kv.get("sp:" + code, { type: "json" }) : null;
+    if (cur && cur.owner !== token) { code = ""; cur = null; }   // 他の人のじゅもんには上書きしない（新しく作る）
+    if (!code || !cur) {
+      for (let i = 0; i < 8; i++) { const c = makeSpell(); if (!(await kv.get("sp:" + normSpell(c)))) { code = c; break; } }
+      if (!code) return J({ error: "spell" }, headers, 500);
+    } else code = cur.code;
+    const rec = { code, owner: token, shelf: body.shelf, books: body.shelf.books.length, savedAt: Date.now(), created: cur ? cur.created : Date.now() };
+    await kv.put("sp:" + normSpell(code), JSON.stringify(rec));
+    return J({ code, savedAt: rec.savedAt, books: rec.books }, headers);
+  }
+  if (path === "/bunko/spell/load") {
+    const rec = await kv.get("sp:" + normSpell(body.code || ""), { type: "json" });
+    if (!rec) return J({ error: "nospell", message: "そのじゅもんは見つかりませんでした。もう一度たしかめてください。" }, headers, 404);
+    return J({ code: rec.code, shelf: rec.shelf, books: rec.books, savedAt: rec.savedAt }, headers);
   }
   // 公開中の作品の一覧
   if (path === "/bunko/works") {
@@ -667,7 +694,7 @@ export default {
       catch (e) { return J({ error: String(e.message || e) }, headers, 500); }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
