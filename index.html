@@ -1060,7 +1060,7 @@ function renderBunko(b){
   $("btnBunko").disabled=!ready||left>0;
   $("bunkoState").textContent= !ready? "整えて［✓ 仕上げた］を押した作品を、クラス文庫に出せます。"
     : left? "〔 〕が "+left+" か所残っています。自分の言葉に書きかえてから出してください。"
-    : b.bunko? (BK_LABEL[b.bunko.status]||"出しました。")+(b.bunko.comments?" 感想 "+b.bunko.comments+" 件":"")
+    : b.bunko? (BK_LABEL[b.bunko.status]||"出しました。")+(b.bunko.comments?" 感想 "+b.bunko.comments+" 件":"")+(b.bunko.obis?" 🎀 あなたの本に帯が "+b.bunko.obis+" 本巻かれています。":"")
     : "ペンネームで、受講者だけが読めるクラス文庫に出せます。";
   const rv=b.bunko&&b.bunko.status==="returned"&&b.bunko.review;
   $("bunkoReview").classList.toggle("hidden",!rv);
@@ -1073,7 +1073,7 @@ async function refreshBunko(b){ // 本を開いたとき、文庫での状態を
   if(!b.bunko||!lsGet("bunko_pass")) return;
   try{ const j=await bunkoApi("/work?id="+encodeURIComponent(b.bunko.id)+"&token="+ownerToken());
     b.bunko.status=j.work.status; b.bunko.comments=(j.comments||[]).length;
-    b.bunko.review=j.work.review||null; b.bunko.returnNote=j.work.returnNote||""; }
+    b.bunko.review=j.work.review||null; b.bunko.returnNote=j.work.returnNote||""; b.bunko.obis=(j.obis||[]).length; }
   catch(e){ if(e.status===404){ b.bunko=null; } else return; }
   saveShelf(); if(view==="book"&&curBook===b.id) renderBunko(b);
 }
