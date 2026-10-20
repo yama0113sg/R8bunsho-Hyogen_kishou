@@ -145,6 +145,16 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .guess{margin-top:10px}
 .qs li{margin-bottom:10px;line-height:1.7} .qs input{margin-top:4px;font-size:15px}
 
+/* ふっかつのじゅもん（先生用） */
+.spbook{padding:14px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--edge);margin-top:10px}
+.spbook .h{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.spbook .h b{font-family:var(--mincho);font-size:17px}
+.spbook .meta{font-size:12px;color:var(--sub);line-height:1.8;margin-top:4px}
+.spbook .txt{margin-top:10px;font-family:var(--mincho);line-height:1.9;white-space:pre-wrap;max-height:55vh;overflow:auto;background:rgba(0,0,0,.25);border-radius:10px;padding:12px}
+.spbook del{color:#ff8fa3;text-decoration:line-through;text-decoration-color:rgba(255,143,163,.7)}
+.spbook ins{color:var(--ok);text-decoration:none;background:rgba(93,255,176,.1)}
+.spbook .ai{color:var(--ai)}
+
 /* 先生用 */
 .item{padding:14px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--edge);margin-bottom:10px}
 .item .h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
@@ -265,6 +275,9 @@ h3{font-size:14px;letter-spacing:.15em;color:var(--sub);margin:22px 0 10px;font-
           <div class="row"><button class="btn small main" id="btnRdSave">保存する</button><button class="btn small" id="btnRdReset">はじめの3人にもどす</button></div>
           <div class="msg" id="rdMsg"></div>
         </details>
+        <h3>ふっかつのじゅもんで本棚をひらく</h3>
+        <div class="row" style="margin-top:0"><input id="spCodeIn" placeholder="例：ほしぞら たぬき もみじ ゆうき 47" style="flex:1;min-width:220px"><button class="btn small main" id="btnSpOpen">ひらく</button></div>
+        <div id="spShelf"></div>
         <h3>確認待ちの作品</h3><div id="tPendW"></div>
         <h3>確認待ちの感想</h3><div id="tPendC"></div>
         <h3>確認待ちの帯</h3><div id="tPendO"></div>
@@ -499,6 +512,43 @@ async function showRead(it){ // 先生用：本文と、AIの感想（時限前�
       +'<button class="btn small danger" data-act="aidel" data-cid="'+esc(c.id)+'">この感想を削除</button></div>').join("")
     +(j.work.status==="public"? '<div class="row" style="margin-top:6px"><button class="btn small" data-act="aire">'+(ais.length?"AIの感想を全員分作り直す":"AIの感想を作る")+'</button></div>' : '');
 }
+/* ふっかつのじゅもん：生徒の本棚をまるごと見る */
+const STG=[["ki","起"],["sho","承"],["ten","転"],["ketsu","結"]];
+const nch=t=>[...String(t||"").replace(/\s/g,"")].length;
+function origFlat(b){ return [(b.lines&&b.lines.ki||"")+((b.bodies&&b.bodies.ki)||"").replace(/^\s+/,""),b.bodies&&b.bodies.sho,b.bodies&&b.bodies.ten,b.bodies&&b.bodies.ketsu].map(x=>(x||"").trim()).filter(Boolean).join("\n\n"); }
+function origHTMLT(b){ return STG.map(([k,n],i)=>'<span class="note">'+n+'</span>\n'+(b.lines&&b.lines[k]?'<span class="ai">'+(i?'（':'')+esc(b.lines[k])+(i?'）\n':'')+'</span>':'')+esc((b.bodies&&b.bodies[k])||"")).join("\n\n"); }
+function sentDiff(a,b){ // 文ごとにくらべる：消えた文は赤の取り消し線、足した文は緑
+  const sp=t=>String(t||"").split(/(?<=[。！？!?」\n])/).filter(x=>x!=="");
+  const A=sp(a), B=sp(b), n=A.length, m=B.length, L=Array.from({length:n+1},()=>new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--) L[i][j]= A[i].trim()===B[j].trim()? L[i+1][j+1]+1 : Math.max(L[i+1][j],L[i][j+1]);
+  let i=0,j=0,out="";
+  while(i<n&&j<m){ if(A[i].trim()===B[j].trim()){ out+=esc(B[j]); i++; j++; } else if(L[i+1][j]>=L[i][j+1]){ out+="<del>"+esc(A[i])+"</del>"; i++; } else { out+="<ins>"+esc(B[j])+"</ins>"; j++; } }
+  while(i<n) out+="<del>"+esc(A[i++])+"</del>"; while(j<m) out+="<ins>"+esc(B[j++])+"</ins>";
+  return out;
+}
+let spData=null;
+function aiUse(b){ const br=b.brush||{}, hn=Object.values(b.hints||{}).reduce((a,h)=>a+(h.used||0),0), ch=Object.values(b.used||{}).reduce((a,v)=>a+(v||0),0);
+  const bits=["チェンジ "+ch+"回","ヒント "+hn+"回"];
+  if(b.bridges) bits.push("つなぎの文 "+Object.keys(b.bridges).length+"か所");
+  if(br.pointsN||br.adviceN||br.rewriteN) bits.push("推敲の相棒：直しどころ "+(br.pointsN||0)+"／相談 "+(br.adviceN||0)+"／書きかえ案 "+(br.rewriteN||0));
+  return bits.join("・"); }
+function renderSpShelf(){
+  if(!spData){ $("spShelf").innerHTML=""; return; }
+  const bs=(spData.shelf&&spData.shelf.books)||[];
+  $("spShelf").innerHTML='<p class="note" style="margin:8px 0 0">じゅもん「'+esc(spData.code)+'」・'+new Date(spData.savedAt).toLocaleString("ja-JP")+' に預けた本棚・'+bs.length+'冊</p>'
+    +bs.map((b,i)=>{ const f=b.final, t=(f&&f.title)||b.title, mode=b._m||(f?"diff":"orig");
+      return '<div class="spbook" data-i="'+i+'"><div class="h"><b>『'+esc(t)+'』'+(f&&f.done?'<span class="st public">仕上げ</span>':f?'<span class="st pending">整え中</span>':'')+'</b><span class="note">'+genreOf(b.genre).name+'・'+md(b.created||0)+(b.imported?'（取りこみ）':'')+'</span></div>'
+        +'<div class="meta">はじめの版 '+nch(origFlat(b))+'字'+(f?' → 仕上げ版 '+nch(String(f.text).replace(/〔[^〕\n]*〕/g,""))+'字':'')+'<br>'+esc(aiUse(b))+(b.bind?'・しばりあり':'')+'</div>'
+        +'<div class="seg" style="margin-top:8px">'+(f?'<button data-m="diff"'+(mode==="diff"?' class="on"':'')+'>くらべる</button><button data-m="fin"'+(mode==="fin"?' class="on"':'')+'>仕上げ版</button>':'')+'<button data-m="orig"'+(mode==="orig"?' class="on"':'')+'>はじめの版</button></div>'
+        +'<div class="txt">'+(mode==="diff"&&f? sentDiff(origFlat(b),f.text) : mode==="fin"&&f? esc(f.text) : origHTMLT(b))+'</div>'
+        +(b.brush&&b.brush.rewrites&&b.brush.rewrites.length?'<p class="note" style="margin-top:6px">AIの書きかえ案（使ったもの）：'+b.brush.rewrites.map(esc).join("／")+'</p>':'')
+        +(b.bridges?'<p class="note" style="margin-top:6px">AIが書いたつなぎの文：'+Object.values(b.bridges).map(esc).join("／")+'</p>':'')+'</div>'; }).join("");
+}
+$("btnSpOpen").onclick=async()=>{ const code=$("spCodeIn").value.trim(); if(!code) return; $("tMsg").textContent="";
+  try{ spData=await api("/bunko/spell/load",{method:"POST",teacher:true,body:{code}}); renderSpShelf(); }
+  catch(e){ spData=null; renderSpShelf(); $("tMsg").textContent=e.message; } };
+$("spShelf").addEventListener("click",e=>{ const b=e.target.closest(".seg button"); if(!b||!spData) return; const i=+b.closest(".spbook").dataset.i; spData.shelf.books[i]._m=b.dataset.m; renderSpShelf(); });
+
 /* AIの読み手の顔ぶれ */
 async function loadReaders(){
   const j=await api("/bunko/admin/readers",{teacher:true}); const rs=j.readers||[];

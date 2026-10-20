@@ -6,7 +6,7 @@
 <title>起承転結</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&family=DotGothic16&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg0:#07060d; --bg1:#12101f; --glass:rgba(255,255,255,.055); --glass2:rgba(255,255,255,.09);
@@ -266,6 +266,11 @@ input[type=text]:focus{outline:none;border-color:var(--g)}
 .spine.antho::before,.spine.antho::after{height:3px;background:linear-gradient(90deg,#9a6d1f,#ffe39a 50%,#9a6d1f)}
 .spine.antho .k{font-size:10px;letter-spacing:.2em;color:#ffd36a;writing-mode:vertical-rl;margin-bottom:6px}
 .shelfempty{color:var(--sub);font-size:14px;line-height:1.8;text-align:center;padding:30px 10px}
+/* ふっかつのじゅもん */
+.dq{margin:6px 4px 12px;padding:16px 18px;background:#000;border:4px double #fff;border-radius:6px;font-family:"DotGothic16",var(--gothic);color:#fff;text-align:center}
+.dq .dqt{font-size:13px;letter-spacing:.3em;opacity:.8}
+.dq .dqc{font-size:clamp(20px,5vw,28px);letter-spacing:.12em;line-height:1.6;margin:8px 0 4px;word-break:keep-all}
+.dq .dqs{font-size:12px;opacity:.7}
 .imp textarea{min-height:200px;font-size:15px;line-height:1.8}
 .imp .msg{white-space:pre-wrap}
 .shelfnote{font-size:12px;color:var(--sub);line-height:1.7;margin:10px 4px 0}
@@ -443,6 +448,18 @@ input.ptitle{font-size:20px;margin-bottom:12px}
       <div class="shelf hidden" id="shelfAntho"></div>
       <div class="row" style="padding:0 6px"><button class="btn" id="btnNewAntho">＋ 短編集をつくる</button></div>
     </div>
+    <div class="shelfwrap">
+      <div class="shelfhead"><h2>ふっかつのじゅもん</h2><span>本棚をまるごと預けて、ロイロに出す</span></div>
+      <div class="dq hidden" id="spBox"><div class="dqt">ふっかつのじゅもん</div><div class="dqc" id="spCode"></div><div class="dqs" id="spWhen"></div></div>
+      <div class="hidden" id="spPassRow" style="margin:0 4px 8px"><input type="text" id="spPass" placeholder="合言葉（クラス文庫と同じ）" autocomplete="off" autocapitalize="off" style="font-size:17px"></div>
+      <div class="row" style="padding:0 4px"><button class="btn main" id="btnSpell">📜 じゅもんをつくる</button><button class="btn hidden" id="btnSpCopy">じゅもんをコピー</button></div>
+      <p class="gnote" id="spNote" style="margin:10px 4px 0">本棚をまるごと預けて、じゅもんを出します。書き足したり整えたりしたら、もう一度押してください。同じじゅもんのまま中身が新しくなります。じゅもんをロイロに出してね。</p>
+      <details style="margin:10px 4px 0"><summary class="gnote" style="cursor:pointer">別の iPad から、じゅもんで本棚をよびもどす</summary>
+        <input type="text" id="spIn" placeholder="例：ほしぞら たぬき もみじ ゆうき 47" style="font-size:17px;margin-top:8px">
+        <div class="row"><button class="btn small" id="btnSpLoad">よびもどす</button></div>
+        <p class="gnote" style="margin:6px 0 0;font-size:12px">いまこの iPad にある本は消えません。じゅもんの本棚にあって、ここにない本だけが足されます。</p></details>
+      <div class="msg" id="spMsg" style="margin:8px 4px 0"></div>
+    </div>
     <div class="shelfwrap imp">
       <div class="shelfhead"><h2>取りこむ</h2><span>前に書いた作品を本棚に入れる</span></div>
       <button class="btn" id="btnImpOpen">📥 書いた作品を取りこむ</button>
@@ -454,7 +471,7 @@ input.ptitle{font-size:20px;margin-bottom:12px}
       </div>
     </div>
     <div class="row" style="margin:0 0 6px"><a class="btn" href="bunko.html" style="text-decoration:none;color:var(--ink)">📖 クラス文庫を読む</a></div>
-    <p class="shelfnote">背表紙に金の帯があるのは、整えて仕上げた本です。本棚はこの iPad の中だけに保存されます（Safari の履歴を消すと消えます）。提出はロイロで。</p>
+    <p class="shelfnote">背表紙に金の帯があるのは、整えて仕上げた本です。本棚はこの iPad の中に保存されます（Safari の履歴を消すと消えます）。ふっかつのじゅもんを作っておけば、じゅもんで呼び戻せます。</p>
   </section>
 
   <!-- 1冊を見る -->
@@ -984,6 +1001,38 @@ function spineHTML(b){
 }
 function setTheme(genre){ const g=genre?genreOf(genre):{c:"#c9a8ff",c2:"#7a5cff"};
   document.documentElement.style.setProperty("--g",g.c); document.documentElement.style.setProperty("--g2",g.c2); }
+/* ---- ふっかつのじゅもん：本棚をまるごと預ける（この iPad の本棚には手を加えない） ---- */
+function renderSpell(){
+  const code=lsGet("kishou_spell"), at=+lsGet("kishou_spell_at")||0;
+  $("spBox").classList.toggle("hidden",!code); $("btnSpCopy").classList.toggle("hidden",!code);
+  $("spCode").textContent=code; $("spWhen").textContent=at? new Date(at).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+" に預けた本棚" : "";
+  $("btnSpell").textContent=code?"📜 いまの本棚で、じゅもんを新しくする":"📜 じゅもんをつくる";
+  $("spPassRow").classList.toggle("hidden",!!lsGet("bunko_pass"));
+}
+function spellPass(){ if(lsGet("bunko_pass")) return true; const p=$("spPass").value.trim(); if(!p){ $("spMsg").style.color="var(--ng)"; $("spMsg").textContent="合言葉を入れてください。"; return false; } lsSet("bunko_pass",p); return true; }
+$("btnSpell").onclick=async()=>{
+  if(!SH.books.length){ $("spMsg").style.color="var(--ng)"; $("spMsg").textContent="本棚に本がありません。"; return; }
+  if(!spellPass()) return;
+  $("btnSpell").disabled=true; $("spMsg").style.color="var(--sub)"; $("spMsg").textContent="本棚を預けています…";
+  try{ const j=await bunkoApi("/spell/save",{token:ownerToken(),code:lsGet("kishou_spell"),shelf:{books:SH.books,antho:SH.antho,v:1}});
+    lsSet("kishou_spell",j.code); lsSet("kishou_spell_at",String(j.savedAt));
+    $("spMsg").style.color="var(--ok)"; $("spMsg").textContent=j.books+"冊を預けました。このじゅもんを、ロイロに出してください。"; }
+  catch(e){ if(String(e.message).includes("合言葉")) lsSet("bunko_pass",""); $("spMsg").style.color="var(--ng)"; $("spMsg").textContent=String(e.message).includes("fetch")?"うまくつながりませんでした。少し待ってもう一度押してください。":e.message; }
+  $("btnSpell").disabled=false; renderSpell();
+};
+$("btnSpCopy").onclick=()=>copyText(lsGet("kishou_spell"),$("btnSpCopy"),$("spMsg"),"じゅもんをコピー");
+$("btnSpLoad").onclick=async()=>{
+  const code=$("spIn").value.trim(); if(!code) return; if(!spellPass()) return;
+  $("btnSpLoad").disabled=true; $("spMsg").style.color="var(--sub)"; $("spMsg").textContent="よびもどしています…";
+  try{ const j=await bunkoApi("/spell/load",{code}); const rb=(j.shelf&&j.shelf.books)||[], ra=(j.shelf&&j.shelf.antho)||[];
+    let added=0, kept=0;
+    for(const b of rb){ if(!b||!b.id) continue; if(SH.books.some(x=>x.id===b.id)){ kept++; continue; } SH.books.push(b); added++; }
+    for(const a of ra){ if(a&&a.id&&!SH.antho.some(x=>x.id===a.id)) SH.antho.push(a); }
+    saveShelf(); render();
+    $("spMsg").style.color="var(--ok)"; $("spMsg").textContent=added+"冊をよびもどしました。"+(kept?"（"+kept+"冊は、もうこの本棚にあったのでそのままにしました）":""); }
+  catch(e){ $("spMsg").style.color="var(--ng)"; $("spMsg").textContent=e.message; }
+  $("btnSpLoad").disabled=false;
+};
 async function copyText(txt,btn,msgEl,label){ let ok=false;
   try{await navigator.clipboard.writeText(txt); ok=true;}catch(e){}
   if(!ok){const a=$("copyArea"); a.value=txt; a.select(); a.setSelectionRange(0,999999); try{ok=document.execCommand("copy");}catch(e){}}
@@ -993,7 +1042,7 @@ async function copyText(txt,btn,msgEl,label){ let ok=false;
 function renderShelfViews(){
   ["scGenre","scWrite","scResult","scShelf","scBook","scPolish","scAntho"].forEach(id=>$(id).classList.add("hidden"));
   $("steps").classList.add("hidden");
-  if(view==="shelf"){ setTheme(null); $("scShelf").classList.remove("hidden");
+  if(view==="shelf"){ setTheme(null); $("scShelf").classList.remove("hidden"); renderSpell();
     const bs=SH.books.slice().sort((a,b)=>a.created-b.created);
     $("shelfBooks").innerHTML=bs.map(spineHTML).join(""); $("shelfBooks").classList.toggle("hidden",!bs.length);
     $("shelfEmpty").classList.toggle("hidden",!!bs.length);
