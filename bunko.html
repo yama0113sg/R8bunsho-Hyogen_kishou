@@ -113,15 +113,17 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .band .bc{font-family:var(--mincho);font-weight:800;font-size:clamp(17px,4.4vw,21px);line-height:1.35}
 .band .bb{font-family:var(--mincho);font-size:12px;line-height:1.6}
 .band .bp{font-size:11px;text-align:right;letter-spacing:.08em;opacity:.85}
-.band.s0{background:#f7f3ea;color:#2a2620} .band.s0 .bc{color:#b3261e}
-.band.s1{background:linear-gradient(180deg,#1b1724,#0f0c15);color:#e8e2d0;border-top:2px solid #c9a24a} .band.s1 .bc{color:#ffd36a}
-.band.s2{background:linear-gradient(180deg,color-mix(in srgb,var(--c) 85%,#fff),var(--c));color:#1d1a26} .band.s2 .bc{color:#1d1a26}
+.band.s0{background:linear-gradient(180deg,rgba(0,0,0,.06),transparent 18%),linear-gradient(90deg,#e4dccb,#efe8da 12%,#ebe3d3 88%,#d9d0bd);color:#2a2620} .band.s0 .bc{color:#a3271f}
+.band.s1{background:linear-gradient(90deg,#120f19,#1d1828 12%,#191523 88%,#0e0b14);color:#e8e2d0;border-top:2px solid #c9a24a} .band.s1 .bc{color:#ffd36a}
+.band.s2{background:linear-gradient(180deg,rgba(255,255,255,.12),transparent 30%),linear-gradient(90deg,color-mix(in srgb,var(--c) 70%,#000) 0%,var(--c) 12%,var(--c) 88%,color-mix(in srgb,var(--c) 70%,#000));color:#1d1a26} .band.s2 .bc{color:#1d1a26}
 .obilist{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 12px;margin-bottom:6px}
 .obilist .oc{flex:0 0 min(78%,260px);scroll-snap-align:center}
 .obilist .bookcover{width:100%}
 .obilist .oc .row{margin-top:8px;justify-content:center}
-.spine .ob{position:absolute;left:0;right:0;bottom:0;height:44px;z-index:1}
-.spine .ob.s0{background:#f1ece2} .spine .ob.s1{background:#17131f;border-top:2px solid #c9a24a} .spine .ob.s2{background:color-mix(in srgb,var(--c) 85%,#fff)}
+.spine .ob{position:absolute;left:0;right:0;bottom:0;height:42px;z-index:1;box-shadow:0 -2px 5px rgba(0,0,0,.35)}
+.spine .ob::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.5) 0,rgba(0,0,0,.14) 16%,rgba(255,255,255,.08) 50%,rgba(0,0,0,.2) 84%,rgba(0,0,0,.5) 100%)}
+.spine.ob0::after,.spine.ob1::after,.spine.ob2::after{bottom:42px}   /* 金の線を、帯のすぐ上にそろえる */
+.spine .ob.s0{background:#d8cfbd} .spine .ob.s1{background:#1a1622;border-top:1px solid #c9a24a} .spine .ob.s2{background:color-mix(in srgb,var(--c) 80%,var(--c2))}
 .spine .p{position:relative;z-index:2}
 .spine.ob0 .p{color:#2a2620} .spine.ob2 .p{color:#1d1a26}
 .stylepick{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:14px 0 4px}
