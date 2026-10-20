@@ -107,12 +107,17 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
   background:linear-gradient(160deg,color-mix(in srgb,var(--c) 70%,#fff) 0%,var(--c2) 70%,color-mix(in srgb,var(--c2) 60%,#000) 100%);
   box-shadow:0 18px 40px rgba(0,0,0,.5),inset 6px 0 10px rgba(0,0,0,.25)}
 .bookcover::before{content:"";position:absolute;left:10px;top:0;bottom:0;width:2px;background:rgba(255,255,255,.18)}
-.bookcover .ct{position:absolute;top:9%;left:0;right:0;text-align:center;padding:0 22px;font-family:var(--mincho);font-weight:800;font-size:22px;line-height:1.4;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.4)}
-.bookcover .cp{position:absolute;top:calc(9% + 4.6em);left:0;right:0;text-align:center;font-family:var(--mincho);font-size:13px;color:rgba(255,255,255,.9)}
-.band{position:absolute;left:0;right:0;bottom:0;height:38%;padding:12px 16px 10px;display:flex;flex-direction:column;justify-content:center;gap:6px;box-shadow:0 -4px 14px rgba(0,0,0,.35)}
-.band .bc{font-family:var(--mincho);font-weight:800;font-size:clamp(17px,4.4vw,21px);line-height:1.35}
-.band .bb{font-family:var(--mincho);font-size:12px;line-height:1.6}
-.band .bp{font-size:11px;text-align:right;letter-spacing:.08em;opacity:.85}
+.bookcover .ct{position:absolute;top:9%;left:0;right:0;text-align:center;padding:0 22px;font-family:var(--mincho);font-weight:800;font-size:clamp(14px,7.8cqw,22px);line-height:1.4;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.4)}
+.bookcover .cp{position:absolute;top:calc(9% + 4.6em);left:0;right:0;text-align:center;font-family:var(--mincho);font-size:clamp(10px,4.6cqw,13px);color:rgba(255,255,255,.9)}
+/* 帯の高さは文字の量に合わせて伸びる（短いときは表紙の4割弱、100字でも6割ほどまで）。字の大きさは表紙の幅に合わせる */
+.bookcover{container-type:inline-size}
+.band{position:absolute;left:0;right:0;bottom:0;min-height:38%;max-height:66%;overflow:hidden;padding:5cqw 6cqw 4cqw;display:flex;flex-direction:column;justify-content:center;gap:2.2cqw;box-shadow:0 -4px 14px rgba(0,0,0,.35)}
+.band .bc{font-family:var(--mincho);font-weight:800;font-size:clamp(13px,7.4cqw,21px);line-height:1.35}
+.band .bb{font-family:var(--mincho);font-size:clamp(10px,4.4cqw,12.5px);line-height:1.6}
+.band .bp{font-size:clamp(9px,3.8cqw,11px);text-align:right;letter-spacing:.08em;opacity:.85}
+.band.lc .bc{font-size:clamp(12px,6.2cqw,18px)}       /* キャッチコピーが長いとき */
+.band.lb .bb{font-size:clamp(9.5px,4cqw,11.5px);line-height:1.55}   /* 推薦文が長いとき */
+.band.lb2 .bb{font-size:clamp(9px,3.7cqw,11px);line-height:1.5}
 .band.s0{background:linear-gradient(180deg,rgba(0,0,0,.06),transparent 18%),linear-gradient(90deg,#e4dccb,#efe8da 12%,#ebe3d3 88%,#d9d0bd);color:#2a2620} .band.s0 .bc{color:#a3271f}
 .band.s1{background:linear-gradient(90deg,#120f19,#1d1828 12%,#191523 88%,#0e0b14);color:#e8e2d0;border-top:2px solid #c9a24a} .band.s1 .bc{color:#ffd36a}
 .band.s2{background:linear-gradient(180deg,rgba(255,255,255,.12),transparent 30%),linear-gradient(90deg,color-mix(in srgb,var(--c) 70%,#000) 0%,var(--c) 12%,var(--c) 88%,color-mix(in srgb,var(--c) 70%,#000));color:#1d1a26} .band.s2 .bc{color:#1d1a26}
@@ -354,7 +359,7 @@ const myObis=()=>{ try{ return JSON.parse(ls.get("bunko_myobi")||"[]"); }catch(e
 function coverHTML(w,o){ // 本の表紙に帯を巻いた姿
   const g=genreOf(w.genre);
   return '<div class="bookcover" style="--c:'+g.c+';--c2:'+g.c2+'"><div class="ct">'+esc(w.title)+'</div><div class="cp">'+esc(w.pen)+'</div>'
-    +'<div class="band s'+(o.style||0)+'"><div class="bc">'+(esc(o.catch)||'<span style="opacity:.4">キャッチコピー</span>')+'</div>'
+    +'<div class="band s'+(o.style||0)+([...(o.catch||"")].length>14?" lc":"")+(n=>n>80?" lb2":n>50?" lb":"")([...(o.body||"")].length)+'"><div class="bc">'+(esc(o.catch)||'<span style="opacity:.4">キャッチコピー</span>')+'</div>'
     +(o.body?'<div class="bb">'+esc(o.body)+'</div>':'')+'<div class="bp">推薦　'+(esc(o.pen)||"——")+'</div></div></div>';
 }
 function guessHTML(o){ const gs=Object.values(o.guess||{}); if(!gs.length) return "";
