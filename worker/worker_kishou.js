@@ -170,11 +170,11 @@ const parseAiComments = readers => t => {
 
 // 作品のAIの感想を、すべて消す（前の「AIの読み手」1人版もふくむ）
 async function deleteAiComments(kv, id) {
-  for (const k of await listAll(kv, "c:" + id + ":ai")) await kv.delete(k.name);
+  await delSubs(kv, id, (await listSub(kv, id, "c:" + id + ":ai")).map(k => k.name));
 }
 // いまの版・いまの読み手への感想が、もうあるか（文体や顔ぶれを変えたら、一括のボタンで作り直される）
 async function hasAiComments(kv, w, ver) {
-  for (const k of await listAll(kv, "c:" + w.id + ":ai-")) {
+  for (const k of await listSub(kv, w.id, "c:" + w.id + ":ai-")) {
     const c = await kv.get(k.name, { type: "json" });
     if (c && c.persona && c.forUpdated === w.updated && String(c.style) === ver) return true;
   }
@@ -191,7 +191,7 @@ async function makeAiComment(env, w, R) {
   catch { return false; }
   // もう届いていた感想は、作り直しても同じ時刻に届いた扱いにする（消えてから出直さないように）
   const oldTimes = [];
-  for (const k of await listAll(env.BUNKO, "c:" + w.id + ":ai-")) {
+  for (const k of await listSub(env.BUNKO, w.id, "c:" + w.id + ":ai-")) {
     const c = await env.BUNKO.get(k.name, { type: "json" });
     if (c && c.persona && c.forUpdated === w.updated) oldTimes.push(c.showAt);
   }
@@ -199,12 +199,14 @@ async function makeAiComment(env, w, R) {
   await deleteAiComments(env.BUNKO, w.id);
   const now = Date.now();
   const order = R.readers.slice().sort(() => Math.random() - 0.5);   // だれが先に届くかも毎回ちがう
+  const entries = [];
   for (let i = 0; i < order.length; i++) {
     const r = order[i], [lo, hi] = AI_SLOTS[i] || AI_SLOTS[AI_SLOTS.length - 1];
     const showAt = oldTimes[i] || now + Math.round((lo + Math.random() * (hi - lo)) * 60000);
     const c = { id: "ai-" + r.key, workId: w.id, name: r.name, persona: r.key, text: result[r.key], ai: true, status: "public", showAt, created: now, forUpdated: w.updated, style: R.ver };
-    await env.BUNKO.put("c:" + w.id + ":ai-" + r.key, JSON.stringify(c), { metadata: { status: "public", ai: true, showAt } });
+    entries.push(["c:" + w.id + ":ai-" + r.key, c, { status: "public", ai: true, showAt }]);
   }
+  await putSubs(env.BUNKO, w.id, entries);
   return true;
 }
 
@@ -242,7 +244,7 @@ async function makeReview(env, id) {
   catch { return false; }
   const cur = await kv.get("w:" + id, { type: "json" }); if (!cur || cur.updated !== w.updated) return false;   // そのあいだに出し直されていたら捨てる
   cur.review = { ...result, at: Date.now() };
-  await kv.put("w:" + id, JSON.stringify(cur), { metadata: workMeta(cur) });
+  await putW(kv, cur);
   return true;
 }
 
@@ -350,10 +352,35 @@ async function callGemini(env, system, user, { models = MODELS, parse = cleanLin
 const J = (obj, headers, status = 200) => new Response(JSON.stringify(obj), { status, headers });
 const clip = (s, n) => String(s || "").slice(0, n);
 const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+// KV の list() は無料枠で1日1000回まで。ふだんの読み書きでは使わず、「目次」のキーを自分で持つ。
+//   idx:w        … 作品の目次 {items:{作品id: workMeta}}
+//   ix:<作品id>  … その作品の感想（c:）と帯（o:）の目次 {items:{キー: metadata}}
+// list() を使うのは、目次を作り直すとき（/bunko/admin/reindex）だけ。
 async function listAll(kv, prefix) {
   const out = []; let cursor;
   do { const r = await kv.list({ prefix, cursor }); out.push(...r.keys); cursor = r.list_complete ? null : r.cursor; } while (cursor);
   return out;
+}
+const getIdx = async (kv, key) => (await kv.get(key, { type: "json" })) || { items: {} };
+async function listWorks(kv) { return Object.values((await getIdx(kv, "idx:w")).items); }
+async function putW(kv, w) {
+  await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) });
+  const ix = await getIdx(kv, "idx:w"); ix.items[w.id] = workMeta(w); await kv.put("idx:w", JSON.stringify(ix));
+}
+// 作品の下の感想・帯（キーは c:<作品id>:… または o:<作品id>:…）
+async function listSub(kv, workId, prefix) {
+  const ix = await getIdx(kv, "ix:" + workId);
+  return Object.entries(ix.items).filter(([k]) => k.startsWith(prefix)).map(([name, metadata]) => ({ name, metadata }));
+}
+async function putSubs(kv, workId, entries) {   // entries: [[key, value, metadata], …]  目次の書きこみは1回にまとめる
+  for (const [k, v, m] of entries) await kv.put(k, JSON.stringify(v), { metadata: m });
+  const ix = await getIdx(kv, "ix:" + workId); for (const [k, , m] of entries) ix.items[k] = m; await kv.put("ix:" + workId, JSON.stringify(ix));
+}
+const putSub = (kv, workId, key, value, meta) => putSubs(kv, workId, [[key, value, meta]]);
+async function delSubs(kv, workId, keys) {
+  if (!keys.length) return;
+  for (const k of keys) await kv.delete(k);
+  const ix = await getIdx(kv, "ix:" + workId); for (const k of keys) delete ix.items[k]; await kv.put("ix:" + workId, JSON.stringify(ix));
 }
 const workMeta = w => ({ id: w.id, pen: w.pen, title: w.title, genre: w.genre, status: w.status,
   rv: w.review ? (w.review.ok ? "ok" : "ng") : null, obi: w.obi == null ? null : w.obi,
@@ -363,8 +390,9 @@ const withoutOwner = w => { const { owner, ...rest } = w; return rest; };
 const workView = (w, teacher, mine) => { const v = withoutOwner(w); if (!teacher && !(mine && w.status === "returned")) { delete v.review; delete v.returnNote; } return v; };
 async function deleteWork(kv, id) {
   await kv.delete("w:" + id);
-  for (const k of await listAll(kv, "c:" + id + ":")) await kv.delete(k.name);
-  for (const k of await listAll(kv, "o:" + id + ":")) await kv.delete(k.name);
+  const ix = await getIdx(kv, "idx:w"); delete ix.items[id]; await kv.put("idx:w", JSON.stringify(ix));
+  for (const k of Object.keys((await getIdx(kv, "ix:" + id)).items)) await kv.delete(k);
+  await kv.delete("ix:" + id);
 }
 
 // ── 帯（おすすめの帯）──
@@ -398,9 +426,9 @@ const obiView = o => { const { owner, ...rest } = o; return rest; };
 async function syncObi(kv, workId) {
   const w = await kv.get("w:" + workId, { type: "json" }); if (!w) return;
   let latest = null;
-  for (const k of await listAll(kv, "o:" + workId + ":")) if (k.metadata && k.metadata.status === "public" && (!latest || k.metadata.created > latest.created)) latest = k.metadata;
+  for (const k of await listSub(kv, workId, "o:" + workId + ":")) if (k.metadata && k.metadata.status === "public" && (!latest || k.metadata.created > latest.created)) latest = k.metadata;
   const style = latest ? latest.style : null;
-  if (w.obi !== style) { w.obi = style; await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) }); }
+  if (w.obi !== style) { w.obi = style; await putW(kv, w); }
 }
 
 async function bunko(request, env, headers, path, ctx) {
@@ -417,9 +445,35 @@ async function bunko(request, env, headers, path, ctx) {
   let body = {};
   if (request.method === "POST") { try { body = await request.json(); } catch { body = {}; } }
 
+  // 目次を作り直す（list() を使う。無料枠を使い切った日は、body.ids で作品番号を渡すと、作品と AI の感想だけで作る）
+  // 何度実行しても同じ結果になる。すでにある目次の中身は消さずに足していく。
+  if (path === "/bunko/admin/reindex") {
+    const widx = await getIdx(kv, "idx:w"); let usedList = false, subs = 0;
+    const addSubs = async (id, keys) => { if (!keys.length) return; const ix = await getIdx(kv, "ix:" + id); for (const [k, m] of keys) ix.items[k] = m; await kv.put("ix:" + id, JSON.stringify(ix)); subs += keys.length; };
+    if (Array.isArray(body.ids)) {
+      for (const id of body.ids.map(x => clip(x, 30))) {
+        const w = await kv.get("w:" + id, { type: "json" }); if (!w) continue;
+        widx.items[w.id] = workMeta(w);
+        const found = [];
+        for (const k of ["ai", "ai-shiori", "ai-haguruma", "ai-sora", "ai-r1", "ai-r2", "ai-r3"]) {
+          const c = await kv.get("c:" + id + ":" + k, { type: "json" });
+          if (c) found.push(["c:" + id + ":" + k, { status: "public", ai: true, showAt: c.showAt || c.created || 0 }]);
+        }
+        await addSubs(id, found);
+      }
+    } else {
+      usedList = true;
+      for (const k of await listAll(kv, "w:")) if (k.metadata) widx.items[k.metadata.id] = k.metadata;
+      const by = {};
+      for (const pre of ["c:", "o:"]) for (const k of await listAll(kv, pre)) { const id = k.name.split(":")[1]; (by[id] = by[id] || []).push([k.name, k.metadata || {}]); }
+      for (const id of Object.keys(by)) await addSubs(id, by[id]);
+    }
+    await kv.put("idx:w", JSON.stringify(widx));
+    return J({ ok: true, works: Object.keys(widx.items).length, subs, usedList }, headers);
+  }
   // 公開中の作品の一覧
   if (path === "/bunko/works") {
-    const all = (await listAll(kv, "w:")).map(k => k.metadata).filter(Boolean);
+    const all = await listWorks(kv);
     const works = all.filter(m => m.status === "public").sort((a, b) => b.updated - a.updated);
     return J({ works, pending: all.filter(m => m.status === "pending").length }, headers);
   }
@@ -430,7 +484,7 @@ async function bunko(request, env, headers, path, ctx) {
     const mine = !!(w && token && w.owner === token);
     if (!w || (w.status !== "public" && !teacher && !mine)) return J({ error: "notfound" }, headers, 404);
     const comments = [], now = Date.now();
-    for (const k of await listAll(kv, "c:" + id + ":")) {
+    for (const k of await listSub(kv, id, "c:" + id + ":")) {
       const m = k.metadata;
       if (!m || (m.status !== "public" && !teacher)) continue;
       if (!teacher && m.ai && m.showAt > now) continue;           // AIの感想は時限まで見せない
@@ -438,7 +492,7 @@ async function bunko(request, env, headers, path, ctx) {
     }
     comments.sort((a, b) => (a.showAt || a.created) - (b.showAt || b.created));
     const obis = [];
-    for (const k of await listAll(kv, "o:" + id + ":")) {
+    for (const k of await listSub(kv, id, "o:" + id + ":")) {
       if (!k.metadata || (k.metadata.status !== "public" && !teacher)) continue;
       const o = await kv.get(k.name, { type: "json" }); if (o) obis.push(obiView(o));
     }
@@ -461,7 +515,7 @@ async function bunko(request, env, headers, path, ctx) {
     const now = Date.now();
     const w = { id, owner: token, pen, title, genre: clip(body.genre, 20), text, lines, bridged: !!body.bridged,
       status: "pending", created: old ? old.created : now, updated: now };
-    await kv.put("w:" + id, JSON.stringify(w), { metadata: workMeta(w) });
+    await putW(kv, w);
     await later(makeReview(env, id));   // 文庫の編集部（AI）が掲載前に読む
     return J({ id, status: w.status }, headers);
   }
@@ -486,7 +540,7 @@ async function bunko(request, env, headers, path, ctx) {
     const now = Date.now();
     const o = { id: rid(), workId: w.id, owner: token, pen, catch: cat, body: txt, style, status: check && check.ok ? "public" : "pending",
       review: check ? { ok: check.ok, why: check.why } : null, guess: check ? check.guess : {}, created: now };
-    await kv.put("o:" + w.id + ":" + o.id, JSON.stringify(o), { metadata: { status: o.status, style, created: now } });
+    await putSub(kv, w.id, "o:" + w.id + ":" + o.id, o, { status: o.status, style, created: now });
     if (o.status === "public") await syncObi(kv, w.id);
     return J({ obi: obiView(o) }, headers);
   }
@@ -495,7 +549,7 @@ async function bunko(request, env, headers, path, ctx) {
     const key = "o:" + clip(body.workId, 30) + ":" + clip(body.id, 30);
     const o = await kv.get(key, { type: "json" });
     if (!o || (o.owner !== body.token && !teacher)) return J({ error: "owner" }, headers, 403);
-    await kv.delete(key); await syncObi(kv, o.workId);
+    await delSubs(kv, o.workId, [key]); await syncObi(kv, o.workId);
     return J({ ok: true }, headers);
   }
   // 帯の相棒：推しどころを引き出す問い
@@ -511,21 +565,21 @@ async function bunko(request, env, headers, path, ctx) {
     const text = clip(body.text, 200).trim(), name = clip(body.name, 20).trim();
     if (!text || !name) return J({ error: "empty" }, headers, 400);
     const c = { id: rid(), workId: w.id, name, text, status: "pending", created: Date.now() };
-    await kv.put("c:" + w.id + ":" + c.id, JSON.stringify(c), { metadata: { status: c.status } });
+    await putSub(kv, w.id, "c:" + w.id + ":" + c.id, c, { status: c.status });
     return J({ ok: true }, headers);
   }
 
   // ── ここから先生用 ──
   if (!teacher) return J({ error: "teacher" }, headers, 401);
   if (path === "/bunko/admin") {
-    const works = (await listAll(kv, "w:")).map(k => k.metadata).filter(Boolean).sort((a, b) => b.updated - a.updated);
-    const comments = [];
-    for (const k of await listAll(kv, "c:")) {
-      if (k.metadata && k.metadata.status === "pending") { const c = await kv.get(k.name, { type: "json" }); if (c) comments.push(c); }
-    }
-    const obis = [];
-    for (const k of await listAll(kv, "o:")) {
-      if (k.metadata && k.metadata.status === "pending") { const o = await kv.get(k.name, { type: "json" }); if (o) obis.push(obiView(o)); }
+    const works = (await listWorks(kv)).sort((a, b) => b.updated - a.updated);
+    const comments = [], obis = [];
+    for (const m of works) {
+      for (const k of await listSub(kv, m.id, "")) {
+        if (!k.metadata || k.metadata.status !== "pending") continue;
+        const v = await kv.get(k.name, { type: "json" }); if (!v) continue;
+        if (k.name.startsWith("c:")) comments.push(v); else if (k.name.startsWith("o:")) obis.push(obiView(v));
+      }
     }
     return J({ works, comments, obis }, headers);
   }
@@ -538,7 +592,7 @@ async function bunko(request, env, headers, path, ctx) {
       else if (["public", "pending", "hidden", "returned"].includes(st)) {
         w.status = st;
         if (st === "returned") { w.returnNote = clip(body.note, 300).trim(); w.returnedAt = Date.now(); }   // 本人に査読を見せて、書き直してもらう
-        await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) });
+        await putW(kv, w);
         if (st === "public") {
           const R = await getReaders(kv);
           if (!(await hasAiComments(kv, w, R.ver))) await later(makeAiComment(env, w, R));
@@ -548,15 +602,16 @@ async function bunko(request, env, headers, path, ctx) {
       const key = "o:" + clip(body.workId, 30) + ":" + clip(body.id, 30);
       const o = await kv.get(key, { type: "json" });
       if (!o) return J({ error: "notfound" }, headers, 404);
-      if (st === "delete") await kv.delete(key);
-      else if (st === "public") { o.status = "public"; await kv.put(key, JSON.stringify(o), { metadata: { status: "public", style: o.style, created: o.created } }); }
+      if (st === "delete") await delSubs(kv, o.workId, [key]);
+      else if (st === "public") { o.status = "public"; await putSub(kv, o.workId, key, o, { status: "public", style: o.style, created: o.created }); }
       await syncObi(kv, o.workId);
     } else if (body.kind === "c") {
       const key = "c:" + clip(body.workId, 30) + ":" + clip(body.id, 30);
       const c = await kv.get(key, { type: "json" });
       if (!c) return J({ error: "notfound" }, headers, 404);
-      if (st === "delete") await kv.delete(key);
-      else if (st === "public") { c.status = "public"; await kv.put(key, JSON.stringify(c), { metadata: { status: "public" } }); }
+      const wid = clip(body.workId, 30);
+      if (st === "delete") await delSubs(kv, wid, [key]);
+      else if (st === "public") { c.status = "public"; await putSub(kv, wid, key, c, { status: "public", ...(c.ai ? { ai: true, showAt: c.showAt } : {}) }); }
     }
     return J({ ok: true }, headers);
   }
@@ -569,9 +624,9 @@ async function bunko(request, env, headers, path, ctx) {
       return J({ made: ok ? 1 : 0, failed: ok ? 0 : 1 }, headers);
     }
     let made = 0, failed = 0; const R = await getReaders(kv);
-    for (const k of await listAll(kv, "w:")) {
-      if (!k.metadata || k.metadata.status !== "public") continue;
-      const w = await kv.get(k.name, { type: "json" }); if (!w) continue;
+    for (const m of await listWorks(kv)) {
+      if (m.status !== "public") continue;
+      const w = await kv.get("w:" + m.id, { type: "json" }); if (!w) continue;
       if (await hasAiComments(kv, w, R.ver)) continue;
       if (await makeAiComment(env, w, R)) made++; else failed++;   // Gemini の RPM に配慮して1件ずつ
     }
@@ -612,7 +667,7 @@ export default {
       catch (e) { return J({ error: String(e.message || e) }, headers, 500); }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
