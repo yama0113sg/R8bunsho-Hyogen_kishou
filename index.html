@@ -310,6 +310,29 @@ input.ptitle{font-size:20px;margin-bottom:12px}
 .tip .ex span{color:var(--sub);font-family:var(--gothic);font-size:12px}
 .rw{margin-top:10px;padding:12px;border-radius:12px;border:1px dashed #ffd36a;background:rgba(255,211,106,.08);font-family:var(--mincho);line-height:1.8}
 
+/* 推し短編集 */
+.osteps{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.osteps span{font-size:12px;padding:5px 11px;border-radius:99px;border:1px solid var(--edge);color:var(--sub)}
+.osteps span.on{color:#15121f;background:#fff;border-color:transparent;font-weight:700}
+.osteps span.done{color:var(--ok);border-color:rgba(93,255,176,.4)}
+.ostep{margin-top:18px;padding-top:14px;border-top:1px dashed var(--edge)}
+.ostep h3{margin:0 0 8px;font-size:15px;letter-spacing:.1em}
+.ostep h3 small{font-weight:500;color:var(--sub);font-size:12px;margin-left:6px;letter-spacing:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{padding:8px 13px;border-radius:99px;font-size:13px;border:1px solid var(--edge);background:rgba(0,0,0,.2);color:#d6d2ea}
+.chips button.on{color:#15121f;background:linear-gradient(135deg,#fff,var(--g));border-color:transparent;font-weight:700}
+.ocover{position:relative;width:min(100%,240px);aspect-ratio:3/4.3;margin:0 auto;border-radius:6px 10px 10px 6px;overflow:hidden;container-type:inline-size;
+  box-shadow:0 18px 40px rgba(0,0,0,.5),inset 6px 0 10px rgba(0,0,0,.25);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10cqw 8cqw}
+.ocover .ot{font-family:var(--mincho);font-weight:800;font-size:clamp(15px,10cqw,26px);line-height:1.4}
+.ocover .oth{font-family:var(--mincho);font-size:clamp(10px,5cqw,13px);margin-top:4cqw;opacity:.85}
+.ocover .oe{position:absolute;bottom:8cqw;left:0;right:0;font-size:clamp(9px,4.4cqw,12px);letter-spacing:.15em;opacity:.85}
+.ocover.c0{background:radial-gradient(circle at 70% 20%,#3b3570 0,#15112a 60%);color:#f3eccf} .ocover.c0::after{content:"";position:absolute;inset:0;background:radial-gradient(1px 1px at 20% 30%,#fff,transparent),radial-gradient(1.5px 1.5px at 80% 60%,#fff,transparent),radial-gradient(1px 1px at 45% 15%,#fff,transparent),radial-gradient(1px 1px at 65% 85%,#fff,transparent);opacity:.7}
+.ocover.c1{background:linear-gradient(160deg,#fde6ee,#f2b8cb);color:#5a2236}
+.ocover.c2{background:linear-gradient(160deg,#f4efe4,#ddd3bf);color:#2a2620} .ocover.c2::before{content:"";position:absolute;inset:6cqw;border:1px solid rgba(42,38,32,.35)}
+.ocover.c3{background:linear-gradient(170deg,#9fd9ef,#2f6f9a);color:#fff}
+.sample{margin-top:10px;padding:14px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid var(--edge);font-size:14px;line-height:1.8}
+.sample .sp{font-family:var(--mincho);color:#d6d2ea}
+
 /* 短編集 */
 .alist{display:flex;flex-direction:column;gap:8px;margin:8px 0 16px}
 .aitem{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--edge)}
@@ -330,6 +353,7 @@ input.ptitle{font-size:20px;margin-bottom:12px}
   <div class="tabs" id="tabs">
     <button class="tab" data-v="write">✎ 書く</button>
     <button class="tab" data-v="shelf">📚 本棚 <b id="shelfN">0</b></button>
+    <button class="tab" data-v="oshi">📕 推し短編集</button>
   </div>
 
   <div class="steps" id="steps">
@@ -531,6 +555,9 @@ input.ptitle{font-size:20px;margin-bottom:12px}
       </div>
     </div>
   </section>
+
+  <!-- 推し短編集 -->
+  <section id="scOshi" class="hidden fadein"><div class="panel" id="oshiBody"></div></section>
 
   <!-- 短編集をつくる -->
   <section id="scAntho" class="hidden fadein">
@@ -780,9 +807,9 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;","
 function render(){
   showQuota();
   $("shelfN").textContent=SH.books.length;
-  [...$("tabs").children].forEach(t=>t.classList.toggle("on", t.dataset.v===(view==="write"?"write":"shelf")));
+  [...$("tabs").children].forEach(t=>t.classList.toggle("on", t.dataset.v===(view==="write"?"write":view==="oshi"?"oshi":"shelf")));
   if(view!=="write"){ renderShelfViews(); return; }
-  ["scShelf","scBook","scPolish","scAntho"].forEach(id=>$(id).classList.add("hidden"));
+  ["scShelf","scBook","scPolish","scAntho","scOshi"].forEach(id=>$(id).classList.add("hidden"));
   $("steps").classList.remove("hidden"); if(!S.genre) setTheme(null);
   if(S.genre){ const g=genreOf(S.genre); document.documentElement.style.setProperty("--g",g.c); document.documentElement.style.setProperty("--g2",g.c2); }
   const kids=[...$("steps").children];
@@ -927,6 +954,7 @@ function plainText(o=S){
 /* ============ 本棚 ============ */
 const SKEY="kishou_shelf_v1";   // 「最初からやり直す」では消えない
 let SH=store.get(SKEY)||{books:[],antho:[]};
+if(!SH.oshi) SH.oshi=[];   // 推し短編集
 const saveShelf=()=>store.set(SKEY,SH);
 let view="write", curBook=null, curAntho=null, bookMode="fin";
 const bookById=id=>SH.books.find(b=>b.id===id);
@@ -1003,6 +1031,98 @@ function spineHTML(b){
 }
 function setTheme(genre){ const g=genre?genreOf(genre):{c:"#c9a8ff",c2:"#7a5cff"};
   document.documentElement.style.setProperty("--g",g.c); document.documentElement.style.setProperty("--g2",g.c2); }
+/* ============ 推し短編集 ============ */
+// 文庫の作品（ほかの人の作品・自分の作品）から選んで、1冊の「推しの短編集」を編む。本棚と一緒に、ふっかつのじゅもんで預けられる。
+const OSHI_THEMES=["放課後","手紙が出てくる話","ちょっとこわい","読んだら元気が出る","恋の話","友だちの話","ふしぎなものが出てくる","最後にひっくり返る","鍵が出てくる話","雨の日に読みたい"];
+const OSHI_COVERS=["夜空","さくら","生成り","海"];
+let curOshi=null, bunkoWorks=null, oshiDelArm=0;
+const oshiOf=id=>SH.oshi.find(o=>o.id===id);
+const OSHI_GUIDE='<details class="sample"><summary style="cursor:pointer;font-weight:700">📕 短編集ってなに？（見本を見る）</summary>'
+  +'<p style="margin:8px 0 0">「短編集」は、短い物語をいくつか集めて1冊にした本です。集めて本にする人を「<b>編者</b>」といいます。編者は、</p>'
+  +'<ol style="margin:4px 0 0;padding-left:1.4em"><li><b>テーマ</b>を決める（どんな本にしたいか）</li><li>テーマに合う作品を<b>選ぶ</b></li><li>読む<b>順番</b>を考えて並べる</li><li>表紙と<b>題名</b>を決める</li><li>作品ごとに<b>書評</b>（おすすめの文）を書く</li><li>本の最初に「<b>はじめに</b>」、最後に「<b>あとがき</b>」を書く</li></ol>'
+  +'<p style="margin:10px 0 4px">見本：『<b>放課後のふしぎ</b>』　編・星</p>'
+  +'<div class="sp">はじめに（一部）：放課後の学校には、昼間にはいない何かがいる。そう思ったことはありませんか。この本には、そんな「放課後のふしぎ」を集めました。<br>'
+  +'目次：一「黒板の猫」　二「美術室の石膏像」　三「図書室の地球儀」<br>'
+  +'書評（一部・友だちへのLINE風）：「ねえ、黒板の猫の話読んだ？」「チョークの猫が動くんやけど、最後がずるい」<br>'
+  +'あとがき（一部）：三つとも、ふしぎなのにこわくない話を選びました。こわい話が苦手なわたしでも、最後まで読めたからです。</div>'
+  +'<p class="gnote" style="margin:8px 0 0">※見本の作品は、説明のための架空のものです。</p></details>';
+function oshiStepState(o){ return [!!o.theme, o.items.length>=1, o.items.length>=3, !!(o.title&&o.editor)]; }
+async function loadBunkoWorks(){ const j=await bunkoApi("/works"); bunkoWorks=j.works||[]; }
+function renderOshi(){
+  const body=$("oshiBody"), o=curOshi&&oshiOf(curOshi);
+  if(!o){
+    body.innerHTML='<p class="label">推しの短編集をつくる</p>'+OSHI_GUIDE
+      +'<div class="ostep"><h3>わたしの推し短編集</h3>'
+      +(SH.oshi.length? SH.oshi.map(x=>'<div class="aitem"><span class="dot" style="--c:var(--g)"></span><span class="tt">『'+esc(x.title||"題名はまだ")+'』<small>テーマ：'+esc(x.theme||"まだ")+'・'+x.items.length+'作</small></span><button data-oopen="'+x.id+'" style="width:auto;padding:0 12px">ひらく</button></div>').join("")
+        : '<p class="gnote" style="margin:0">まだありません。</p>')
+      +'<div class="row"><button class="btn main" data-oact="new">＋ 推し短編集をつくる</button></div></div>';
+    return;
+  }
+  const st=oshiStepState(o), mine=new Set(o.items.map(x=>x.src+":"+x.id));
+  const itemRow=(x,i)=>'<div class="aitem" style="--c:'+genreOf(x.genre).c+'"><span class="n">'+KAN[i]+'</span><span class="tt">『'+esc(x.title)+'』<small>'+esc(x.pen||"")+'・'+genreOf(x.genre).name+(x.src==="own"?'・自分の作品':'')+'</small></span>'
+    +'<button data-oup="'+i+'"'+(i===0?" disabled":"")+'>↑</button><button data-odn="'+i+'"'+(i===o.items.length-1?" disabled":"")+'>↓</button><button data-orm="'+i+'">✕</button></div>';
+  const pickRow=(x,src)=>{ const k=src+":"+x.id, on=mine.has(k);
+    return '<div class="aitem" style="--c:'+genreOf(x.genre).c+'"><span class="dot"></span><span class="tt">『'+esc(x.title)+'』<small>'+esc(x.pen||"")+'・'+genreOf(x.genre).name+'</small></span>'
+      +(on?'<button disabled>✓</button>':'<button data-oadd="'+src+':'+esc(x.id)+'">＋</button>')+'</div>'; };
+  const own=SH.books.map(b=>({id:b.id,title:bTitle(b),pen:"自分",genre:b.genre}));
+  body.innerHTML='<p class="label">推しの短編集をつくる</p>'
+    +'<div class="osteps">'+["① テーマ","② 選ぶ","③ 並べる","④ 題名と表紙"].map((t,i)=>'<span class="'+(st[i]?"done":"")+'">'+(st[i]?"✓ ":"")+t+'</span>').join("")+'<span>⑤ 書評</span><span>⑥ はじめに・あとがき</span></div>'
+    +OSHI_GUIDE
+    +'<div class="ostep"><h3>① テーマ<small>どんな本にしたい？ カードから選ぶか、自分で書こう</small></h3>'
+      +'<div class="chips" id="oThemes">'+OSHI_THEMES.map(t=>'<button data-otheme="'+t+'"'+(o.theme===t?' class="on"':'')+'>'+t+'</button>').join("")+'</div>'
+      +'<input type="text" id="oTheme" maxlength="30" value="'+esc(o.theme||"")+'" placeholder="自分で書く（例：読むと夏を思い出す話）" style="font-size:16px;margin-top:10px;text-align:left"></div>'
+    +'<div class="ostep"><h3>② 選ぶ<small>テーマに合う作品に＋（自分の作品も入れてOK）</small></h3>'
+      +'<p class="label" style="margin:0 0 6px">クラス文庫の作品</p>'
+      +(bunkoWorks? (bunkoWorks.length? bunkoWorks.map(x=>pickRow(x,"bunko")).join("") : '<p class="gnote">文庫に作品がありません。</p>')
+        : '<div class="row" style="margin-top:0"><button class="btn small" data-oact="loadb">文庫の作品を読みこむ</button></div>'+(lsGet("bunko_pass")?'':'<input type="text" id="oPass" placeholder="合言葉（クラス文庫と同じ）" style="font-size:16px;margin-top:8px">'))
+      +'<p class="label" style="margin:12px 0 6px">自分の本棚の作品</p>'
+      +(own.length? own.map(x=>pickRow(x,"own")).join("") : '<p class="gnote">本棚に作品がありません。</p>')
+      +'<p class="gnote" style="margin:8px 0 0">どの作品か思い出せないときは、［📖 クラス文庫を読む］で読み直してから選ぼう。</p></div>'
+    +'<div class="ostep"><h3>③ 並べる<small>3〜5作がおすすめ。1作目は「入り口」、最後は「余韻」</small></h3>'
+      +(o.items.length? '<div class="alist">'+o.items.map(itemRow).join("")+'</div>' : '<p class="gnote" style="margin:0">②で＋を押すと、ここに並びます。</p>')
+      +'<p class="gnote" style="margin:6px 0 0">いま '+o.items.length+' 作</p></div>'
+    +'<div class="ostep"><h3>④ 題名と表紙</h3>'
+      +'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,240px);gap:16px;align-items:start">'
+      +'<div><p class="label" style="margin:0 0 6px">短編集の題名</p><input type="text" id="oTitle" maxlength="24" value="'+esc(o.title||"")+'" placeholder="例：放課後のふしぎ" style="font-size:18px;text-align:left">'
+      +'<p class="label" style="margin:12px 0 6px">編者（ペンネーム）</p><input type="text" id="oEditor" maxlength="20" value="'+esc(o.editor||"")+'" placeholder="ペンネーム" style="font-size:16px;text-align:left">'
+      +'<p class="label" style="margin:12px 0 6px">表紙</p><div class="chips" id="oCovers">'+OSHI_COVERS.map((c,i)=>'<button data-ocover="'+i+'"'+((o.cover||0)===i?' class="on"':'')+'>'+c+'</button>').join("")+'</div></div>'
+      +'<div id="oPrev">'+oshiCover(o)+'</div></div></div>'
+    +'<div class="ostep"><h3>⑤ 書評<small>6限で書きます（作品ごとに「推し方ガチャ」を引いて書く）</small></h3><p class="gnote" style="margin:0">いまは①〜④までできればOKです。</p></div>'
+    +'<div class="msg" id="oMsg"></div>'
+    +'<div class="nav"><button class="btn" data-oact="back">← 一覧へ</button><button class="btn danger" data-oact="del">この短編集を消す</button></div>';
+}
+function oshiCover(o){ return '<div class="ocover c'+(o.cover||0)+'"><div class="ot">'+(esc(o.title)||'<span style="opacity:.45">題名</span>')+'</div>'+(o.theme?'<div class="oth">'+esc(o.theme)+'</div>':'')+'<div class="oe">編・'+(esc(o.editor)||"——")+'</div></div>'; }
+function oshiTouch(o){ o.updated=Date.now(); saveShelf(); }
+$("oshiBody").addEventListener("click",async e=>{
+  const x=e.target.closest("button"); if(!x) return; const d=x.dataset, o=curOshi&&oshiOf(curOshi);
+  if(d.oopen){ curOshi=d.oopen; renderOshi(); window.scrollTo(0,0); return; }
+  if(d.oact==="new"){ const n={id:newId(),title:"",editor:lsGet("kishou_pen"),theme:"",cover:0,items:[],reviews:{},created:Date.now(),updated:Date.now()}; SH.oshi.push(n); saveShelf(); curOshi=n.id; renderOshi(); window.scrollTo(0,0); return; }
+  if(d.oact==="back"){ curOshi=null; renderOshi(); window.scrollTo(0,0); return; }
+  if(!o) return;
+  if(d.oact==="del"){ if(Date.now()-oshiDelArm>=3000){ oshiDelArm=Date.now(); x.textContent="もう一度押すと消えます"; setTimeout(()=>{ if(x.isConnected) x.textContent="この短編集を消す"; },3000); return; }
+    SH.oshi=SH.oshi.filter(z=>z.id!==o.id); saveShelf(); curOshi=null; renderOshi(); return; }
+  if(d.oact==="loadb"){ const pw=$("oPass"); if(pw&&pw.value.trim()) lsSet("bunko_pass",pw.value.trim());
+    if(!lsGet("bunko_pass")){ $("oMsg").textContent="合言葉を入れてください。"; return; }
+    x.disabled=true; x.textContent="読みこんでいます…";
+    try{ await loadBunkoWorks(); renderOshi(); }catch(err){ if(String(err.message).includes("合言葉")) lsSet("bunko_pass",""); renderOshi(); $("oMsg").textContent=err.message.includes("fetch")?"うまくつながりませんでした。もう一度押してください。":err.message; }
+    return; }
+  if(d.otheme){ o.theme=d.otheme; oshiTouch(o); renderOshi(); return; }
+  if(d.ocover!=null){ o.cover=+d.ocover; oshiTouch(o); [...$("oCovers").children].forEach(b=>b.classList.toggle("on",b===x)); $("oPrev").innerHTML=oshiCover(o); return; }
+  if(d.oadd){ const [src,...rest]=d.oadd.split(":"), id=rest.join(":");
+    const w= src==="bunko"? (bunkoWorks||[]).find(z=>z.id===id) : (b=>b&&{id:b.id,title:bTitle(b),pen:"自分",genre:b.genre})(bookById(id));
+    if(w&&!o.items.some(z=>z.src===src&&z.id===id)){ o.items.push({src,id,title:w.title,pen:w.pen,genre:w.genre}); oshiTouch(o); }
+    renderOshi(); return; }
+  if(d.orm!=null){ o.items.splice(+d.orm,1); oshiTouch(o); renderOshi(); return; }
+  if(d.oup!=null&&+d.oup>0){ const i=+d.oup; [o.items[i-1],o.items[i]]=[o.items[i],o.items[i-1]]; oshiTouch(o); renderOshi(); return; }
+  if(d.odn!=null&&+d.odn<o.items.length-1){ const i=+d.odn; [o.items[i+1],o.items[i]]=[o.items[i],o.items[i+1]]; oshiTouch(o); renderOshi(); return; }
+});
+$("oshiBody").addEventListener("input",e=>{ const o=curOshi&&oshiOf(curOshi); if(!o) return;
+  if(e.target.id==="oTheme"){ o.theme=e.target.value.trim(); [...$("oThemes").children].forEach(b=>b.classList.toggle("on",b.dataset.otheme===o.theme)); }
+  else if(e.target.id==="oTitle") o.title=e.target.value.trim();
+  else if(e.target.id==="oEditor") o.editor=e.target.value.trim();
+  else return;
+  oshiTouch(o); $("oPrev").innerHTML=oshiCover(o); });
+
 /* ---- ふっかつのじゅもん：本棚をまるごと預ける（この iPad の本棚には手を加えない） ---- */
 function renderSpell(){
   const code=lsGet("kishou_spell"), at=+lsGet("kishou_spell_at")||0;
@@ -1016,7 +1136,7 @@ $("btnSpell").onclick=async()=>{
   if(!SH.books.length){ $("spMsg").style.color="var(--ng)"; $("spMsg").textContent="本棚に本がありません。"; return; }
   if(!spellPass()) return;
   $("btnSpell").disabled=true; $("spMsg").style.color="var(--sub)"; $("spMsg").textContent="本棚を預けています…";
-  try{ const j=await bunkoApi("/spell/save",{token:ownerToken(),code:lsGet("kishou_spell"),shelf:{books:SH.books,antho:SH.antho,v:1}});
+  try{ const j=await bunkoApi("/spell/save",{token:ownerToken(),code:lsGet("kishou_spell"),shelf:{books:SH.books,antho:SH.antho,oshi:SH.oshi,v:1}});
     lsSet("kishou_spell",j.code); lsSet("kishou_spell_at",String(j.savedAt));
     $("spMsg").style.color="var(--ok)"; $("spMsg").textContent=j.books+"冊を預けました。このじゅもんを、ロイロに出してください。"; }
   catch(e){ if(String(e.message).includes("合言葉")) lsSet("bunko_pass",""); $("spMsg").style.color="var(--ng)"; $("spMsg").textContent=String(e.message).includes("fetch")?"うまくつながりませんでした。少し待ってもう一度押してください。":e.message; }
@@ -1030,6 +1150,7 @@ $("btnSpLoad").onclick=async()=>{
     let added=0, kept=0;
     for(const b of rb){ if(!b||!b.id) continue; if(SH.books.some(x=>x.id===b.id)){ kept++; continue; } SH.books.push(b); added++; }
     for(const a of ra){ if(a&&a.id&&!SH.antho.some(x=>x.id===a.id)) SH.antho.push(a); }
+    for(const o of ((j.shelf&&j.shelf.oshi)||[])){ if(o&&o.id&&!SH.oshi.some(x=>x.id===o.id)) SH.oshi.push(o); }
     saveShelf(); render();
     $("spMsg").style.color="var(--ok)"; $("spMsg").textContent=added+"冊をよびもどしました。"+(kept?"（"+kept+"冊は、もうこの本棚にあったのでそのままにしました）":""); }
   catch(e){ $("spMsg").style.color="var(--ng)"; $("spMsg").textContent=e.message; }
@@ -1042,8 +1163,9 @@ async function copyText(txt,btn,msgEl,label){ let ok=false;
   if(ok){ btn.textContent="✓ コピーしました"; setTimeout(()=>btn.textContent=label,3000); } }
 
 function renderShelfViews(){
-  ["scGenre","scWrite","scResult","scShelf","scBook","scPolish","scAntho"].forEach(id=>$(id).classList.add("hidden"));
+  ["scGenre","scWrite","scResult","scShelf","scBook","scPolish","scAntho","scOshi"].forEach(id=>$(id).classList.add("hidden"));
   $("steps").classList.add("hidden");
+  if(view==="oshi"){ setTheme(null); $("scOshi").classList.remove("hidden"); renderOshi(); return; }
   if(view==="shelf"){ setTheme(null); $("scShelf").classList.remove("hidden"); renderSpell();
     const bs=SH.books.slice().sort((a,b)=>a.created-b.created);
     $("shelfBooks").innerHTML=bs.map(spineHTML).join(""); $("shelfBooks").classList.toggle("hidden",!bs.length);
