@@ -712,17 +712,23 @@ function aiUse(b){ const br=b.brush||{}, hn=Object.values(b.hints||{}).reduce((a
   return bits.join("・"); }
 // ── 生徒の途中の推し短編集をのぞく（預けた本棚から。読むだけで、生徒のデータは変えない） ──
 const OS_PUB={pending:"確認待ち",public:"公開中",hidden:"非公開",returned:"返却中"};
-function osRowHTML(x,o){ const pct=Math.round(o.done/6*100);
+function osRowHTML(x,o,dup,many){ const pct=Math.round(o.done/6*100);
   return '<div class="osrow"><div class="osh"><b>'+esc(x.pen||"（ペンネームなし）")+'</b>　『'+esc(o.title||"題名はまだ")+'』'+(o.pub?'<span class="st '+esc(o.pub)+'">'+(OS_PUB[o.pub]||"")+'</span>':'')
     +'<span class="note" style="margin-left:auto;font-size:12px">'+(o.updated?hm(o.updated):"")+'</span></div>'
+    +(many>1||dup||o.from?'<div class="note" style="font-size:12px;color:#ffd36a">'+[many>1?'この生徒は推し短編集を '+many+' 冊 持っています（別々の本です'+(o.created?'。この本は '+hm(o.created)+' に作成':'')+'）':'',o.from?'前の「短編集」からうつしたもの':'',dup?'同じ本が、ほかのじゅもんにも '+dup+' つあります（いちばん新しいものを出しています）':''].filter(Boolean).join("／")+'</div>':'')
     +'<div class="osbar"><i style="width:'+pct+'%"></i></div>'
     +'<div class="note" style="font-size:12.5px">進み具合 '+o.done+'/6・作品 '+o.n+'・書評 '+o.rv+'/'+o.n+'・はじめに '+(o.intro?o.intro+'字':'まだ')+'・あとがき '+(o.after?o.after+'字':'まだ')+'</div>'
     +'<div class="row" style="margin-top:6px"><button class="btn small" data-ospeek="'+esc(x.code)+'" data-osid="'+esc(o.id)+'">📖 のぞく</button><button class="btn small" data-osshelf="'+esc(x.code)+'">本棚をひらく</button></div></div>'; }
 async function loadOsAll(){ $("osAll").innerHTML='<p class="note">読みこんでいます…</p>';
   try{ const L=(await api("/bunko/admin/spells",{teacher:true})).spells||[];
-    const rows=[]; for(const x of L) for(const o of (x.oshi||[])) rows.push([x,o]);
+    // 同じ推し短編集（同じ id）が、いくつかのじゅもんに入っていることがある（別の iPad・ホーム画面のアプリと Safari など）。いちばん新しいものだけを出す
+    const by={}; for(const x of L) for(const o of (x.oshi||[])){ const cur=by[o.id]; if(!cur) by[o.id]={x,o,dup:0}; else { cur.dup++; if(o.updated>cur.o.updated){ cur.x=x; cur.o=o; } } }
+    const rows=Object.values(by).map(r=>[r.x,r.o,r.dup]);
+    // 同じ人（同じじゅもん）が、推し短編集を2冊以上持っているときは、印をつける
+    const per={}; for(const [x] of rows) per[x.code]=(per[x.code]||0)+1;
+    for(const r of rows) r[3]=per[r[0].code];
     rows.sort((a,b)=>(a[0].pen||"").localeCompare(b[0].pen||"","ja")||(b[1].updated-a[1].updated));
-    $("osAll").innerHTML=rows.length? rows.map(([x,o])=>osRowHTML(x,o)).join("") : '<p class="note">まだありません。生徒がアプリで推し短編集を開いて少し書くと、自動で預けられてここに出てきます。<br>それでも出ない生徒がいるときは、［⚙ 設定］の［目次を作り直す］を押してから、もう一度［↻ 読みこむ］を押してください。</p>'; }
+    $("osAll").innerHTML=rows.length? rows.map(([x,o,dup,many])=>osRowHTML(x,o,dup,many)).join("") : '<p class="note">まだありません。生徒がアプリで推し短編集を開いて少し書くと、自動で預けられてここに出てきます。<br>それでも出ない生徒がいるときは、［⚙ 設定］の［目次を作り直す］を押してから、もう一度［↻ 読みこむ］を押してください。</p>'; }
   catch(e){ $("osAll").innerHTML=""; $("tMsg").textContent=e.message; } }
 $("btnOsAll").onclick=loadOsAll;
 const osBText=b=>b&&b.final? String(b.final.text||"") : b? origFlat(b) : "";

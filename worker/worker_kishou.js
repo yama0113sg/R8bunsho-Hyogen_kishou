@@ -501,7 +501,7 @@ function oshiSummary(list) {
     const rvDone = items.filter(it => t((rv[it.src + ":" + it.id] || {}).text)).length, n = items.length;
     const steps = [!!t(o.theme), n >= 1, n >= 3, !!(t(o.title) && t(o.editor)), n > 0 && rvDone === n, !!(t(o.intro) && t(o.after))];
     return { id: clip(o.id, 30), title: clip(t(o.title), 24), editor: clip(t(o.editor), 20), n, done: steps.filter(Boolean).length, rv: rvDone,
-      intro: len(t(o.intro).replace(/\s/g, "")), after: len(t(o.after).replace(/\s/g, "")), pub: o.pub ? clip(o.pub.status, 12) : "", updated: +o.updated || 0 };
+      intro: len(t(o.intro).replace(/\s/g, "")), after: len(t(o.after).replace(/\s/g, "")), pub: o.pub ? clip(o.pub.status, 12) : "", from: o.from === "antho" ? "antho" : "", created: +o.created || 0, updated: +o.updated || 0 };
   });
 }
 // ── 推し短編集の「編集部からの直しメモ」──
