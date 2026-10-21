@@ -322,6 +322,10 @@ input.ptitle{font-size:20px;margin-bottom:12px}
 .cnote .cfix{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-weight:700;cursor:pointer}
 .cnote .cfix input{width:20px;height:20px;accent-color:var(--ok)}
 .cnote .cwarn{display:block;font-size:12px;color:#ffb36b;margin-top:2px} .cnote.ok .cwarn{color:var(--ok)}
+.osave{position:sticky;top:6px;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:-6px 0 12px;padding:8px 12px;border-radius:12px;
+  background:rgba(18,16,31,.92);border:1px solid var(--edge);font-size:12.5px;color:var(--sub);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.osave b{color:var(--ink);font-weight:700} .osave .sv.ok{color:var(--ok)} .osave .sv.wait{color:#ffd36a}
+.osave .btn{margin-left:auto;padding:5px 12px;font-size:12px}
 .oprog{margin:0 0 14px;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid var(--edge)}
 .oprog .ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;color:var(--sub)}
 .oprog .ph>b{font-size:15px;color:var(--ink);letter-spacing:.1em} .oprog .ph span b{color:var(--ok);font-size:17px}
@@ -1115,7 +1119,7 @@ function renderOshi(){
       +'<button data-oread="'+src+':'+esc(x.id)+'" style="width:auto;padding:0 10px">読む</button>'
       +(on?'<button disabled>✓</button>':'<button data-oadd="'+src+':'+esc(x.id)+'">＋</button>')+'</div>'; };
   const own=SH.books.map(b=>({id:b.id,title:bTitle(b),pen:"自分",genre:b.genre}));
-  body.innerHTML='<p class="label">推しの短編集をつくる</p>'
+  body.innerHTML='<div class="osave" id="oSave"></div><p class="label">推しの短編集をつくる</p>'
     +'<div class="oprog" id="oSteps">'+oshiProgHTML(o)+'</div>'
     +OSHI_GUIDE
     +'<div class="ostep" id="os1"><h3>① テーマ<small>どんな本にしたい？ カードから選ぶか、自分で書こう</small></h3>'
@@ -1151,7 +1155,7 @@ function renderOshi(){
       +oshiPubHTML(o,st)+'</div>'
     +'<div class="msg" id="oMsg"></div>'
     +'<div class="nav"><button class="btn" data-oact="back">← 一覧へ</button><button class="btn danger" data-oact="del">この短編集を消す</button></div>';
-  refreshCoachCards(o);
+  refreshCoachCards(o); renderOSave();
 }
 // 書評（オーソドックスな形）
 const rvKey=it=>it.src+":"+it.id;
@@ -1167,7 +1171,19 @@ function rvItemHTML(o,it,i){ const r=(o.reviews||{})[rvKey(it)]||{};
     +'<div class="count"><span><span class="rvn">'+nchars(r.text||"")+'</span> 字</span></div>'
     +'<div class="rvprev">'+rvPreview(r.text,o.editor)+'</div></div>'; }
 function oshiCover(o){ return '<div class="ocover c'+(o.cover||0)+'"><div class="ot">'+(esc(o.title)||'<span style="opacity:.45">題名</span>')+'</div>'+(o.theme?'<div class="oth">'+esc(o.theme)+'</div>':'')+'<div class="oe">編・'+(esc(o.editor)||"——")+'</div></div>'; }
-function oshiTouch(o){ o.updated=Date.now(); saveShelf(); }
+function oshiTouch(o){ o.updated=Date.now(); saveShelf(); renderOSave(); }
+// 保存のようす（不安な人向け）：書くたびに iPad に保存。ふっかつのじゅもんにも自動で預ける（［いますぐ預ける］も押せる）
+const hms=t=>new Date(t).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+function renderOSave(){ const el=$("oSave"), o=curOshi&&oshiOf(curOshi); if(!el||!o) return;
+  const bk=lastBackup(), un=hasUnsaved(), pass=!!lsGet("bunko_pass");
+  el.innerHTML='<span class="sv">💾 この iPad に保存ずみ <b>'+hms(o.updated||Date.now())+'</b></span>'
+    +'<span class="sv '+(un?"wait":"ok")+'">☁ '+(!pass?'合言葉を入れると、預けられます':spBusy?'預けています…':bk?(un?'預けるのを待っています（前回 '+hms(bk)+'）':'預けました '+hms(bk)):'まだ預けていません')+'</span>'
+    +(pass?'<button class="btn small" id="btnOSaveNow"'+(spBusy||!un?' disabled':'')+'>☁ いますぐ預ける</button>':''); }
+let oSaveArm=0;
+$("oshiBody").addEventListener("click",async e=>{ if(!e.target.closest("#btnOSaveNow")) return;
+  if(Date.now()-oSaveArm<30000) return; oSaveArm=Date.now();
+  const tm=setTimeout(renderOSave,50); try{ await spellSave(); }catch(err){ $("oMsg").style.color="var(--ng)"; $("oMsg").textContent=String(err.message).includes("fetch")?"うまくつながりませんでした。この iPad には保存されているので、安心してね。少し待ってもう一度押してください。":err.message; oSaveArm=0; }
+  clearTimeout(tm); renderOSave(); });
 // プレビューの「まだです」のページから、書く場所へ移る
 function oshiJumpTo(k){ const el= k==="intro"? $("oIntro") : k==="after"? $("oAfter") : k.startsWith("rv")? document.querySelector('.rvtext[data-rvi="'+k.slice(2)+'"]') : null;
   if(!el) return; el.scrollIntoView({behavior:"smooth",block:"center"}); setTimeout(()=>{ try{ el.focus({preventScroll:true}); }catch(e){ el.focus(); } },400); }
@@ -1368,7 +1384,7 @@ async function spellSave(){
         shelf:{books:SH.books,antho:SH.antho,oshi:SH.oshi,draft:S.genre?S:null,v:1}});
     lsSet("kishou_spell",j.code); lsSet("kishou_spell_at",String(j.savedAt)); lsSet("kishou_bk_local",String(t0));
     return j; }
-  finally{ spBusy=false; if(view==="shelf") renderSpell(); }
+  finally{ spBusy=false; if(view==="shelf") renderSpell(); if(view==="oshi") renderOSave(); }
 }
 async function autoBackup(leaving){
   if(!hasUnsaved()||!lsGet("bunko_pass")||spBusy) return;
