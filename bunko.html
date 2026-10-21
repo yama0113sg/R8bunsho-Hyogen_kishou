@@ -76,7 +76,7 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .shelfrow:last-child{margin-bottom:16px}
 .shelfrow::after{content:"";position:absolute;left:0;right:0;bottom:-14px;height:14px;border-radius:2px;
   background:linear-gradient(to bottom,rgba(255,236,210,.24) 0 4px,rgba(255,236,210,.1) 4px 8px,rgba(0,0,0,.45) 8px 14px);box-shadow:0 10px 18px rgba(0,0,0,.35)}
-.slot{height:212px;display:flex;align-items:flex-end}
+.slot{height:var(--sh,212px);display:flex;align-items:flex-end}
 .spine{width:var(--sw,48px);height:var(--h);border-radius:4px 4px 2px 2px;position:relative;display:flex;flex-direction:column;align-items:center;padding:14px 0 8px;overflow:hidden;
   background:linear-gradient(90deg,color-mix(in srgb,var(--c2) 45%,#000) 0,color-mix(in srgb,var(--c2) 80%,#000) 16%,color-mix(in srgb,var(--c2) 85%,var(--c)) 50%,color-mix(in srgb,var(--c2) 60%,#000) 100%);
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),3px 0 8px rgba(0,0,0,.45);transition:transform .2s}
@@ -432,10 +432,17 @@ function layoutShelf(){
   const gap=6, avail=Math.max(200,el.clientWidth-20), fit=Math.max(1,Math.floor((avail+gap)/(48+gap)));
   const rows=Math.ceil(n/fit), base=Math.floor(n/rows), extra=n%rows, per=base+(extra?1:0);
   const sw=Math.max(44,Math.min(62,Math.floor((avail-(per-1)*gap)/per))), k=Math.min(1.2,sw/48);
-  el.style.setProperty("--sw",sw+"px");
-  const spine=w=>{ const g=genreOf(w.genre), h=Math.round(186+Math.min(24,Math.max(0,(w.chars-800)/40))), L=[...w.title].length;
+  // 太くしたぶん背も高くして、本らしい細長さにする
+  const hs=Math.max(1,Math.min(1.4,sw/48*1.1));
+  el.style.setProperty("--sw",sw+"px"); el.style.setProperty("--sh",Math.round(212*hs)+"px");
+  // 題名は、なるべく1列でおさめる（入らない長い題名だけ2列にする）
+  const titleCSS=(h,L)=>{ const area=h-92, fsMax=Math.round(15*k);
+    const one=Math.floor(area/(L*1.12));
+    if(one>=12) return 'font-size:'+Math.min(fsMax,one)+'px;white-space:nowrap';
+    return 'font-size:'+Math.max(9,Math.min(fsMax-2,Math.floor(area*2/(L*1.12)),Math.floor((sw-12)/2.3)))+'px'; };
+  const spine=w=>{ const g=genreOf(w.genre), h=Math.round((186+Math.min(24,Math.max(0,(w.chars-800)/40)))*hs), L=[...w.title].length;
     return '<div class="slot"><button class="spine'+(w.obi!=null?" ob"+w.obi:"")+'" data-id="'+esc(w.id)+'" style="--c:'+g.c+';--c2:'+g.c2+';--h:'+h+'px" title="'+esc(w.title)+'">'+(w.obi!=null?'<span class="ob s'+w.obi+'"></span>':'')
-      +'<span class="t" style="font-size:'+Math.round((L<=5?15:L<=8?12:L<=14?11:10)*k)+'px">'+esc(w.title)+'</span><span class="p">'+esc(w.pen)+'</span></button></div>'; };
+      +'<span class="t" style="'+titleCSS(h,L)+'">'+esc(w.title)+'</span><span class="p">'+esc(w.pen)+'</span></button></div>'; };
   let html="", i=0;
   for(let r=0;r<rows;r++){ const c=base+(r<extra?1:0); html+='<div class="shelfrow">'+works.slice(i,i+c).map(spine).join("")+'</div>'; i+=c; }
   el.innerHTML=html;
