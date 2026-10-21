@@ -190,6 +190,19 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .rvbox ol{margin:6px 0 0;padding-left:1.3em}
 .rvbox textarea{margin-top:8px;font-size:14px}
 h3{font-size:14px;letter-spacing:.15em;color:var(--sub);margin:22px 0 10px;font-weight:700}
+h3 small{font-weight:500;letter-spacing:0;margin-left:4px}
+/* 先生用のタブ */
+.ttabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 6px;padding-bottom:10px;border-bottom:1px solid var(--edge)}
+.ttabs button{padding:9px 14px;border-radius:12px;font-size:14px;font-weight:700;color:var(--sub);border:1px solid var(--edge);display:flex;align-items:center;gap:6px}
+.ttabs button.on{background:#fff;color:#15121f;border-color:transparent}
+.badge{min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:#ff5d7a;color:#fff;font-size:12px;display:inline-grid;place-items:center}
+.tdone{text-align:center;padding:30px 0;color:var(--ok);font-weight:700}
+#tpWorks .item .h{cursor:pointer}
+#tpWorks .item:not(.open)>:not(.h){display:none}
+#tpWorks .item:not(.open){padding:10px 14px}
+#tpWorks .item .h b::before{content:"▸ ";color:var(--sub);font-size:12px}
+#tpWorks .item.open .h b::before{content:"▾ "}
+.item.gone{opacity:.25;pointer-events:none;transition:opacity .3s}
 </style>
 </head>
 <body>
@@ -293,27 +306,53 @@ h3{font-size:14px;letter-spacing:.15em;color:var(--sub);margin:22px 0 10px;font-
         <div class="row"><button class="btn main" id="btnTEnter">入る</button><button class="btn" id="btnTClose">もどる</button></div>
       </div>
       <div id="senseiBody" class="hidden">
-        <div class="row" style="margin-top:0"><button class="btn small" id="btnTReload">↻ 読みこみ直す</button><button class="btn small" id="btnTClose2">棚へもどる</button></div>
-        <div class="row"><button class="btn small" id="btnAiAll">AIの感想をまだない作品に付ける</button></div>
-        <p class="note" id="aiAllMsg" style="margin-top:6px">公開中の作品には、AIの読み手の感想が、公開してから7分後〜1時間半ほどのあいだに、1人ずつ届きます。</p>
-        <details style="margin-top:14px" id="rdBox"><summary class="note" style="cursor:pointer">AIの読み手の顔ぶれ（名前・性格・話し方）を変える</summary>
-          <p class="note" style="margin:10px 0">ここに入れた名前や性格は、Cloudflare の保存場所にしまわれます（公開リポジトリには残りません）。1〜3人まで。使わない読み手は「使う」をはずしてください。保存したあと［AIの感想をまだない作品に付ける］を押すと、全部の作品の感想が新しい顔ぶれで作り直されます。</p>
-          <div id="rdList"></div>
-          <div class="row"><button class="btn small main" id="btnRdSave">保存する</button><button class="btn small" id="btnRdReset">はじめの3人にもどす</button></div>
-          <div class="msg" id="rdMsg"></div>
-        </details>
-        <h3>ふっかつのじゅもんで本棚をひらく</h3>
-        <div class="row" style="margin-top:0"><input id="spCodeIn" placeholder="例：ほしぞら たぬき もみじ ゆうき 47" style="flex:1;min-width:220px"><button class="btn small main" id="btnSpOpen">ひらく</button></div>
-        <details id="spListBox" style="margin-top:8px"><summary class="note" style="cursor:pointer">じゅもんの一覧（ペンネーム・題名から探す。本棚が消えた生徒に教えるとき）</summary>
-          <input id="spFind" placeholder="ペンネームや題名で絞りこむ" style="margin-top:8px">
-          <div id="spList" style="margin-top:8px"></div></details>
-        <div id="spShelf"></div>
-        <h3>確認待ちの作品</h3><div id="tPendW"></div>
-        <h3>確認待ちの感想</h3><div id="tPendC"></div>
-        <h3>確認待ちの帯</h3><div id="tPendO"></div>
-        <h3>推し短編集</h3><div id="tAn"></div>
-        <h3>公開中・非公開の作品</h3><div id="tOther"></div>
-        <p class="note" style="margin-top:14px">公開・非公開を切りかえてから棚に反映されるまで、最大1分ほどかかることがあります。</p>
+        <div class="row" style="margin-top:0;justify-content:space-between"><button class="btn small" id="btnTReload">↻ 読みこみ直す</button><button class="btn small" id="btnTClose2">棚へもどる</button></div>
+        <div class="ttabs" id="tTabs"><button data-t="inbox">📥 確認待ち<b class="badge hidden" id="tBadge"></b></button><button data-t="works">📚 作品</button><button data-t="shelf">🧑‍🎓 提出・本棚</button><button data-t="set">⚙ 設定</button></div>
+
+        <!-- ① 確認待ち：先生が何か押す必要があるものだけ -->
+        <div class="tpane" id="tpInbox">
+          <p class="tdone hidden" id="tInboxDone">✓ 確認待ちはありません</p>
+          <div id="tsW"><h3>作品</h3><div id="tPendW"></div></div>
+          <div id="tsC"><h3>感想</h3><div id="tPendC"></div></div>
+          <div id="tsO"><h3>帯</h3><div id="tPendO"></div></div>
+          <div id="tsA"><h3>推し短編集</h3><div id="tPendAn"></div></div>
+        </div>
+
+        <!-- ② 作品：公開中・非公開・返却中の作品と推し短編集（押すと開く） -->
+        <div class="tpane hidden" id="tpWorks">
+          <input id="tFind" placeholder="ペンネームや題名で絞りこむ">
+          <h3>作品 <small id="tOtherN"></small></h3><div id="tOther"></div>
+          <h3>推し短編集 <small id="tAnN"></small></h3><div id="tAn"></div>
+          <p class="note" style="margin-top:14px">行を押すと、読む・公開・非公開などのボタンが出ます。切りかえてから棚に反映されるまで、最大1分ほどかかることがあります。</p>
+        </div>
+
+        <!-- ③ 提出・本棚：ふっかつのじゅもん -->
+        <div class="tpane hidden" id="tpShelf">
+          <h3 style="margin-top:6px">じゅもんで本棚をひらく</h3>
+          <div class="row" style="margin-top:0"><input id="spCodeIn" placeholder="例：ほしぞら たぬき もみじ ゆうき 47" style="flex:1;min-width:220px"><button class="btn small main" id="btnSpOpen">ひらく</button></div>
+          <details id="spListBox" style="margin-top:12px"><summary class="note" style="cursor:pointer">じゅもんの一覧（ペンネーム・題名から探す。本棚が消えた生徒に教えるとき）</summary>
+            <input id="spFind" placeholder="ペンネームや題名で絞りこむ" style="margin-top:8px">
+            <div id="spList" style="margin-top:8px"></div></details>
+          <div id="spShelf"></div>
+        </div>
+
+        <!-- ④ 設定：たまにしか使わないもの -->
+        <div class="tpane hidden" id="tpSet">
+          <h3 style="margin-top:6px">AIの感想</h3>
+          <p class="note" id="aiAllMsg">公開中の作品には、AIの読み手の感想が、公開してから7分後〜1時間半ほどのあいだに、1人ずつ届きます。</p>
+          <div class="row"><button class="btn small" id="btnAiAll">AIの感想をまだない作品に付ける</button></div>
+          <h3>AIの読み手の顔ぶれ</h3>
+          <details id="rdBox"><summary class="note" style="cursor:pointer">名前・性格・話し方を変える</summary>
+            <p class="note" style="margin:10px 0">ここに入れた名前や性格は、Cloudflare の保存場所にしまわれます（公開リポジトリには残りません）。1〜3人まで。使わない読み手は「使う」をはずしてください。保存したあと［AIの感想をまだない作品に付ける］を押すと、全部の作品の感想が新しい顔ぶれで作り直されます。</p>
+            <div id="rdList"></div>
+            <div class="row"><button class="btn small main" id="btnRdSave">保存する</button><button class="btn small" id="btnRdReset">はじめの3人にもどす</button></div>
+            <div class="msg" id="rdMsg"></div>
+          </details>
+          <h3>困ったとき</h3>
+          <p class="note">「出したのに棚にない」作品があるときは、目次を作り直します。何度押しても大丈夫ですが、1日に何回も押さないでください（Cloudflare の list の回数を使います）。</p>
+          <div class="row"><button class="btn small" id="btnReindex">目次を作り直す</button></div>
+          <p class="note" id="reindexMsg" style="margin-top:6px"></p>
+        </div>
       </div>
       <div class="msg" id="tMsg"></div>
     </div>
@@ -521,11 +560,12 @@ $("btnTEnter").onclick=tEnter;
 $("tpassIn").addEventListener("keydown",e=>{ if(e.key==="Enter") tEnter(); });
 const closeSensei=()=>{ if(ls.get("bunko_pass")) loadShelf().catch(()=>show("scGate")); else show("scGate"); };
 $("btnTClose").onclick=closeSensei; $("btnTClose2").onclick=closeSensei;
-$("btnTReload").onclick=()=>loadAdmin();
+$("btnTReload").onclick=()=>loadAdmin(true);
 let admin={works:[],comments:[]};
 const stLabel={public:"公開中",pending:"確認待ち",hidden:"非公開",returned:"返却中"};
-async function loadAdmin(){
+async function loadAdmin(keep){
   $("tMsg").textContent="";
+  const y=window.scrollY, opened=keep?[...document.querySelectorAll("#tpWorks .item.open")].map(x=>x.dataset.id||x.dataset.anid):[];
   try{ admin=await api("/bunko/admin",{teacher:true}); }
   catch(e){ $("tMsg").textContent=e.message; $("senseiGate").classList.remove("hidden"); $("senseiBody").classList.add("hidden"); return; }
   $("senseiGate").classList.add("hidden"); $("senseiBody").classList.remove("hidden");
@@ -536,29 +576,51 @@ async function loadAdmin(){
     +(w.status!=="hidden"?'<button class="btn small" data-act="hidden">非公開にする</button>':'')
     +'<button class="btn small danger" data-act="delete">削除</button></div></div>';
   const pw=admin.works.filter(w=>w.status==="pending"), ow=admin.works.filter(w=>w.status!=="pending");
-  $("tPendW").innerHTML=pw.length? pw.map(workRow).join("") : '<p class="note">ありません。</p>';
-  $("tOther").innerHTML=ow.length? ow.map(workRow).join("") : '<p class="note">ありません。</p>';
+  $("tPendW").innerHTML=pw.map(workRow).join("");
+  $("tOther").innerHTML=ow.length? ow.map(workRow).join("") : '<p class="note">ありません。</p>'; $("tOtherN").textContent=ow.length+"冊";
   const titleOf=id=>{const w=admin.works.find(x=>x.id===id); return w?w.title:"（消えた作品）";};
   const os=admin.obis||[];
   $("tPendO").innerHTML=os.length? os.map(o=>{ const w=admin.works.find(x=>x.id===o.workId)||{title:"（消えた作品）",pen:"",genre:"nichijo"};
     return '<div class="item" data-oid="'+esc(o.id)+'" data-wid="'+esc(o.workId)+'"><div class="h"><b style="font-size:14px">『'+esc(w.title)+'』への帯</b><span>'+esc(o.pen)+'・'+md(o.created)+'</span></div>'
       +'<div style="max-width:220px;margin:10px 0">'+coverHTML(w,o)+'</div>'
       +(o.review&&o.review.why?'<p class="note" style="color:#ff8fa3">編集部（AI）：'+esc(o.review.why)+'</p>':'<p class="note">編集部（AI）のチェックができなかったので、確認待ちになっています。</p>')
-      +'<div class="row"><button class="btn small main" data-act="opublic">公開する</button><button class="btn small danger" data-act="odelete">削除</button></div></div>'; }).join("")
-    : '<p class="note">ありません。</p>';
-  const ans=admin.oshis||[];
-  $("tAn").innerHTML=ans.length? ans.map(a=>'<div class="item" data-anid="'+esc(a.id)+'"><div class="h"><b>『'+esc(a.title)+'』<span class="st '+a.status+'">'+stLabel[a.status]+'</span>'
+      +'<div class="row"><button class="btn small main" data-act="opublic">公開する</button><button class="btn small danger" data-act="odelete">削除</button></div></div>'; }).join("") : "";
+  const ans=admin.oshis||[], anRow=a=>'<div class="item" data-anid="'+esc(a.id)+'"><div class="h"><b>『'+esc(a.title)+'』<span class="st '+a.status+'">'+stLabel[a.status]+'</span>'
       +(a.rv?'<span class="rv '+a.rv+'">'+(a.rv==="ok"?"編集部：気になる点なし":"編集部：気になる点あり")+'</span>':'')+'</b><span>編・'+esc(a.editor)+'・'+a.n+'作・'+md(a.updated)+'</span></div>'
       +'<div class="anrv"></div><div class="row"><button class="btn small" data-act="anread">📖 本として読む</button><button class="btn small" data-act="anrv">編集部のメモ</button>'
       +(a.status!=="public"?'<button class="btn small main" data-act="anpublic">公開する</button>':'')
       +(a.status!=="hidden"?'<button class="btn small" data-act="anhidden">非公開にする</button>':'')
-      +'<button class="btn small danger" data-act="andelete">削除</button></div></div>').join("")
-    : '<p class="note">ありません。</p>';
+      +'<button class="btn small danger" data-act="andelete">削除</button></div></div>';
+  const pa=ans.filter(a=>a.status==="pending"), oa=ans.filter(a=>a.status!=="pending");
+  $("tPendAn").innerHTML=pa.map(anRow).join("");
+  $("tAn").innerHTML=oa.length? oa.map(anRow).join("") : '<p class="note">ありません。</p>'; $("tAnN").textContent=oa.length+"冊";
   $("tPendC").innerHTML=admin.comments.length? admin.comments.map(c=>'<div class="item" data-cid="'+esc(c.id)+'" data-wid="'+esc(c.workId)+'"><div class="h"><b style="font-size:14px">『'+esc(titleOf(c.workId))+'』への感想</b><span>'+esc(c.name)+'・'+md(c.created)+'</span></div>'
-    +'<div class="cm pending" style="margin:10px 0 0"><p>'+esc(c.text)+'</p></div><div class="row"><button class="btn small main" data-act="cpublic">公開する</button><button class="btn small danger" data-act="cdelete">削除</button></div></div>').join("")
-    : '<p class="note">ありません。</p>';
+    +'<div class="cm pending" style="margin:10px 0 0"><p>'+esc(c.text)+'</p></div><div class="row"><button class="btn small main" data-act="cpublic">公開する</button><button class="btn small danger" data-act="cdelete">削除</button></div></div>').join("") : "";
+  // 確認待ちの件数（0件の種類は見出しごと出さない）
+  const cnt={W:pw.length,C:admin.comments.length,O:os.length,A:pa.length}, total=cnt.W+cnt.C+cnt.O+cnt.A;
+  for(const k in cnt) $("ts"+k).classList.toggle("hidden",!cnt[k]);
+  $("tInboxDone").classList.toggle("hidden",!!total);
+  $("tBadge").textContent=total; $("tBadge").classList.toggle("hidden",!total);
+  applyFind(); showTTab();
+  if(keep){ for(const it of document.querySelectorAll("#tpWorks .item")) if(opened.includes(it.dataset.id||it.dataset.anid)) it.classList.add("open"); window.scrollTo(0,y); }
 }
+// タブ（どれを開いていたかは、ページを閉じるまで覚えておく）
+let tTab=ss.get("bunko_ttab")||"inbox";
+function showTTab(){ const P={inbox:"tpInbox",works:"tpWorks",shelf:"tpShelf",set:"tpSet"};
+  for(const k in P) $(P[k]).classList.toggle("hidden",k!==tTab);
+  [...$("tTabs").children].forEach(b=>b.classList.toggle("on",b.dataset.t===tTab)); }
+$("tTabs").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; tTab=b.dataset.t; ss.set("bunko_ttab",tTab); showTTab(); });
+// 作品タブ：行を押すと開く・絞りこみ
+$("tpWorks").addEventListener("click",e=>{ if(e.target.closest("button,textarea,input,a")) return; const h=e.target.closest(".item>.h"); if(h) h.parentElement.classList.toggle("open"); });
+function applyFind(){ const q=$("tFind").value.trim();
+  for(const it of $("tpWorks").querySelectorAll(".item")) it.classList.toggle("hidden",!!q&&!it.querySelector(".h").textContent.includes(q)); }
+$("tFind").addEventListener("input",applyFind);
+$("btnReindex").onclick=async()=>{ const b=$("btnReindex"); b.disabled=true; $("reindexMsg").textContent="作り直しています…";
+  try{ const r=await api("/bunko/admin/reindex",{method:"POST",teacher:true,body:{}}); $("reindexMsg").textContent="作り直しました（作品 "+r.works+" 冊）。"; await loadAdmin(true); }
+  catch(e){ $("reindexMsg").textContent=e.message; } b.disabled=false; };
 let delArm={};
+// 押したあとは、その行をうすくしてから読みこみ直す（いまいる場所はそのまま）
+async function doneItem(it){ if(it) it.classList.add("gone"); await loadAdmin(true); }
 const hm=ts=>{const d=new Date(ts);return (d.getMonth()+1)+"/"+d.getDate()+" "+d.getHours()+"時"+String(d.getMinutes()).padStart(2,"0")+"分";};
 // 文庫の編集部（AI）の査読。先生が［本人に返す］を押したときだけ、生徒のアプリに届く
 function reviewHTML(w){
@@ -678,17 +740,17 @@ $("scSensei").addEventListener("click",async e=>{
           :'<textarea class="rnote" rows="2" maxlength="300" placeholder="先生からのひとこと（なくてもよい）"></textarea><div class="row" style="margin-top:6px"><button class="btn small" data-act="anreturn">本人に返す</button><button class="btn small" data-act="anrerev">査読をやり直す</button></div>')+'</div>';
       return; }
     if(act==="anreturn"){ const note=(it.querySelector(".rnote")||{}).value||""; b.disabled=true;
-      await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"an",id:it.dataset.anid,status:"returned",note}}); await loadAdmin(); return; }
+      await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"an",id:it.dataset.anid,status:"returned",note}}); await doneItem(it); return; }
     if(act==="anpublic"||act==="anhidden"||act==="andelete"){
       if(act==="andelete"&&!(Date.now()-(delArm["an"+it.dataset.anid]||0)<3000)){ delArm["an"+it.dataset.anid]=Date.now(); b.textContent="もう一度押すと消えます"; setTimeout(()=>b.textContent="削除",3000); return; }
-      b.disabled=true; await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"an",id:it.dataset.anid,status:act.slice(2)}}); await loadAdmin(); return; }
+      b.disabled=true; await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"an",id:it.dataset.anid,status:act.slice(2)}}); await doneItem(it); return; }
     if(act==="opublic"||act==="odelete"){
       if(act==="odelete"&&!(Date.now()-(delArm["o"+it.dataset.oid]||0)<3000)){ delArm["o"+it.dataset.oid]=Date.now(); b.textContent="もう一度押すと消えます"; setTimeout(()=>b.textContent="削除",3000); return; }
       b.disabled=true; await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"o",workId:it.dataset.wid,id:it.dataset.oid,status:act==="opublic"?"public":"delete"}});
-      await loadAdmin(); return; }
+      await doneItem(it); return; }
     if(act==="return"){ const note=(it.querySelector(".rnote")||{}).value||"";
       b.disabled=true; await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"w",id:it.dataset.id,status:"returned",note}});
-      await loadAdmin(); return; }
+      await doneItem(it); return; }
     if(act==="rerev"){ b.disabled=true; b.textContent="読んでいます…";
       const r=await api("/bunko/admin/review",{method:"POST",teacher:true,body:{id:it.dataset.id}});
       if(!r.ok) $("tMsg").textContent="うまく査読できませんでした。少し待ってもう一度押してください。";
@@ -706,7 +768,7 @@ $("scSensei").addEventListener("click",async e=>{
     b.disabled=true;
     if(act==="cpublic"||act==="cdelete") await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"c",workId:it.dataset.wid,id:it.dataset.cid,status:act==="cpublic"?"public":"delete"}});
     else await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"w",id:it.dataset.id,status:act}});
-    await loadAdmin();
+    await doneItem(it);
   }catch(err){ $("tMsg").textContent=err.message; b.disabled=false; }
 });
 
