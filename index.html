@@ -493,9 +493,11 @@ input.ptitle{font-size:20px;margin-bottom:12px}
       <div class="shelfempty hidden" id="shelfEmpty">まだ本がありません。<br>書き上げた物語は、ここに一冊ずつ並んでいきます。<br><span style="font-size:13px">本棚が急に空っぽになったときは、下の「ふっかつのじゅもん」から、じゅもんでよびもどせます。じゅもんがわからなければ、先生に聞いてね。</span></div>
     </div>
     <div class="shelfwrap">
-      <div class="shelfhead"><h2>短編集</h2><span>本棚の作品を選んで、一冊にまとめる</span></div>
-      <div class="shelf hidden" id="shelfAntho"></div>
-      <div class="row" style="padding:0 6px"><button class="btn" id="btnNewAntho">＋ 短編集をつくる</button></div>
+      <div class="shelfhead"><h2>推し短編集</h2><span>友だちの作品や自分の作品を集めて、一冊に編む</span></div>
+      <div class="row" style="padding:0 6px"><button class="btn" id="btnGoOshi">📕 推し短編集をつくる・ひらく</button></div>
+      <!-- 前の「短編集」（自分の作品をまとめてコピーするだけのもの）は、推し短編集とまぎらわしいので画面から外した。
+           作ってあったものは、推し短編集にうつしてある（SH.antho のデータは消さずに残す） -->
+      <div class="hidden"><div class="shelf hidden" id="shelfAntho"></div><button class="btn" id="btnNewAntho"></button></div>
     </div>
     <div class="shelfwrap">
       <div class="shelfhead"><h2>ふっかつのじゅもん</h2><span>本棚をまるごと預けて、ロイロに出す</span></div>
@@ -1326,7 +1328,7 @@ $("btnSpLoad").onclick=async()=>{
     for(const o of ((j.shelf&&j.shelf.oshi)||[])){ if(o&&o.id&&!SH.oshi.some(x=>x.id===o.id)) SH.oshi.push(o); }
     const dr=j.shelf&&j.shelf.draft; let drOk=false;
     if(dr&&dr.genre&&!S.genre){ S=dr; save(); drOk=true; }   // 書きかけの物語は、この iPad で何も書いていないときだけもどす
-    saveShelf(); render();
+    migrateAntho(); saveShelf(); render();
     $("spMsg").style.color="var(--ok)"; $("spMsg").textContent=added+"冊"+(drOk?"と、書きかけの物語":"")+"をよびもどしました。"+(kept?"（"+kept+"冊は、もうこの本棚にあったのでそのままにしました）":""); }
   catch(e){ $("spMsg").style.color="var(--ng)"; $("spMsg").textContent=e.message; }
   $("btnSpLoad").disabled=false;
@@ -1699,6 +1701,17 @@ $("btnAnthoDel").onclick=()=>{ if(Date.now()-aDelArm<3000){ SH.antho=SH.antho.fi
 // 前の版で完成していた作品も、本棚に入れておく
 if(S.done) upsertBook();
 
+// 前の「短編集」を、推し短編集にうつす（1回だけ。もとのデータは消さない）
+function migrateAntho(){ let n=0;
+  for(const a of SH.antho||[]){ if(a.moved||!a.ids||!a.ids.length) continue;
+    const items=a.ids.map(bookById).filter(Boolean).map(b=>({src:"own",id:b.id,title:bTitle(b),pen:"自分",genre:b.genre}));
+    if(!items.length) continue;
+    const o={id:newId(),title:a.title||"",editor:lsGet("kishou_pen"),theme:"",cover:0,items,reviews:{},created:a.created||Date.now(),updated:Date.now(),from:"antho"};
+    SH.oshi.push(o); a.moved=o.id; n++; }
+  if(n) saveShelf();
+}
+$("btnGoOshi").onclick=()=>$("tabs").querySelector('[data-v="oshi"]').click();
+migrateAntho();
 render();
 </script>
 <script src="oshibook.js"></script>
