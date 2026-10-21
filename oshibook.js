@@ -52,6 +52,10 @@ const CSS=`
 .obk-end{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:12%;font-size:calc(var(--fs)*.85);line-height:1.9;color:#333}
 .obk-end h3{font-size:1.2em;margin:0 0 .6em;border-bottom:1px solid #ccc;padding-bottom:.4em}
 .obk-end .ft{margin-top:1.4em;font-size:.85em;color:#888}
+.obk-todo{position:absolute;inset:10%;border:2px dashed #c9c2b0;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1em;text-align:center;color:#8a8170;font-size:calc(var(--fs)*.95);line-height:1.8}
+.obk-todo .th{font-weight:800;font-size:1.25em;color:#555}
+.obk .obk-todo-go{background:#2a2333;color:#fff;border:none;border-radius:12px;padding:10px 18px;font-size:15px}
+.obk-cv .odr{position:absolute;top:16cqw;left:0;right:0;font-size:clamp(9px,3.4cqw,12px);letter-spacing:.15em;opacity:.85}
 .obk-hint{font-size:12px;color:#8f8aa8;margin-top:6px}
 `;
 const KAN=["一","二","三","四","五","六","七","八","九","十","十一","十二"];
@@ -85,20 +89,27 @@ function build(){
   meas.innerHTML='<div class="obk-body"></div>'; document.body.appendChild(meas);
   const b=book, P=[];
   P.push({kind:"cover"});
+  // b.draft のとき（編集中のプレビュー）は、まだ書いていないところに「まだです」のページをはさむ
+  const todo=(head,k)=>({kind:"todo",head,k});
   if(b.intro) P.push(...paginate(meas,b.intro,"はじめに","編者　"+(b.editor||"")).map(p=>({...p,run:"はじめに"})));
+  else if(b.draft) P.push(todo("はじめに","intro"));
   P.push({kind:"toc"});
   b.items.forEach((it,i)=>{
     P.push({kind:"door",i});
     P.push(...paginate(meas,it.text||"（この作品は、いま読めません）","","").map(p=>({...p,run:KAN[i]+"　"+it.title})));
     if(it.review) P.push(...paginate(meas,it.review,"書評　『"+it.title+"』","評・"+(b.editor||"")).map(p=>({...p,run:"書評"})));
+    else if(b.draft) P.push(todo("書評　『"+it.title+"』","rv"+i));
   });
   if(b.after) P.push(...paginate(meas,b.after,"あとがき","編者　"+(b.editor||"")).map(p=>({...p,run:"あとがき"})));
+  else if(b.draft) P.push(todo("あとがき","after"));
   P.push({kind:"end"});
   meas.remove(); pages=P;
 }
 function pageHTML(p){
   const b=book;
-  if(p.kind==="cover") return '<div class="obk-cv c'+(b.cover||0)+'"><div class="ol">推 し 短 編 集</div><div class="ot">'+esc(b.title)+'</div>'+(b.theme?'<div class="oth">'+esc(b.theme)+'</div>':'')+'<div class="oe">編・'+esc(b.editor)+'</div></div>';
+  if(p.kind==="cover") return '<div class="obk-cv c'+(b.cover||0)+'"><div class="ol">推 し 短 編 集</div>'+(b.draft?'<div class="odr">編集中のプレビュー</div>':'')+'<div class="ot">'+esc(b.title)+'</div>'+(b.theme?'<div class="oth">'+esc(b.theme)+'</div>':'')+'<div class="oe">編・'+esc(b.editor)+'</div></div>';
+  if(p.kind==="todo") return '<div class="obk-todo"><div class="th">'+esc(p.head)+'</div><div class="tm">ここに入る文章は、<br>まだ書かれていません。</div>'
+    +(b.onTodo?'<button class="obk-todo-go" data-k="'+esc(p.k)+'">✎ ここを書きに行く</button>':'')+'</div>';
   if(p.kind==="toc") return '<div class="obk-body obk-toc"><h2>目次</h2>'+b.items.map((it,i)=>'<span class="tl">'+KAN[i]+'　『'+esc(it.title)+'』　<small>'+esc(it.pen||"")+'</small></span>').join("")+'</div>';
   if(p.kind==="door"){ const it=b.items[p.i], o=it.obi;
     return '<div class="obk-door"><div class="dt"><span class="dn">'+KAN[p.i]+'</span><span class="dh">'+esc(it.title)+'</span><span class="dp">'+esc(it.pen||"")+(it.genreName?'　〈'+esc(it.genreName)+'〉':'')+'</span></div>'
@@ -136,7 +147,8 @@ async function open(b){
   root.querySelector(".obk-next").onclick=()=>move(1);
   root.querySelector(".obk-prev").onclick=()=>move(-1);
   const pg=root.querySelector(".obk-page");
-  pg.addEventListener("click",e=>{ const r=pg.getBoundingClientRect(), x=(e.clientX-r.left)/r.width; if(x<.38) move(1); else if(x>.62) move(-1); });
+  pg.addEventListener("click",e=>{ const go=e.target.closest(".obk-todo-go"); if(go){ const k=go.dataset.k, f=b.onTodo; close(); if(f) f(k); return; }
+    const r=pg.getBoundingClientRect(), x=(e.clientX-r.left)/r.width; if(x<.38) move(1); else if(x>.62) move(-1); });
   let sx=null, sy=0;
   pg.addEventListener("touchstart",e=>{ sx=e.touches[0].clientX; sy=e.touches[0].clientY; },{passive:true});
   pg.addEventListener("touchend",e=>{ if(sx==null) return; const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy; sx=null;
