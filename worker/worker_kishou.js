@@ -487,6 +487,16 @@ async function makeAnReview(env, id) {
   await putAn(kv, cur);
   return true;
 }
+// 預けた本棚の推し短編集の進み具合（先生が、クラス全体の途中経過を一覧で見るため）
+function oshiSummary(list) {
+  return (Array.isArray(list) ? list : []).slice(0, 10).map(o => {
+    const items = Array.isArray(o && o.items) ? o.items : [], rv = (o && o.reviews) || {}, t = x => String(x || "").trim();
+    const rvDone = items.filter(it => t((rv[it.src + ":" + it.id] || {}).text)).length, n = items.length;
+    const steps = [!!t(o.theme), n >= 1, n >= 3, !!(t(o.title) && t(o.editor)), n > 0 && rvDone === n, !!(t(o.intro) && t(o.after))];
+    return { id: clip(o.id, 30), title: clip(t(o.title), 24), editor: clip(t(o.editor), 20), n, done: steps.filter(Boolean).length, rv: rvDone,
+      intro: len(t(o.intro).replace(/\s/g, "")), after: len(t(o.after).replace(/\s/g, "")), pub: o.pub ? clip(o.pub.status, 12) : "", updated: +o.updated || 0 };
+  });
+}
 // ── 推し短編集の「編集部からの直しメモ」──
 // 出された推し短編集を、編集者として読んで、もっとよくするための具体的なメモを返す（書きかえた文は出さない。直すのは生徒）
 const AN_COACH = `あなたは、高校3年生の「文章表現」の授業で、生徒が編んだ「推しの短編集」を読む、文庫の編集者です。
@@ -604,9 +614,9 @@ async function bunko(request, env, headers, path, ctx) {
     await kv.put("sp:" + normSpell(code), JSON.stringify(rec));
     // じゅもんの目次（先生が、ペンネームや題名からじゅもんを探せるように）。中身が大きく変わったときだけ書きかえる
     const pen = clip(body.pen, 20).trim(), titles = body.shelf.books.slice(-4).map(b => clip((b && b.final && b.final.title) || (b && b.title) || "", 30)).filter(Boolean);
-    const six = await getIdx(kv, "idx:sp"), old = six.items[normSpell(code)];
-    if (!old || old.pen !== pen || old.books !== rec.books || JSON.stringify(old.titles) !== JSON.stringify(titles) || rec.savedAt - (old.savedAt || 0) > 86400000) {
-      six.items[normSpell(code)] = { code, pen, books: rec.books, titles, savedAt: rec.savedAt, created: rec.created };
+    const six = await getIdx(kv, "idx:sp"), old = six.items[normSpell(code)], oshi = oshiSummary(body.shelf.oshi);
+    if (!old || old.pen !== pen || old.books !== rec.books || JSON.stringify(old.titles) !== JSON.stringify(titles) || JSON.stringify(old.oshi || []) !== JSON.stringify(oshi) || rec.savedAt - (old.savedAt || 0) > 86400000) {
+      six.items[normSpell(code)] = { code, pen, books: rec.books, titles, oshi, savedAt: rec.savedAt, created: rec.created };
       await kv.put("idx:sp", JSON.stringify(six));
     }
     return J({ code, savedAt: rec.savedAt, books: rec.books }, headers);

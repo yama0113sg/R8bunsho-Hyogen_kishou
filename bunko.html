@@ -188,6 +188,10 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .st.public{background:rgba(93,255,176,.18);color:var(--ok)} .st.pending{background:rgba(255,211,106,.18);color:var(--gold)} .st.hidden{background:rgba(255,255,255,.1);color:var(--sub)}
 .st.returned{background:rgba(255,143,163,.16);color:#ff8fa3}
 .rv{font-size:12px;margin-left:6px;color:var(--sub)}
+.osrow{padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid var(--edge);margin-bottom:8px}
+.osrow .osh{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;font-size:14px} .osrow .osh b{font-family:var(--mincho);font-size:15px}
+.osbar{height:6px;border-radius:99px;background:rgba(255,255,255,.1);margin:6px 0;overflow:hidden}
+.osbar i{display:block;height:100%;background:linear-gradient(90deg,var(--ok),#9fe3ff)}
 .coachbox{margin-top:10px;padding:12px 14px;border-radius:12px;background:rgba(159,227,255,.07);border:1px solid rgba(159,227,255,.3);font-size:14px;line-height:1.8}
 .coachbox ol{margin:8px 0 0;padding-left:1.3em} .coachbox li{margin-bottom:10px}
 .coachbox .cpart{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;background:rgba(159,227,255,.18);color:var(--ai);margin-right:6px}
@@ -337,7 +341,11 @@ h3 small{font-weight:500;letter-spacing:0;margin-left:4px}
 
         <!-- ③ 提出・本棚：ふっかつのじゅもん -->
         <div class="tpane hidden" id="tpShelf">
-          <h3 style="margin-top:6px">じゅもんで本棚をひらく</h3>
+          <h3 style="margin-top:6px">推し短編集の進み具合（クラス全体）</h3>
+          <p class="note">生徒の iPad から自動で預けられた、途中の推し短編集です（最大10分ほど前の状態。生徒が［☁ いますぐ預ける］を押すと、すぐ新しくなります）。［のぞく］で本として読めます。生徒には何も届きません。</p>
+          <div class="row" style="margin-top:6px"><button class="btn small main" id="btnOsAll">↻ 読みこむ</button></div>
+          <div id="osAll" style="margin-top:8px"></div>
+          <h3>じゅもんで本棚をひらく</h3>
           <div class="row" style="margin-top:0"><input id="spCodeIn" placeholder="例：ほしぞら たぬき もみじ ゆうき 47" style="flex:1;min-width:220px"><button class="btn small main" id="btnSpOpen">ひらく</button></div>
           <details id="spListBox" style="margin-top:12px"><summary class="note" style="cursor:pointer">じゅもんの一覧（ペンネーム・題名から探す。本棚が消えた生徒に教えるとき）</summary>
             <input id="spFind" placeholder="ペンネームや題名で絞りこむ" style="margin-top:8px">
@@ -639,7 +647,7 @@ let tTab=ss.get("bunko_ttab")||"inbox";
 function showTTab(){ const P={inbox:"tpInbox",works:"tpWorks",shelf:"tpShelf",set:"tpSet"};
   for(const k in P) $(P[k]).classList.toggle("hidden",k!==tTab);
   [...$("tTabs").children].forEach(b=>b.classList.toggle("on",b.dataset.t===tTab)); }
-$("tTabs").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; tTab=b.dataset.t; ss.set("bunko_ttab",tTab); showTTab(); });
+$("tTabs").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; tTab=b.dataset.t; ss.set("bunko_ttab",tTab); showTTab(); if(tTab==="shelf"&&!$("osAll").innerHTML) loadOsAll(); });
 // 作品タブ：行を押すと開く・絞りこみ
 $("tpWorks").addEventListener("click",e=>{ if(e.target.closest("button,textarea,input,a")) return; const h=e.target.closest(".item>.h"); if(h) h.parentElement.classList.toggle("open"); });
 function applyFind(){ const q=$("tFind").value.trim();
@@ -702,10 +710,44 @@ function aiUse(b){ const br=b.brush||{}, hn=Object.values(b.hints||{}).reduce((a
   if(br.pointsN||br.adviceN||br.rewriteN) bits.push("推敲の相棒：直しどころ "+(br.pointsN||0)+"／相談 "+(br.adviceN||0)+"／書きかえ案 "+(br.rewriteN||0));
   if(br.fixes&&br.fixes.length) bits.push("編集部メモの直し案 "+br.fixes.length+"か所");
   return bits.join("・"); }
+// ── 生徒の途中の推し短編集をのぞく（預けた本棚から。読むだけで、生徒のデータは変えない） ──
+const OS_PUB={pending:"確認待ち",public:"公開中",hidden:"非公開",returned:"返却中"};
+function osRowHTML(x,o){ const pct=Math.round(o.done/6*100);
+  return '<div class="osrow"><div class="osh"><b>'+esc(x.pen||"（ペンネームなし）")+'</b>　『'+esc(o.title||"題名はまだ")+'』'+(o.pub?'<span class="st '+esc(o.pub)+'">'+(OS_PUB[o.pub]||"")+'</span>':'')
+    +'<span class="note" style="margin-left:auto;font-size:12px">'+(o.updated?hm(o.updated):"")+'</span></div>'
+    +'<div class="osbar"><i style="width:'+pct+'%"></i></div>'
+    +'<div class="note" style="font-size:12.5px">進み具合 '+o.done+'/6・作品 '+o.n+'・書評 '+o.rv+'/'+o.n+'・はじめに '+(o.intro?o.intro+'字':'まだ')+'・あとがき '+(o.after?o.after+'字':'まだ')+'</div>'
+    +'<div class="row" style="margin-top:6px"><button class="btn small" data-ospeek="'+esc(x.code)+'" data-osid="'+esc(o.id)+'">📖 のぞく</button><button class="btn small" data-osshelf="'+esc(x.code)+'">本棚をひらく</button></div></div>'; }
+async function loadOsAll(){ $("osAll").innerHTML='<p class="note">読みこんでいます…</p>';
+  try{ const L=(await api("/bunko/admin/spells",{teacher:true})).spells||[];
+    const rows=[]; for(const x of L) for(const o of (x.oshi||[])) rows.push([x,o]);
+    rows.sort((a,b)=>(a[0].pen||"").localeCompare(b[0].pen||"","ja")||(b[1].updated-a[1].updated));
+    $("osAll").innerHTML=rows.length? rows.map(([x,o])=>osRowHTML(x,o)).join("") : '<p class="note">まだありません。（生徒が推し短編集を作って、アプリが自動で預けると、ここに出てきます）</p>'; }
+  catch(e){ $("osAll").innerHTML=""; $("tMsg").textContent=e.message; } }
+$("btnOsAll").onclick=loadOsAll;
+const osBText=b=>b&&b.final? String(b.final.text||"") : b? origFlat(b) : "";
+async function peekOshi(shelf,o){
+  const rv=o.reviews||{}, ids=(o.items||[]).filter(x=>x.src==="bunko").map(x=>x.id); let W={};
+  if(ids.length){ try{ W=(await api("/bunko/texts",{method:"POST",teacher:true,body:{ids}})).works||{}; }catch(e){} }
+  const books=(shelf&&shelf.books)||[];
+  OshiBook.open({title:o.title||"（題名）",editor:o.editor||"",theme:o.theme||"",cover:o.cover||0,intro:String(o.intro||"").trim(),after:String(o.after||"").trim(),draft:true,
+    items:(o.items||[]).map(it=>{ const r=String((rv[it.src+":"+it.id]||{}).text||"").trim();
+      if(it.src==="bunko"){ const w=W[it.id]; return {title:it.title,pen:it.pen,genreName:genreOf(it.genre).name,text:w?w.text:"（この作品は、いまクラス文庫で読めません）",obi:w&&w.obi,review:r}; }
+      const b=books.find(z=>z.id===it.id); return {title:b?((b.final&&b.final.title)||b.title):it.title,pen:o.editor||"自分",genreName:genreOf(it.genre).name,text:b?osBText(b).trim():"（本棚にこの作品がありません）",obi:null,review:r}; })});
+}
+$("tpShelf").addEventListener("click",async e=>{
+  const pk=e.target.closest("[data-ospeek]"), sh=e.target.closest("[data-osshelf]"), lo=e.target.closest("[data-osopen]");
+  if(sh){ $("spCodeIn").value=sh.dataset.osshelf; $("btnSpOpen").click(); setTimeout(()=>$("spShelf").scrollIntoView({behavior:"smooth",block:"start"}),400); return; }
+  if(lo&&spData){ const o=(spData.shelf.oshi||[])[+lo.dataset.osopen]; if(o) peekOshi(spData.shelf,o); return; }
+  if(!pk) return; pk.disabled=true; const lb=pk.textContent; pk.textContent="ひらいています…";
+  try{ const j=await api("/bunko/spell/load",{method:"POST",teacher:true,body:{code:pk.dataset.ospeek}}); const o=((j.shelf&&j.shelf.oshi)||[]).find(z=>z.id===pk.dataset.osid);
+    if(o) await peekOshi(j.shelf,o); else $("tMsg").textContent="その推し短編集は、いまの本棚にありませんでした（消したのかもしれません）。"; }
+  catch(err){ $("tMsg").textContent=err.message; }
+  pk.disabled=false; pk.textContent=lb; });
 function renderSpShelf(){
   if(!spData){ $("spShelf").innerHTML=""; return; }
-  const bs=(spData.shelf&&spData.shelf.books)||[];
-  $("spShelf").innerHTML='<p class="note" style="margin:8px 0 0">じゅもん「'+esc(spData.code)+'」・'+new Date(spData.savedAt).toLocaleString("ja-JP")+' に預けた本棚・'+bs.length+'冊</p>'
+  const bs=(spData.shelf&&spData.shelf.books)||[], os=(spData.shelf&&spData.shelf.oshi)||[];
+  $("spShelf").innerHTML=(os.length?'<p class="note" style="margin:10px 0 4px">推し短編集：'+os.map((o,i)=>'<button class="btn small" data-osopen="'+i+'" style="margin:2px 4px 2px 0">📖 『'+esc(o.title||"題名はまだ")+'』（'+(o.items||[]).length+'作）</button>').join("")+'</p>':'')+'<p class="note" style="margin:8px 0 0">じゅもん「'+esc(spData.code)+'」・'+new Date(spData.savedAt).toLocaleString("ja-JP")+' に預けた本棚・'+bs.length+'冊</p>'
     +bs.map((b,i)=>{ const f=b.final, t=(f&&f.title)||b.title, mode=b._m||(f?"diff":"orig");
       return '<div class="spbook" data-i="'+i+'"><div class="h"><b>『'+esc(t)+'』'+(f&&f.done?'<span class="st public">仕上げ</span>':f?'<span class="st pending">整え中</span>':'')+'</b><span class="note">'+genreOf(b.genre).name+'・'+md(b.created||0)+(b.imported?'（取りこみ）':'')+'</span></div>'
         +'<div class="meta">はじめの版 '+nch(origFlat(b))+'字'+(f?' → 仕上げ版 '+nch(String(f.text).replace(/〔[^〕\n]*〕/g,""))+'字':'')+'<br>'+esc(aiUse(b))+(b.bind?'・しばりあり':'')+'</div>'
