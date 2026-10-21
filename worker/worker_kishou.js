@@ -450,6 +450,57 @@ async function syncObi(kv, workId) {
   if (w.obi !== style) { w.obi = style; await putW(kv, w); }
 }
 
+// ── 推し短編集（みんなの推し短編集）──
+// 生徒が文庫の作品（と自分の作品）を集めて編んだ1冊。キーは an:<id>、目次は idx:an（list() は使わない）。
+// 文庫の作品は、本文を写さずに作品番号だけ持つ（読むときに、いまの本文といちばん新しい帯をつける）。
+// 自分の作品で、文庫に出していないものだけ本文を持つ。出すと先生の確認待ちになり、先生が公開すると棚に並ぶ。
+const AN_REVIEW = `あなたは、高校3年生のクラスの「文庫の編集部」です。生徒が、クラスの友だちの作品を集めて「推しの短編集」を編みました。
+受講者全員が読む棚に並べる前に、編者が書いた文章（はじめに・あとがき・書評）と、まだ文庫に出ていない自作の本文を読んで、だれかを傷つけないかだけを見てください。
+悪口・からかい（作品や作者をけなす書き方をふくむ）、実在の人物や先生をばかにする内容、性的な内容、差別、個人情報、自傷をすすめる内容があれば ok を false にして、why に理由を60字以内で書く。なければ ok は true、why は空。
+文章のうまい・へた、ネタバレ、短さは問題にしない。
+出力は JSON だけ：{"ok":true,"why":""}`;
+const parseAnRv = t => { const o = jsonOf(t); return o && typeof o.ok === "boolean" ? { ok: o.ok, why: String(o.why || "").slice(0, 100) } : null; };
+const anMeta = a => ({ id: a.id, title: a.title, editor: a.editor, theme: a.theme, cover: a.cover, status: a.status,
+  works: a.items.filter(x => x.src === "bunko").map(x => x.id), n: a.items.length,
+  rv: a.review ? (a.review.ok ? "ok" : "ng") : null, created: a.created, updated: a.updated });
+async function putAn(kv, a) {
+  await kv.put("an:" + a.id, JSON.stringify(a));
+  const ix = await getIdx(kv, "idx:an"); ix.items[a.id] = anMeta(a); await kv.put("idx:an", JSON.stringify(ix));
+}
+async function deleteAn(kv, id) {
+  await kv.delete("an:" + id);
+  const ix = await getIdx(kv, "idx:an"); delete ix.items[id]; await kv.put("idx:an", JSON.stringify(ix));
+}
+// 査読のメモは、先生と、返却された本人にだけ見せる
+const anView = (a, teacher, mine) => { const { owner, ...v } = a; if (!teacher && !(mine && a.status === "returned")) { delete v.review; delete v.returnNote; } return v; };
+async function makeAnReview(env, id) {
+  const kv = env.BUNKO;
+  const a = await kv.get("an:" + id, { type: "json" }); if (!a) return false;
+  const parts = [`題名：『${a.title}』　編・${a.editor}　テーマ：${a.theme}`, `はじめに：\n${a.intro}`];
+  a.items.forEach((x, i) => { parts.push(`作品${i + 1}『${x.title}』の書評：\n${x.review}`); if (x.text) parts.push(`作品${i + 1}『${x.title}』の本文（自作）：\n${clip(x.text, 4000)}`); });
+  parts.push(`あとがき：\n${a.after}`);
+  let result;
+  try { ({ result } = await callGemini(env, AN_REVIEW, clip(parts.join("\n\n"), 14000) + "\n\nJSON で出してください。", { models: HINT_MODELS, parse: parseAnRv, temperature: 0.2, json: true })); }
+  catch { return false; }
+  const cur = await kv.get("an:" + id, { type: "json" }); if (!cur || cur.updated !== a.updated) return false;
+  cur.review = { ...result, at: Date.now() };
+  await putAn(kv, cur);
+  return true;
+}
+// 文庫の作品の本文と、いちばん新しい公開中の帯をつける（公開中の作品だけ）
+async function expandWorks(kv, ids) {
+  const out = {};
+  for (const id of [...new Set(ids)].slice(0, 20)) {
+    const w = await kv.get("w:" + id, { type: "json" });
+    if (!w || w.status !== "public") continue;
+    let latest = null;
+    for (const k of await listSub(kv, id, "o:" + id + ":")) if (k.metadata && k.metadata.status === "public" && (!latest || k.metadata.created > latest.metadata.created)) latest = k;
+    const o = latest ? await kv.get(latest.name, { type: "json" }) : null;
+    out[id] = { id, title: w.title, pen: w.pen, genre: w.genre, text: w.text, obi: o ? { catch: o.catch, body: o.body, pen: o.pen, style: o.style } : null };
+  }
+  return out;
+}
+
 async function bunko(request, env, headers, path, ctx) {
   const later = p => (ctx && ctx.waitUntil) ? ctx.waitUntil(p) : p;   // 先生の操作は待たせずに、裏でAIの感想を作る
   const kv = env.BUNKO;
@@ -511,6 +562,64 @@ async function bunko(request, env, headers, path, ctx) {
     const rec = await kv.get("sp:" + normSpell(body.code || ""), { type: "json" });
     if (!rec) return J({ error: "nospell", message: "そのじゅもんは見つかりませんでした。もう一度たしかめてください。" }, headers, 404);
     return J({ code: rec.code, shelf: rec.shelf, books: rec.books, savedAt: rec.savedAt }, headers);
+  }
+  // ── 推し短編集 ──
+  // 公開中の推し短編集の一覧（収録された作品番号つき。「収録されました」のお知らせにも使う）
+  if (path === "/bunko/oshis") {
+    const all = Object.values((await getIdx(kv, "idx:an")).items);
+    return J({ oshis: all.filter(m => m.status === "public").sort((a, b) => b.updated - a.updated) }, headers);
+  }
+  // 文庫の作品の本文と帯（推し短編集をアプリで読むとき）
+  if (path === "/bunko/texts") {
+    return J({ works: await expandWorks(kv, (Array.isArray(body.ids) ? body.ids : []).map(x => clip(x, 30))) }, headers);
+  }
+  // 1冊を読む（公開中のもの。本人と先生は確認待ちのものも）
+  if (path === "/bunko/oshi") {
+    const id = url.searchParams.get("id") || "", token = url.searchParams.get("token") || "";
+    const a = await kv.get("an:" + clip(id, 30), { type: "json" });
+    const mine = !!(a && token && a.owner === token);
+    if (!a || (a.status !== "public" && !teacher && !mine)) return J({ error: "notfound" }, headers, 404);
+    return J({ oshi: anView(a, teacher, mine), works: await expandWorks(kv, a.items.filter(x => x.src === "bunko").map(x => x.id)), mine }, headers);
+  }
+  // 推し短編集を出す（同じ端末から同じ id で出し直すと、差し替えて確認待ちにもどる）
+  if (path === "/bunko/oshi/submit") {
+    const token = clip(body.token, 64);
+    if (token.length < 16) return J({ error: "token" }, headers, 400);
+    const title = clip(body.title, 24).trim(), editor = clip(body.editor, 20).trim(), intro = clip(body.intro, 2000).trim(), after = clip(body.after, 2000).trim();
+    const src = Array.isArray(body.items) ? body.items.slice(0, 12) : [];
+    if (!title || !editor || !intro || !after || src.length < 2) return J({ error: "empty", message: "題名・編者・はじめに・あとがきを書いて、作品を2つ以上入れてください。" }, headers, 400);
+    const items = [];
+    for (const x of src) {
+      const review = clip(x && x.review, 1500).trim();
+      if (!review) return J({ error: "empty", message: "書評がまだの作品があります。" }, headers, 400);
+      if (x.src === "bunko") {
+        const w = await kv.get("w:" + clip(x.id, 30), { type: "json" });
+        if (!w || w.status !== "public") return J({ error: "gone", message: `『${clip(x.title, 40)}』は、いまクラス文庫に並んでいないので入れられません。` }, headers, 400);
+        items.push({ src: "bunko", id: w.id, title: w.title, pen: w.pen, genre: w.genre, review });
+      } else {
+        const text = clip(x && x.text, 20000).trim();
+        if (!text) return J({ error: "empty", message: "自分の作品の本文がありません。" }, headers, 400);
+        if (/[〔〕]/.test(text)) return J({ error: "mark", message: `『${clip(x.title, 40)}』に〔 〕が残っています。自分の言葉に書きかえてから出してください。` }, headers, 400);
+        items.push({ src: "own", id: clip(x.id, 30), title: clip(x.title, 40).trim() || "無題", pen: editor, genre: clip(x.genre, 20), text, review });
+      }
+    }
+    let id = /^[a-z0-9]{6,24}$/.test(body.id || "") ? body.id : null;
+    const old = id ? await kv.get("an:" + id, { type: "json" }) : null;
+    if (old && old.owner !== token) return J({ error: "owner" }, headers, 403);
+    if (!old) id = rid();
+    const now = Date.now();
+    const a = { id, owner: token, title, editor, theme: clip(body.theme, 30).trim(), cover: [0, 1, 2, 3].includes(body.cover) ? body.cover : 0,
+      intro, after, items, status: "pending", created: old ? old.created : now, updated: now };
+    await putAn(kv, a);
+    await later(makeAnReview(env, id));
+    return J({ id, status: a.status }, headers);
+  }
+  // 自分の推し短編集を取り下げる
+  if (path === "/bunko/oshi/withdraw") {
+    const a = await kv.get("an:" + clip(body.id, 30), { type: "json" });
+    if (!a || a.owner !== body.token) return J({ error: "owner" }, headers, 403);
+    await deleteAn(kv, a.id);
+    return J({ ok: true }, headers);
   }
   // 公開中の作品の一覧
   if (path === "/bunko/works") {
@@ -622,7 +731,8 @@ async function bunko(request, env, headers, path, ctx) {
         if (k.name.startsWith("c:")) comments.push(v); else if (k.name.startsWith("o:")) obis.push(obiView(v));
       }
     }
-    return J({ works, comments, obis }, headers);
+    const oshis = Object.values((await getIdx(kv, "idx:an")).items).sort((a, b) => b.updated - a.updated);
+    return J({ works, comments, obis, oshis }, headers);
   }
   if (path === "/bunko/admin/set") {
     const st = body.status;
@@ -638,6 +748,15 @@ async function bunko(request, env, headers, path, ctx) {
           const R = await getReaders(kv);
           if (!(await hasAiComments(kv, w, R.ver))) await later(makeAiComment(env, w, R));
         }
+      }
+    } else if (body.kind === "an") {
+      const a = await kv.get("an:" + clip(body.id, 30), { type: "json" });
+      if (!a) return J({ error: "notfound" }, headers, 404);
+      if (st === "delete") await deleteAn(kv, a.id);
+      else if (["public", "pending", "hidden", "returned"].includes(st)) {
+        a.status = st;
+        if (st === "returned") { a.returnNote = clip(body.note, 300).trim(); a.returnedAt = Date.now(); }
+        await putAn(kv, a);
       }
     } else if (body.kind === "o") {
       const key = "o:" + clip(body.workId, 30) + ":" + clip(body.id, 30);
@@ -675,6 +794,7 @@ async function bunko(request, env, headers, path, ctx) {
   }
   // 編集部（AI）の査読をやり直す
   if (path === "/bunko/admin/review") {
+    if (body.kind === "an") { const ok = await makeAnReview(env, clip(body.id, 30)); const a = await kv.get("an:" + clip(body.id, 30), { type: "json" }); return J({ ok, review: a && a.review }, headers); }
     const ok = await makeReview(env, clip(body.id, 30));
     const w = await kv.get("w:" + clip(body.id, 30), { type: "json" });
     return J({ ok, review: w && w.review }, headers);
@@ -708,7 +828,7 @@ export default {
       catch (e) { return J({ error: String(e.message || e) }, headers, 500); }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
