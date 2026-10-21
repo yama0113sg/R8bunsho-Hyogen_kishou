@@ -339,7 +339,7 @@ function parseHints(t) {
   return out.length ? out : null;
 }
 
-async function callGemini(env, system, user, { models = MODELS, parse = cleanLine, temperature = 1.1, json = false } = {}) {
+async function callGemini(env, system, user, { models = MODELS, parse = cleanLine, temperature = 1.1, json = false, maxTokens = 1024 } = {}) {
   let lastErr = "";
   for (const model of models) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
@@ -349,7 +349,7 @@ async function callGemini(env, system, user, { models = MODELS, parse = cleanLin
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: user }] }],
-        generationConfig: Object.assign({ temperature, maxOutputTokens: 1024 }, json ? { responseMimeType: "application/json" } : {}),
+        generationConfig: Object.assign({ temperature, maxOutputTokens: maxTokens }, json ? { responseMimeType: "application/json" } : {}),
       }),
     });
     if (!res.ok) { lastErr = `${model}:${res.status}`; continue; }
@@ -462,7 +462,7 @@ const AN_REVIEW = `あなたは、高校3年生のクラスの「文庫の編集
 const parseAnRv = t => { const o = jsonOf(t); return o && typeof o.ok === "boolean" ? { ok: o.ok, why: String(o.why || "").slice(0, 100) } : null; };
 const anMeta = a => ({ id: a.id, title: a.title, editor: a.editor, theme: a.theme, cover: a.cover, status: a.status,
   works: a.items.filter(x => x.src === "bunko").map(x => x.id), n: a.items.length,
-  rv: a.review ? (a.review.ok ? "ok" : "ng") : null, created: a.created, updated: a.updated });
+  rv: a.review ? (a.review.ok ? "ok" : "ng") : null, coach: a.coach ? a.coach.notes.length : 0, created: a.created, updated: a.updated });
 async function putAn(kv, a) {
   await kv.put("an:" + a.id, JSON.stringify(a));
   const ix = await getIdx(kv, "idx:an"); ix.items[a.id] = anMeta(a); await kv.put("idx:an", JSON.stringify(ix));
@@ -472,7 +472,7 @@ async function deleteAn(kv, id) {
   const ix = await getIdx(kv, "idx:an"); delete ix.items[id]; await kv.put("idx:an", JSON.stringify(ix));
 }
 // 査読のメモは、先生と、返却された本人にだけ見せる
-const anView = (a, teacher, mine) => { const { owner, ...v } = a; if (!teacher && !(mine && a.status === "returned")) { delete v.review; delete v.returnNote; } return v; };
+const anView = (a, teacher, mine) => { const { owner, ...v } = a; if (!teacher && !(mine && a.status === "returned")) { delete v.review; delete v.returnNote; delete v.coach; } return v; };
 async function makeAnReview(env, id) {
   const kv = env.BUNKO;
   const a = await kv.get("an:" + id, { type: "json" }); if (!a) return false;
@@ -484,6 +484,52 @@ async function makeAnReview(env, id) {
   catch { return false; }
   const cur = await kv.get("an:" + id, { type: "json" }); if (!cur || cur.updated !== a.updated) return false;
   cur.review = { ...result, at: Date.now() };
+  await putAn(kv, cur);
+  return true;
+}
+// ── 推し短編集の「編集部からの直しメモ」──
+// 出された推し短編集を、編集者として読んで、もっとよくするための具体的なメモを返す（書きかえた文は出さない。直すのは生徒）
+const AN_COACH = `あなたは、高校3年生の「文章表現」の授業で、生徒が編んだ「推しの短編集」を読む、文庫の編集者です。
+生徒は、クラスの友だちの作品（と自分の作品）を選んで並べ、題名・はじめに・作品ごとの書評・あとがきを書きました。
+先生は、生徒にもう一段ていねいに推敲してほしいと思っています。編集者として、直すとよくなるところを具体的に指摘してください。
+見るところ（この順に、手を抜かずに見る）：
+・はじめに：テーマを選んだ理由やきっかけが、自分の体験や気持ちで書けているか。読む人への案内（どう読んでほしいか・だれに読んでほしいか）があるか。中身を言いすぎていないか。
+・書評（作品ごと）：①どんな話か（結末は言わない）②好きな一文の引用 ③なぜそこが好きか ④どんな人に読んでほしいか、がそろっているか。「おもしろい」「すごい」など、ほかの作品にも言えることばだけで終わっていないか。引用した一文が、ほんとうにその作品の本文にあるか。
+・あとがき：並べた順番の理由、編んでみて気づいたこと（作品どうしのつながり、テーマの見え方）、作者へのひとことがあるか。
+・全体：題名とテーマと作品が合っているか。並び順に意図が感じられるか。
+返し方：
+・good：この短編集のいちばんよいところを、具体的に一つ。50字以内。
+・notes：直すとよくなるところ。5〜8つ。必ず、はじめに・あとがき・書評のそれぞれから1つ以上入れる。
+　part は "intro"（はじめに）／"after"（あとがき）／"rv1"・"rv2"…（その番号の作品の書評）／"title"（題名・テーマ）／"order"（並び順）のどれか。
+　quote は、その部分の文章からそのまま抜き出したことば（30字以内、一字もちがえない）。抜き出すところがなければ空。
+　why は、なぜ直すとよいか（60字以内）。
+　how は、生徒が自分で考えて直せるように、問いかけか、直す方向で書く（70字以内）。「〜を書き足してみませんか？」「〜はどうですか？」のように。書きかえた文や、そのまま使える例文は、ぜったいに書かない。
+・責める言い方をしない。編集者が書き手に返すメモのように、やわらかい、です・ます調で書く。
+・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名、家庭の事情には触れない。
+出力は JSON だけ：{"good":"…","notes":[{"part":"intro","quote":"…","why":"…","how":"…"}]}`;
+const parseCoach = a => t => {
+  const o = jsonOf(t); if (!o || !Array.isArray(o.notes)) return null;
+  const partText = p => p === "intro" ? a.intro : p === "after" ? a.after : /^rv\d+$/.test(p) ? ((a.items[+p.slice(2) - 1] || {}).review || null) : p === "title" || p === "order" ? "" : null;
+  const notes = o.notes.map(n => ({ part: String(n.part || "").trim(), quote: String(n.quote || "").trim(), why: String(n.why || "").trim(), how: String(n.how || "").trim() }))
+    .filter(n => partText(n.part) != null && n.why && len(n.why) <= 100 && n.how && len(n.how) <= 110)
+    .map(n => ({ ...n, quote: n.quote && partText(n.part).includes(n.quote) ? n.quote : "" })).slice(0, 8);
+  return notes.length >= 2 ? { good: String(o.good || "").trim().slice(0, 90), notes } : null;
+};
+async function makeAnCoach(env, id) {
+  const kv = env.BUNKO;
+  const a = await kv.get("an:" + id, { type: "json" }); if (!a) return false;
+  const W = await expandWorks(kv, a.items.filter(x => x.src === "bunko").map(x => x.id));
+  const parts = [`題名：『${a.title}』　編者：${a.editor}　テーマ：${a.theme || "（なし）"}`, `【はじめに】\n${a.intro}`];
+  a.items.forEach((x, i) => {
+    const text = x.src === "bunko" ? (W[x.id] ? W[x.id].text : "") : x.text;
+    parts.push(`【作品${i + 1}】『${x.title}』（${x.pen}）\n本文（はじめの部分）：\n${clip(text, 1500)}\n【作品${i + 1}の書評】\n${x.review}`);
+  });
+  parts.push(`【あとがき】\n${a.after}`);
+  let result;
+  try { ({ result } = await callGemini(env, AN_COACH, clip(parts.join("\n\n"), 16000) + "\n\nJSON で出してください。", { parse: parseCoach(a), temperature: 0.4, json: true, maxTokens: 4096 })); }
+  catch { return false; }
+  const cur = await kv.get("an:" + id, { type: "json" }); if (!cur || cur.updated !== a.updated) return false;
+  cur.coach = { ...result, at: Date.now() };
   await putAn(kv, cur);
   return true;
 }
@@ -618,7 +664,7 @@ async function bunko(request, env, headers, path, ctx) {
     const a = { id, owner: token, title, editor, theme: clip(body.theme, 30).trim(), cover: [0, 1, 2, 3].includes(body.cover) ? body.cover : 0,
       intro, after, items, status: "pending", created: old ? old.created : now, updated: now };
     await putAn(kv, a);
-    await later(makeAnReview(env, id));
+    await later((async () => { await makeAnReview(env, id); await makeAnCoach(env, id); })());   // 害のチェックのあと、直しメモも作っておく（先生が返すときに使う）
     return J({ id, status: a.status }, headers);
   }
   // 自分の推し短編集を取り下げる
@@ -810,6 +856,18 @@ async function bunko(request, env, headers, path, ctx) {
   if (path === "/bunko/admin/spells") {
     return J({ spells: Object.values((await getIdx(kv, "idx:sp")).items).sort((a, b) => b.savedAt - a.savedAt) }, headers);
   }
+  // 推し短編集の直しメモ：{id} で作り直す／{id, drop:[番号…]} で、先生が要らないメモを外す
+  if (path === "/bunko/admin/coach") {
+    const id = clip(body.id, 30);
+    if (Array.isArray(body.drop)) {
+      const a = await kv.get("an:" + id, { type: "json" }); if (!a || !a.coach) return J({ error: "notfound" }, headers, 404);
+      a.coach.notes = a.coach.notes.filter((_, i) => !body.drop.includes(i)); await putAn(kv, a);
+      return J({ ok: true, coach: a.coach }, headers);
+    }
+    const ok = await makeAnCoach(env, id);
+    const a = await kv.get("an:" + id, { type: "json" });
+    return J({ ok, coach: a && a.coach }, headers);
+  }
   // AIの読み手の顔ぶれ：GET で読む／POST {readers} で保存／POST {reset:true} ではじめの3人にもどす
   if (path === "/bunko/admin/readers") {
     if (request.method === "POST") {
@@ -844,7 +902,7 @@ export default {
       }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {

@@ -315,6 +315,13 @@ input.ptitle{font-size:20px;margin-bottom:12px}
 .osteps span{font-size:12px;padding:5px 11px;border-radius:99px;border:1px solid var(--edge);color:var(--sub)}
 .osteps span.on{color:#15121f;background:#fff;border-color:transparent;font-weight:700}
 .osteps span.done{color:var(--ok);border-color:rgba(93,255,176,.4)}
+.cnote{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,211,106,.08);border:1px solid rgba(255,211,106,.45);font-size:13.5px;line-height:1.75}
+.cnote.ok{background:rgba(93,255,176,.06);border-color:rgba(93,255,176,.4)}
+.cnote .ch{font-weight:700;color:#ffd36a;font-size:12.5px} .cnote.ok .ch{color:var(--ok)}
+.cnote .cq{font-family:var(--mincho);color:var(--ai)} .cnote .chow{margin-top:2px}
+.cnote .cfix{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-weight:700;cursor:pointer}
+.cnote .cfix input{width:20px;height:20px;accent-color:var(--ok)}
+.cnote .cwarn{display:block;font-size:12px;color:#ffb36b;margin-top:2px} .cnote.ok .cwarn{color:var(--ok)}
 .oprog{margin:0 0 14px;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid var(--edge)}
 .oprog .ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;color:var(--sub)}
 .oprog .ph>b{font-size:15px;color:var(--ink);letter-spacing:.1em} .oprog .ph span b{color:var(--ok);font-size:17px}
@@ -1123,8 +1130,8 @@ function renderOshi(){
       +'<p class="gnote" style="margin:8px 0 0">どの作品か思い出せないときは、［📖 クラス文庫を読む］で読み直してから選ぼう。</p></div>'
     +'<div class="ostep" id="os3"><h3>③ 並べる<small>3〜5作がおすすめ。1作目は「入り口」、最後は「余韻」</small></h3>'
       +(o.items.length? '<div class="alist">'+o.items.map(itemRow).join("")+'</div>' : '<p class="gnote" style="margin:0">②で＋を押すと、ここに並びます。</p>')
-      +'<p class="gnote" style="margin:6px 0 0">いま '+o.items.length+' 作</p></div>'
-    +'<div class="ostep" id="os4"><h3>④ 題名と表紙</h3>'
+      +'<p class="gnote" style="margin:6px 0 0">いま '+o.items.length+' 作</p>'+coachFor(o,"order")+'</div>'
+    +'<div class="ostep" id="os4"><h3>④ 題名と表紙</h3>'+coachFor(o,"title")
       +'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,240px);gap:16px;align-items:start">'
       +'<div><p class="label" style="margin:0 0 6px">短編集の題名</p><input type="text" id="oTitle" maxlength="24" value="'+esc(o.title||"")+'" placeholder="例：放課後のふしぎ" style="font-size:18px;text-align:left">'
       +'<p class="label" style="margin:12px 0 6px">編者（ペンネーム）</p><input type="text" id="oEditor" maxlength="20" value="'+esc(o.editor||"")+'" placeholder="ペンネーム" style="font-size:16px;text-align:left">'
@@ -1134,16 +1141,17 @@ function renderOshi(){
       +(o.items.length? o.items.map((it,i)=>rvItemHTML(o,it,i)).join("") : '<p class="gnote" style="margin:0">③に作品を並べると、ここで書評を書けます。</p>')+'</div>'
     +'<div class="ostep" id="os6"><h3>⑥ はじめに・あとがき<small>本の最初と最後に、編者として読者に語りかけよう</small></h3>'
       +'<div class="ftip"><b>「はじめに」に書くこと</b>（本の入り口。読む前の人に向けて）<br>① このテーマにした理由・きっかけ<br>② どんな作品を集めたか（中身は言いすぎない）<br>③ どんなふうに読んでほしいか・どんな人に読んでほしいか<br><i>例：雨の日の放課後、だれもいない教室で、ふと「こわい話が読みたい」と思いました。…</i></div>'
-      +'<textarea id="oIntro" rows="6" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="はじめに（150〜300字くらい）">'+esc(o.intro||"")+'</textarea>'
+      +coachFor(o,"intro")+'<textarea id="oIntro" rows="6" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="はじめに（150〜300字くらい）">'+esc(o.intro||"")+'</textarea>'
       +'<div class="count"><span><span id="oIntroN">'+nchars(o.intro||"")+'</span> 字</span></div>'
       +'<div class="ftip" style="margin-top:14px"><b>「あとがき」に書くこと</b>（本の出口。読み終えた人に向けて）<br>① 並べる順番の工夫（なぜこの順にしたか）<br>② 編んでみて気づいたこと（作品どうしのつながり、テーマの見え方）<br>③ 作者のみなさん・読んでくれた人へのひとこと<br><i>例：一作目に「黒板の猫」を置いたのは、こわさの入り口がやさしいからです。…</i></div>'
-      +'<textarea id="oAfter" rows="6" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="あとがき（150〜300字くらい）">'+esc(o.after||"")+'</textarea>'
+      +coachFor(o,"after")+'<textarea id="oAfter" rows="6" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="あとがき（150〜300字くらい）">'+esc(o.after||"")+'</textarea>'
       +'<div class="count"><span><span id="oAfterN">'+nchars(o.after||"")+'</span> 字</span></div></div>'
     +'<div class="ostep"><h3>📖 本にする<small>ページをめくって読んでみよう。できたら、クラス文庫の「推し短編集の棚」へ</small></h3>'
       +'<div class="row" style="margin-top:0"><button class="btn main" data-oact="read"'+(o.items.length?'':' disabled')+'>📖 本として読む</button></div>'
       +oshiPubHTML(o,st)+'</div>'
     +'<div class="msg" id="oMsg"></div>'
     +'<div class="nav"><button class="btn" data-oact="back">← 一覧へ</button><button class="btn danger" data-oact="del">この短編集を消す</button></div>';
+  refreshCoachCards(o);
 }
 // 書評（オーソドックスな形）
 const rvKey=it=>it.src+":"+it.id;
@@ -1155,7 +1163,7 @@ function rvItemHTML(o,it,i){ const r=(o.reviews||{})[rvKey(it)]||{};
     +'<details class="rvsrc" data-rsi="'+i+'"><summary>📖 元の作品を読みながら書く</summary><div class="rvsrcbody">読みこんでいます…</div></details>'
     +(it.src==="bunko"?'<div class="row"><button class="btn small" data-rvq="'+i+'">🤝 推しどころを引き出す（AI）</button></div>':'')
     +'<ol class="qs" id="rvqs'+i+'"></ol>'
-    +'<textarea class="rvtext" data-rvi="'+i+'" rows="7" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="ここに書評を書く（200〜400字くらい）">'+esc(r.text||"")+'</textarea>'
+    +coachFor(o,rvKey(it))+'<textarea class="rvtext" data-rvi="'+i+'" rows="7" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="ここに書評を書く（200〜400字くらい）">'+esc(r.text||"")+'</textarea>'
     +'<div class="count"><span><span class="rvn">'+nchars(r.text||"")+'</span> 字</span></div>'
     +'<div class="rvprev">'+rvPreview(r.text,o.editor)+'</div></div>'; }
 function oshiCover(o){ return '<div class="ocover c'+(o.cover||0)+'"><div class="ot">'+(esc(o.title)||'<span style="opacity:.45">題名</span>')+'</div>'+(o.theme?'<div class="oth">'+esc(o.theme)+'</div>':'')+'<div class="oe">編・'+(esc(o.editor)||"——")+'</div></div>'; }
@@ -1190,6 +1198,7 @@ function oshiProgHTML(o){
     ["os4","④ 題名と表紙", o.title&&o.editor? "『"+esc(o.title)+"』　編・"+esc(o.editor) : [!o.title&&"題名",!o.editor&&"編者のペンネーム"].filter(Boolean).join("と")+"がまだです"],
     ["os5","⑤ 書評", !n? "作品を選ぶと書けます" : (n-noRv.length)+" / "+n+" 作 書けました"+(noRv.length?"　まだ："+noRv.map(it=>"『"+esc(it.title)+"』").join(""):"")+(shortRv.length?'<br><span class="pw">短め（200字くらいが目安）：'+shortRv.map(it=>"『"+esc(it.title)+"』").join("")+'</span>':"")],
     ["os6","⑥ はじめに・あとがき", "はじめに "+(ti?ti+"字":"まだ")+"　／　あとがき "+(ta?ta+"字":"まだ")+((ti&&ti<100)||(ta&&ta<100)?'<br><span class="pw">150字くらいが目安です</span>':"")]];
+  if(coachOn(o)){ const cn=o.pub.coach.notes.length, lf=coachLeft(o); L.push(["oPub","📮 直しメモ", lf? (cn-lf)+" / "+cn+" こ 直しました（あと "+lf+" こ）" : "全部直しました（"+cn+" こ）"]); st.push(!lf); }
   const p=o.pub, pubLine= p? (AN_LABEL[p.status]||"出しました。") : done===6&&n>=2? "🎉 ぜんぶそろいました！ いちばん下の［📚 クラス文庫に出す］から出せます。" : "";
   return '<div class="ph"><b>進み具合</b><span>6つのうち <b>'+done+'</b> つ できました</span></div>'
     +'<div class="pbar"><i style="width:'+Math.round(done/6*100)+'%"></i></div>'
@@ -1198,7 +1207,7 @@ function oshiProgHTML(o){
     +'<div class="row" style="margin-top:10px"><button class="btn small main" data-oact="read">📖 いまの状態で読んでみる（途中でもOK）</button></div>'
     +'<p class="gnote" style="margin:6px 0 0;font-size:12px">読んでみても、文庫には出ません。まだ書いていないところは「まだです」のページになります。</p>';
 }
-function oshiRefreshState(o){ const st=oshiStepState(o); if($("oSteps")) $("oSteps").innerHTML=oshiProgHTML(o); if($("oPub")) $("oPub").outerHTML=oshiPubHTML(o,st); }
+function oshiRefreshState(o){ const st=oshiStepState(o); refreshCoachCards(o); if($("oSteps")) $("oSteps").innerHTML=oshiProgHTML(o); if($("oPub")) $("oPub").outerHTML=oshiPubHTML(o,st); }
 // 本として読むためのデータ（文庫の作品は、いまの本文といちばん新しい帯を文庫から取ってくる）
 async function oshiBookData(o){
   const rv=o.reviews||{}, ids=o.items.filter(x=>x.src==="bunko").map(x=>x.id); let W={};
@@ -1210,9 +1219,12 @@ async function oshiBookData(o){
 }
 const AN_LABEL={pending:"先生の確認待ちです。",public:"クラス文庫の「推し短編集の棚」に並んでいます。",hidden:"先生が非公開にしています。",returned:"文庫の編集部から返ってきました。下のメモを見て直し、出し直してください。"};
 function oshiPubHTML(o,st){
-  const ready=st[3]&&st[4]&&st[5]&&o.items.length>=2, p=o.pub, rv=p&&p.status==="returned"&&p.review;
+  const left=coachLeft(o), ready=st[3]&&st[4]&&st[5]&&o.items.length>=2&&!left, p=o.pub, rv=p&&p.status==="returned"&&p.review&&!p.review.ok&&p.review;
   return '<div class="pubbox" id="oPub">'+(p?esc(AN_LABEL[p.status]||"出しました。"):ready?"できあがったら、クラス文庫に出せます。先生が確認したら、みんなが読めるようになります。":"①〜⑥がそろうと（作品は2つ以上）、クラス文庫に出せます。")
     +(rv?'<div style="margin-top:6px"><b>📮 文庫の編集部（AI）より</b><br>'+esc(rv.why||"")+'</div>':'')+(p&&p.returnNote?'<div style="margin-top:6px">先生から：'+esc(p.returnNote)+'</div>':'')
+    +(coachOn(o)?'<div style="margin-top:8px"><b>📮 編集部からの直しメモ</b>　'+(p.coach.notes.length-left)+' / '+p.coach.notes.length+' こ 直しました'
+      +(p.coach.good?'<div style="margin-top:4px">よいところ：'+esc(p.coach.good)+'</div>':'')
+      +(left?'<div style="margin-top:4px;color:#ffd36a">メモは、それぞれの欄（書評・はじめに・あとがきなど）のすぐ上にあります。全部直すと、出し直せます。</div>':'<div style="margin-top:4px;color:var(--ok)">全部直しました。もう一度本として読んでから、出し直そう。</div>')+'</div>':'')
     +'<div class="row"><button class="btn small main" data-oact="pub"'+(ready?'':' disabled')+'>'+(p?'📚 いまの内容で出し直す':'📚 クラス文庫に出す')+'</button>'
     +(p?'<button class="btn small danger" data-oact="unpub">取り下げる</button>':'')+'</div>'
     +(lsGet("bunko_pass")?'':'<input type="text" id="oPubPass" placeholder="合言葉（クラス文庫と同じ）" style="font-size:16px;margin-top:8px">')+'</div>';
@@ -1238,10 +1250,31 @@ async function oshiWithdraw(o,x){
   try{ await bunkoApi("/oshi/withdraw",{id:o.pub.id,token:ownerToken()}); o.pub=null; oshiTouch(o); renderOshi(); $("oMsg").style.color="var(--ok)"; $("oMsg").textContent="取り下げました。（この iPad の短編集は消えていません）"; }
   catch(err){ if(err.status===403){ o.pub=null; oshiTouch(o); renderOshi(); } else { x.disabled=false; $("oMsg").style.color="var(--ng)"; $("oMsg").textContent=err.message; } }
 }
+// ── 編集部からの直しメモ（先生が返したときだけ届く） ──
+// メモごとに［直した］を付ける。はじめに・あとがき・書評は、返ってきたときから文章が変わっていないと「直した」にならない
+function coachPart(o,k){ if(k==="intro") return (o.intro||"").trim(); if(k==="after") return (o.after||"").trim(); if(k==="title") return o.title+"｜"+o.theme;
+  if(k==="order") return o.items.map(rvKey).join(","); return (((o.reviews||{})[k]||{}).text||"").trim(); }
+function coachSnap(o){ const m={}; for(const n of o.pub.coach.notes) m[n.key]=coachPart(o,n.key); return m; }
+function coachDone(o,i){ const p=o.pub, n=p.coach.notes[i]; if(!(p.fixed||{})[i]) return false;
+  return n.key==="title"||n.key==="order"||coachPart(o,n.key)!==(p.snap||{})[n.key]; }
+const coachOn=o=>!!(o.pub&&o.pub.status==="returned"&&o.pub.coach&&o.pub.coach.notes.length);
+const coachLeft=o=>coachOn(o)? o.pub.coach.notes.filter((_,i)=>!coachDone(o,i)).length : 0;
+function coachFor(o,k){ if(!coachOn(o)) return "";
+  return o.pub.coach.notes.map((n,i)=>n.key!==k?"":'<div class="cnote" data-ci="'+i+'"><div class="ch">📮 編集部からの直しメモ</div>'
+    +(n.quote?'<div class="cq">「'+esc(n.quote)+'」</div>':'')+'<div>'+esc(n.why)+'</div><div class="chow">→ '+esc(n.how)+'</div>'
+    +'<label class="cfix"><input type="checkbox" data-cfix="'+i+'"'+((o.pub.fixed||{})[i]?" checked":"")+'> 直した</label><span class="cwarn"></span></div>').join(""); }
+function refreshCoachCards(o){ if(!coachOn(o)) return;
+  for(const el of document.querySelectorAll("#oshiBody .cnote")){ const i=+el.dataset.ci, ok=coachDone(o,i), chk=!!(o.pub.fixed||{})[i];
+    el.classList.toggle("ok",ok); el.querySelector(".cwarn").textContent= ok? "✓ できました" : chk? "まだ文章が変わっていません。メモを読んで書き直してから、もう一度たしかめよう。" : ""; } }
 // 出した推し短編集の状態を確かめる（ひらいたとき）
 async function refreshOshiPub(o){
   if(!o.pub||!lsGet("bunko_pass")) return;
-  try{ const j=await bunkoApi("/oshi?id="+encodeURIComponent(o.pub.id)+"&token="+ownerToken()); o.pub.status=j.oshi.status; o.pub.review=j.oshi.review||null; o.pub.returnNote=j.oshi.returnNote||""; }
+  try{ const j=await bunkoApi("/oshi?id="+encodeURIComponent(o.pub.id)+"&token="+ownerToken()); o.pub.status=j.oshi.status; o.pub.review=j.oshi.review||null; o.pub.returnNote=j.oshi.returnNote||"";
+    const c=j.oshi.status==="returned"&&j.oshi.coach;
+    if(c&&(!o.pub.coach||o.pub.coach.at!==c.at)){ // 返ってきた時点の文章を写しておき、直したかどうかをくらべる
+      o.pub.coach={good:c.good,at:c.at,notes:c.notes.map(n=>{ const m=/^rv(\d+)$/.exec(n.part), it=m&&o.items[+m[1]-1]; return {...n,key:it?rvKey(it):n.part}; })};
+      o.pub.snap=coachSnap(o); o.pub.fixed={}; }
+    if(!c){ delete o.pub.coach; delete o.pub.snap; delete o.pub.fixed; } }
   catch(e){ if(e.status===404) o.pub=null; else return; }
   saveShelf(); if(view==="oshi"&&curOshi===o.id) renderOshi();
 }
@@ -1296,6 +1329,8 @@ $("oshiBody").addEventListener("toggle",async e=>{ const dt=e.target; if(!dt.cla
   const o=curOshi&&oshiOf(curOshi), it=o&&o.items[+dt.dataset.rsi]; if(!it) return; const box=dt.querySelector(".rvsrcbody");
   try{ box.textContent=await workTextOf(it.src,it.id); dt.dataset.loaded="1"; }catch(err){ box.textContent="うまく読みこめませんでした。いったん閉じて、もう一度ひらいてください。"; }
 },true);
+$("oshiBody").addEventListener("change",e=>{ const cb=e.target.closest("input[data-cfix]"); if(!cb) return; const o=curOshi&&oshiOf(curOshi); if(!coachOn(o)) return;
+  o.pub.fixed=o.pub.fixed||{}; o.pub.fixed[+cb.dataset.cfix]=cb.checked; oshiTouch(o); oshiRefreshState(o); });
 $("oshiBody").addEventListener("input",e=>{ const o=curOshi&&oshiOf(curOshi); if(!o) return;
   if(e.target.classList.contains("rvtext")){ const i=+e.target.dataset.rvi, it=o.items[i], k=rvKey(it); o.reviews=o.reviews||{}; const r=o.reviews[k]||(o.reviews[k]={});
     r.text=e.target.value; oshiTouch(o); const box=e.target.closest(".rvitem"); box.querySelector(".rvn").textContent=nchars(r.text);

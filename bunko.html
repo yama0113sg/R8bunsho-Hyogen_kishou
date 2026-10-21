@@ -187,7 +187,12 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .st{display:inline-block;font-size:11px;padding:2px 9px;border-radius:99px;margin-left:6px;vertical-align:middle}
 .st.public{background:rgba(93,255,176,.18);color:var(--ok)} .st.pending{background:rgba(255,211,106,.18);color:var(--gold)} .st.hidden{background:rgba(255,255,255,.1);color:var(--sub)}
 .st.returned{background:rgba(255,143,163,.16);color:#ff8fa3}
-.rv{font-size:12px;margin-left:6px;color:var(--sub)} .rv.ng{color:#ff8fa3} .rv.ok{color:var(--ok)}
+.rv{font-size:12px;margin-left:6px;color:var(--sub)}
+.coachbox{margin-top:10px;padding:12px 14px;border-radius:12px;background:rgba(159,227,255,.07);border:1px solid rgba(159,227,255,.3);font-size:14px;line-height:1.8}
+.coachbox ol{margin:8px 0 0;padding-left:1.3em} .coachbox li{margin-bottom:10px}
+.coachbox .cpart{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;background:rgba(159,227,255,.18);color:var(--ai);margin-right:6px}
+.coachbox .q{font-family:var(--mincho);color:var(--ai)}
+.coachbox li .btn{padding:3px 10px;font-size:12px;margin-left:4px} .rv.ng{color:#ff8fa3} .rv.ok{color:var(--ok)}
 .rvbox{margin-top:10px;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,143,163,.35);background:rgba(255,143,163,.06);font-size:14px;line-height:1.75}
 .rvbox.ok{border-color:rgba(93,255,176,.3);background:rgba(93,255,176,.05)}
 .rvbox .q{font-family:var(--mincho);color:var(--ai)}
@@ -611,7 +616,7 @@ async function loadAdmin(keep){
       +(o.review&&o.review.why?'<p class="note" style="color:#ff8fa3">編集部（AI）：'+esc(o.review.why)+'</p>':'<p class="note">編集部（AI）のチェックができなかったので、確認待ちになっています。</p>')
       +'<div class="row"><button class="btn small main" data-act="opublic">公開する</button><button class="btn small danger" data-act="odelete">削除</button></div></div>'; }).join("") : "";
   const ans=admin.oshis||[], anRow=a=>'<div class="item" data-anid="'+esc(a.id)+'"><div class="h"><b>『'+esc(a.title)+'』<span class="st '+a.status+'">'+stLabel[a.status]+'</span>'
-      +(a.rv?'<span class="rv '+a.rv+'">'+(a.rv==="ok"?"編集部：気になる点なし":"編集部：気になる点あり")+'</span>':'')+'</b><span>編・'+esc(a.editor)+'・'+a.n+'作・'+md(a.updated)+'</span></div>'
+      +(a.rv?'<span class="rv '+a.rv+'">'+(a.rv==="ok"?"編集部：気になる点なし":"編集部：気になる点あり")+'</span>':'')+(a.coach?'<span class="rv">直しメモ '+a.coach+'</span>':'')+'</b><span>編・'+esc(a.editor)+'・'+a.n+'作・'+md(a.updated)+'</span></div>'
       +'<div class="anrv"></div><div class="row"><button class="btn small" data-act="anread">📖 本として読む</button><button class="btn small" data-act="anrv">編集部のメモ</button>'
       +(a.status!=="public"?'<button class="btn small main" data-act="anpublic">公開する</button>':'')
       +(a.status!=="hidden"?'<button class="btn small" data-act="anhidden">非公開にする</button>':'')
@@ -749,6 +754,19 @@ $("btnAiAll").onclick=async()=>{ const b=$("btnAiAll"); b.disabled=true; $("aiAl
       : "AIの感想のない公開中の作品は、ありませんでした。"; }
   catch(e){ $("aiAllMsg").textContent=e.message; }
   b.disabled=false; };
+// 推し短編集：害のチェック（編集部）と、直しメモ（AI）。先生は要らないメモを外してから返せる
+const PART_NAME=(p,a)=>p==="intro"?"はじめに":p==="after"?"あとがき":p==="title"?"題名・テーマ":p==="order"?"並び順":/^rv\d+$/.test(p)?"書評『"+(((a&&a.items[+p.slice(2)-1])||{}).title||p.slice(2))+"』":p;
+function anRvHTML(a){
+  const r=a.review, c=a.coach, own=a.items.filter(x=>x.src==="own");
+  return '<div class="rvbox'+(r&&r.ok?" ok":"")+'">'+(!r?'<p class="note" style="margin:0">編集部（AI）の査読はまだです。</p>':r.ok?'<b>編集部（AI）：だれかを傷つける書き方は、ありませんでした。</b>':'<b>編集部（AI）：気になる点があります。</b><div>'+esc(r.why)+'</div>')
+    +'<p class="note" style="margin:6px 0 0">はじめに・あとがき・書評'+(own.length?'・文庫に出ていない自作（'+own.map(x=>'『'+esc(x.title)+'』').join("")+'）':'')+'を見ています。</p></div>'
+    +'<div class="coachbox"><b>📝 直しメモ（AI）</b>'+(c?'<span class="note">　'+c.notes.length+'こ。要らないメモは［外す］で消してから返してください。</span>':'')
+    +(!c?'<p class="note" style="margin:6px 0 0">まだ作っていません（出されてから1分ほどで自動で作られます）。</p>'
+      :(c.good?'<p style="margin:8px 0 0">よいところ：'+esc(c.good)+'</p>':'')+'<ol>'+c.notes.map((n,i)=>'<li><span class="cpart">'+esc(PART_NAME(n.part,a))+'</span>'+(n.quote?'<span class="q">「'+esc(n.quote)+'」</span>':'')+'<br>'+esc(n.why)+'<br>→ '+esc(n.how)+' <button class="btn small" data-act="cdrop" data-ci="'+i+'">外す</button></li>').join("")+'</ol>')
+    +'<div class="row" style="margin-top:6px"><button class="btn small" data-act="coachre">'+(c?"直しメモを作り直す":"直しメモを作る")+'</button></div></div>'
+    +(a.status==="returned"?'<p class="note" style="margin:8px 0 0">本人に返しています。'+(a.returnNote?'先生からのひとこと：'+esc(a.returnNote):'')+'</p>'
+      :'<textarea class="rnote" rows="2" maxlength="300" placeholder="先生からのひとこと（なくてもよい）"></textarea><div class="row" style="margin-top:6px"><button class="btn small main" data-act="anreturn">'+(c&&c.notes.length?"直しメモをつけて本人に返す":"本人に返す")+'</button><button class="btn small" data-act="anrerev">査読をやり直す</button></div>');
+}
 $("scSensei").addEventListener("click",async e=>{
   const b=e.target.closest("button[data-act]"); if(!b) return; const it=b.closest(".item"), act=b.dataset.act;
   try{
@@ -756,14 +774,12 @@ $("scSensei").addEventListener("click",async e=>{
       if(box.classList.toggle("hidden")){ it.querySelector(".aibox").classList.add("hidden"); return; }
       await showRead(it); return; }
     if(act==="anread"){ await openAn(it.dataset.anid,true,b); return; }
-    if(act==="anrv"||act==="anrerev"){ const box=it.querySelector(".anrv");
-      if(act==="anrerev"){ b.disabled=true; b.textContent="読んでいます…"; const r=await api("/bunko/admin/review",{method:"POST",teacher:true,body:{kind:"an",id:it.dataset.anid}}); if(!r.ok) $("tMsg").textContent="うまく査読できませんでした。少し待ってもう一度押してください。"; }
-      const a=(await api("/bunko/oshi?id="+encodeURIComponent(it.dataset.anid),{teacher:true})).oshi, r=a.review;
-      box.innerHTML='<div class="rvbox'+(r&&r.ok?" ok":"")+'">'+(!r?'<p class="note" style="margin:0">編集部（AI）の査読はまだです。</p>':r.ok?'<b>編集部（AI）：気になる点はありませんでした。</b>':'<b>編集部（AI）：気になる点があります。</b><div>'+esc(r.why)+'</div>')
-        +'<p class="note" style="margin:6px 0 0">はじめに・あとがき・書評'+(a.items.some(x=>x.src==="own")?'・文庫に出ていない自作（'+a.items.filter(x=>x.src==="own").map(x=>'『'+esc(x.title)+'』').join("")+'）':'')+'を見ています。</p>'
-        +(a.status==="returned"?'<p class="note" style="margin:8px 0 0">本人に返しています。'+(a.returnNote?'先生からのひとこと：'+esc(a.returnNote):'')+'</p>'
-          :'<textarea class="rnote" rows="2" maxlength="300" placeholder="先生からのひとこと（なくてもよい）"></textarea><div class="row" style="margin-top:6px"><button class="btn small" data-act="anreturn">本人に返す</button><button class="btn small" data-act="anrerev">査読をやり直す</button></div>')+'</div>';
-      return; }
+    if(act==="anrv"||act==="anrerev"||act==="coachre"||act==="cdrop"){ const box=it.querySelector(".anrv"), id=it.dataset.anid;
+      if(act==="anrerev"){ b.disabled=true; b.textContent="読んでいます…"; const r=await api("/bunko/admin/review",{method:"POST",teacher:true,body:{kind:"an",id}}); if(!r.ok) $("tMsg").textContent="うまく査読できませんでした。少し待ってもう一度押してください。"; }
+      if(act==="coachre"){ b.disabled=true; b.textContent="編集部が読んでいます…（20秒ほど）"; const r=await api("/bunko/admin/coach",{method:"POST",teacher:true,body:{id}}); if(!r.ok) $("tMsg").textContent="直しメモをうまく作れませんでした。少し待ってもう一度押してください。"; }
+      if(act==="cdrop"){ b.disabled=true; await api("/bunko/admin/coach",{method:"POST",teacher:true,body:{id,drop:[+b.dataset.ci]}}); }
+      const a=(await api("/bunko/oshi?id="+encodeURIComponent(id),{teacher:true})).oshi;
+      box.innerHTML=anRvHTML(a); return; }
     if(act==="anreturn"){ const note=(it.querySelector(".rnote")||{}).value||""; b.disabled=true;
       await api("/bunko/admin/set",{method:"POST",teacher:true,body:{kind:"an",id:it.dataset.anid,status:"returned",note}}); await doneItem(it); return; }
     if(act==="anpublic"||act==="anhidden"||act==="andelete"){
