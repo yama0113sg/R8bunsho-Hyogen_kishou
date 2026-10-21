@@ -556,6 +556,13 @@ async function bunko(request, env, headers, path, ctx) {
     } else code = cur.code;
     const rec = { code, owner: token, shelf: body.shelf, books: body.shelf.books.length, savedAt: Date.now(), created: cur ? cur.created : Date.now() };
     await kv.put("sp:" + normSpell(code), JSON.stringify(rec));
+    // じゅもんの目次（先生が、ペンネームや題名からじゅもんを探せるように）。中身が大きく変わったときだけ書きかえる
+    const pen = clip(body.pen, 20).trim(), titles = body.shelf.books.slice(-4).map(b => clip((b && b.final && b.final.title) || (b && b.title) || "", 30)).filter(Boolean);
+    const six = await getIdx(kv, "idx:sp"), old = six.items[normSpell(code)];
+    if (!old || old.pen !== pen || old.books !== rec.books || JSON.stringify(old.titles) !== JSON.stringify(titles) || rec.savedAt - (old.savedAt || 0) > 86400000) {
+      six.items[normSpell(code)] = { code, pen, books: rec.books, titles, savedAt: rec.savedAt, created: rec.created };
+      await kv.put("idx:sp", JSON.stringify(six));
+    }
     return J({ code, savedAt: rec.savedAt, books: rec.books }, headers);
   }
   if (path === "/bunko/spell/load") {
@@ -799,6 +806,10 @@ async function bunko(request, env, headers, path, ctx) {
     const w = await kv.get("w:" + clip(body.id, 30), { type: "json" });
     return J({ ok, review: w && w.review }, headers);
   }
+  // じゅもんの一覧（iPad の本棚が消えた生徒に、じゅもんを教えるため）
+  if (path === "/bunko/admin/spells") {
+    return J({ spells: Object.values((await getIdx(kv, "idx:sp")).items).sort((a, b) => b.savedAt - a.savedAt) }, headers);
+  }
   // AIの読み手の顔ぶれ：GET で読む／POST {readers} で保存／POST {reset:true} ではじめの3人にもどす
   if (path === "/bunko/admin/readers") {
     if (request.method === "POST") {
@@ -833,7 +844,7 @@ export default {
       }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {

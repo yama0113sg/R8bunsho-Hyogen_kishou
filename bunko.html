@@ -304,6 +304,9 @@ h3{font-size:14px;letter-spacing:.15em;color:var(--sub);margin:22px 0 10px;font-
         </details>
         <h3>ふっかつのじゅもんで本棚をひらく</h3>
         <div class="row" style="margin-top:0"><input id="spCodeIn" placeholder="例：ほしぞら たぬき もみじ ゆうき 47" style="flex:1;min-width:220px"><button class="btn small main" id="btnSpOpen">ひらく</button></div>
+        <details id="spListBox" style="margin-top:8px"><summary class="note" style="cursor:pointer">じゅもんの一覧（ペンネーム・題名から探す。本棚が消えた生徒に教えるとき）</summary>
+          <input id="spFind" placeholder="ペンネームや題名で絞りこむ" style="margin-top:8px">
+          <div id="spList" style="margin-top:8px"></div></details>
         <div id="spShelf"></div>
         <h3>確認待ちの作品</h3><div id="tPendW"></div>
         <h3>確認待ちの感想</h3><div id="tPendC"></div>
@@ -592,7 +595,15 @@ function sentDiff(a,b){ // 文ごとにくらべる：消えた文は赤の取�
   while(i<n) out+="<del>"+esc(A[i++])+"</del>"; while(j<m) out+="<ins>"+esc(B[j++])+"</ins>";
   return out;
 }
-let spData=null;
+let spData=null, spells=null;
+function renderSpList(){ const q=$("spFind").value.trim(), L=(spells||[]).filter(x=>!q||(x.pen||"").includes(q)||(x.titles||[]).some(t=>t.includes(q)));
+  $("spList").innerHTML=!spells?'<p class="note">読みこんでいます…</p>':!L.length?'<p class="note">見つかりません。（自動で預ける仕組みより前に作ったじゅもんは、生徒がもう一度アプリを開くと、ここに出てきます）</p>'
+    :L.map(x=>'<div class="item" style="padding:10px 12px"><div class="h"><b style="font-size:15px">'+esc(x.code)+'</b><span>'+esc(x.pen||"（ペンネームなし）")+'・'+x.books+'冊・'+md(x.savedAt)+'</span></div>'
+      +'<p class="note" style="margin:4px 0 0">'+(x.titles||[]).map(t=>'『'+esc(t)+'』').join(" ")+'</p><div class="row" style="margin-top:6px"><button class="btn small" data-spopen="'+esc(x.code)+'">この本棚をひらく</button></div></div>').join(""); }
+$("spListBox").addEventListener("toggle",async()=>{ if(!$("spListBox").open) return; spells=null; renderSpList();
+  try{ spells=(await api("/bunko/admin/spells",{teacher:true})).spells||[]; }catch(e){ spells=[]; $("tMsg").textContent=e.message; } renderSpList(); });
+$("spFind").addEventListener("input",renderSpList);
+$("spList").addEventListener("click",e=>{ const b=e.target.closest("[data-spopen]"); if(!b) return; $("spCodeIn").value=b.dataset.spopen; $("btnSpOpen").click(); $("spCodeIn").scrollIntoView({behavior:"smooth",block:"start"}); });
 function aiUse(b){ const br=b.brush||{}, hn=Object.values(b.hints||{}).reduce((a,h)=>a+(h.used||0),0), ch=Object.values(b.used||{}).reduce((a,v)=>a+(v||0),0);
   const bits=["チェンジ "+ch+"回","ヒント "+hn+"回"];
   if(b.bridges) bits.push("つなぎの文 "+Object.keys(b.bridges).length+"か所");

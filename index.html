@@ -490,7 +490,7 @@ input.ptitle{font-size:20px;margin-bottom:12px}
       <div class="annote hidden" id="anNote"></div>
       <div class="shelfhead"><h2>本棚</h2><span id="shelfCount"></span></div>
       <div class="shelf" id="shelfBooks"></div>
-      <div class="shelfempty hidden" id="shelfEmpty">まだ本がありません。<br>書き上げた物語は、ここに一冊ずつ並んでいきます。</div>
+      <div class="shelfempty hidden" id="shelfEmpty">まだ本がありません。<br>書き上げた物語は、ここに一冊ずつ並んでいきます。<br><span style="font-size:13px">本棚が急に空っぽになったときは、下の「ふっかつのじゅもん」から、じゅもんでよびもどせます。じゅもんがわからなければ、先生に聞いてね。</span></div>
     </div>
     <div class="shelfwrap">
       <div class="shelfhead"><h2>短編集</h2><span>本棚の作品を選んで、一冊にまとめる</span></div>
@@ -500,9 +500,10 @@ input.ptitle{font-size:20px;margin-bottom:12px}
     <div class="shelfwrap">
       <div class="shelfhead"><h2>ふっかつのじゅもん</h2><span>本棚をまるごと預けて、ロイロに出す</span></div>
       <div class="dq hidden" id="spBox"><div class="dqt">ふっかつのじゅもん</div><div class="dqc" id="spCode"></div><div class="dqs" id="spWhen"></div></div>
+      <p class="gnote" id="spAuto" style="margin:0 4px 10px"></p>
       <div class="hidden" id="spPassRow" style="margin:0 4px 8px"><input type="text" id="spPass" placeholder="合言葉（クラス文庫と同じ）" autocomplete="off" autocapitalize="off" style="font-size:17px"></div>
       <div class="row" style="padding:0 4px"><button class="btn main" id="btnSpell">📜 じゅもんをつくる</button><button class="btn hidden" id="btnSpCopy">じゅもんをコピー</button></div>
-      <p class="gnote" id="spNote" style="margin:10px 4px 0">本棚をまるごと預けて、じゅもんを出します。書き足したり整えたりしたら、もう一度押してください。同じじゅもんのまま中身が新しくなります。じゅもんをロイロに出してね。</p>
+      <p class="gnote" id="spNote" style="margin:10px 4px 0">本棚は、書き足すたびに自動で預けられます（同じじゅもんのまま中身が新しくなります）。提出の前には、念のためボタンを押してからじゅもんをロイロに出してね。</p>
       <details style="margin:10px 4px 0"><summary class="gnote" style="cursor:pointer">別の iPad から、じゅもんで本棚をよびもどす</summary>
         <input type="text" id="spIn" placeholder="例：ほしぞら たぬき もみじ ゆうき 47" style="font-size:17px;margin-top:8px">
         <div class="row"><button class="btn small" id="btnSpLoad">よびもどす</button></div>
@@ -696,7 +697,7 @@ const store={ get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){re
 function fresh(){ return {genre:null,bind:null,stage:0,lines:{},rar:{},hist:{},hints:{},bodies:{},used:{},tried:{},start:null,title:"",done:false}; }
 let S=store.get(KEY)||fresh(); if(!S.rar) S.rar={}; if(!S.hist) S.hist={}; if(!S.hints) S.hints={};
 let lastCall=0, busy=false, arm=0;
-const save=()=>store.set(KEY,S);
+const save=()=>{ store.set(KEY,S); markDirty(); };
 // チェンジの回数はジャンルごと・段階ごとに数える
 const uk=k=>S.genre+":"+k, usedOf=k=>S.used[uk(k)]||0;
 
@@ -980,7 +981,7 @@ function plainText(o=S){
 const SKEY="kishou_shelf_v1";   // 「最初からやり直す」では消えない
 let SH=store.get(SKEY)||{books:[],antho:[]};
 if(!SH.oshi) SH.oshi=[];   // 推し短編集
-const saveShelf=()=>store.set(SKEY,SH);
+const saveShelf=()=>{ store.set(SKEY,SH); markDirty(); };
 let view="write", curBook=null, curAntho=null, bookMode="fin";
 const bookById=id=>SH.books.find(b=>b.id===id);
 const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -1273,14 +1274,43 @@ function renderSpell(){
   $("spCode").textContent=code; $("spWhen").textContent=at? new Date(at).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+" に預けた本棚" : "";
   $("btnSpell").textContent=code?"📜 いまの本棚で、じゅもんを新しくする":"📜 じゅもんをつくる";
   $("spPassRow").classList.toggle("hidden",!!lsGet("bunko_pass"));
+  $("spAuto").innerHTML= !lsGet("bunko_pass")? '⚠ 合言葉を入れると、本棚が<b>自動で預けられる</b>ようになります。'
+    : !code? '☁ 本棚に本ができたら、自動で預けて、じゅもんを作ります。'
+    : hasUnsaved()? '☁ まだ預けていない書き足しがあります（10分ごとに自動で預けます）。'
+    : '☁ 本棚は自動で預けられています。';
 }
 function spellPass(){ if(lsGet("bunko_pass")) return true; const p=$("spPass").value.trim(); if(!p){ $("spMsg").style.color="var(--ng)"; $("spMsg").textContent="合言葉を入れてください。"; return false; } lsSet("bunko_pass",p); return true; }
+/* ---- 自動で預ける（iPad の Safari は、しばらく開かないとサイトのデータを消すことがあるため） ----
+   本棚や書きかけの物語が変わったら、30秒たってから預ける。ただし前に預けてから10分たつまでは待つ（KV の書きこみ回数をおさえる）。 */
+const AUTO_GAP=10*60*1000;
+var autoT=0, spBusy=false;   // var：起動の途中で save() が呼ばれても大丈夫なように
+function markDirty(){ try{ localStorage.setItem("kishou_dirty",String(Date.now())); }catch(e){} clearTimeout(autoT); autoT=setTimeout(()=>autoBackup(false),30000); }
+const lastBackup=()=>+lsGet("kishou_bk_local")||+lsGet("kishou_spell_at")||0;
+const hasUnsaved=()=>(+lsGet("kishou_dirty")||0)>lastBackup();
+async function spellSave(){
+  if(spBusy) throw new Error("いま預けています。"); spBusy=true; const t0=Date.now();
+  try{ const j=await bunkoApi("/spell/save",{token:ownerToken(),code:lsGet("kishou_spell"),pen:lsGet("kishou_pen"),
+        shelf:{books:SH.books,antho:SH.antho,oshi:SH.oshi,draft:S.genre?S:null,v:1}});
+    lsSet("kishou_spell",j.code); lsSet("kishou_spell_at",String(j.savedAt)); lsSet("kishou_bk_local",String(t0));
+    return j; }
+  finally{ spBusy=false; if(view==="shelf") renderSpell(); }
+}
+async function autoBackup(leaving){
+  if(!hasUnsaved()||!lsGet("bunko_pass")||spBusy) return;
+  if(!SH.books.length&&!S.genre) return;
+  const gap=Date.now()-lastBackup(), need=leaving?2*60*1000:AUTO_GAP;
+  if(gap<need){ clearTimeout(autoT); autoT=setTimeout(()=>autoBackup(false),need-gap+1000); return; }
+  try{ await spellSave(); }catch(e){ if(e.status===401||String(e.message).includes("合言葉")) lsSet("bunko_pass",""); }
+}
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") autoBackup(true); });
+setTimeout(()=>autoBackup(false),5000);
+try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}   // 「消さないで」とお願いしておく（効くかは端末しだい）
+$("spPass").addEventListener("change",()=>{ const p=$("spPass").value.trim(); if(p){ lsSet("bunko_pass",p); autoBackup(false); } });   // ここでは画面を組み直さない（ボタンの位置がずれて押しそこねるため）
 $("btnSpell").onclick=async()=>{
   if(!SH.books.length){ $("spMsg").style.color="var(--ng)"; $("spMsg").textContent="本棚に本がありません。"; return; }
   if(!spellPass()) return;
   $("btnSpell").disabled=true; $("spMsg").style.color="var(--sub)"; $("spMsg").textContent="本棚を預けています…";
-  try{ const j=await bunkoApi("/spell/save",{token:ownerToken(),code:lsGet("kishou_spell"),shelf:{books:SH.books,antho:SH.antho,oshi:SH.oshi,v:1}});
-    lsSet("kishou_spell",j.code); lsSet("kishou_spell_at",String(j.savedAt));
+  try{ const j=await spellSave();
     $("spMsg").style.color="var(--ok)"; $("spMsg").textContent=j.books+"冊を預けました。このじゅもんを、ロイロに出してください。"; }
   catch(e){ if(String(e.message).includes("合言葉")) lsSet("bunko_pass",""); $("spMsg").style.color="var(--ng)"; $("spMsg").textContent=String(e.message).includes("fetch")?"うまくつながりませんでした。少し待ってもう一度押してください。":e.message; }
   $("btnSpell").disabled=false; renderSpell();
@@ -1294,8 +1324,10 @@ $("btnSpLoad").onclick=async()=>{
     for(const b of rb){ if(!b||!b.id) continue; if(SH.books.some(x=>x.id===b.id)){ kept++; continue; } SH.books.push(b); added++; }
     for(const a of ra){ if(a&&a.id&&!SH.antho.some(x=>x.id===a.id)) SH.antho.push(a); }
     for(const o of ((j.shelf&&j.shelf.oshi)||[])){ if(o&&o.id&&!SH.oshi.some(x=>x.id===o.id)) SH.oshi.push(o); }
+    const dr=j.shelf&&j.shelf.draft; let drOk=false;
+    if(dr&&dr.genre&&!S.genre){ S=dr; save(); drOk=true; }   // 書きかけの物語は、この iPad で何も書いていないときだけもどす
     saveShelf(); render();
-    $("spMsg").style.color="var(--ok)"; $("spMsg").textContent=added+"冊をよびもどしました。"+(kept?"（"+kept+"冊は、もうこの本棚にあったのでそのままにしました）":""); }
+    $("spMsg").style.color="var(--ok)"; $("spMsg").textContent=added+"冊"+(drOk?"と、書きかけの物語":"")+"をよびもどしました。"+(kept?"（"+kept+"冊は、もうこの本棚にあったのでそのままにしました）":""); }
   catch(e){ $("spMsg").style.color="var(--ng)"; $("spMsg").textContent=e.message; }
   $("btnSpLoad").disabled=false;
 };
