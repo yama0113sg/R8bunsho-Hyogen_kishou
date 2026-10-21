@@ -1123,7 +1123,7 @@ function renderOshi(){
       +'<div class="ftip" style="margin-top:14px"><b>「あとがき」に書くこと</b>（本の出口。読み終えた人に向けて）<br>① 並べる順番の工夫（なぜこの順にしたか）<br>② 編んでみて気づいたこと（作品どうしのつながり、テーマの見え方）<br>③ 作者のみなさん・読んでくれた人へのひとこと<br><i>例：一作目に「黒板の猫」を置いたのは、こわさの入り口がやさしいからです。…</i></div>'
       +'<textarea id="oAfter" rows="6" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="あとがき（150〜300字くらい）">'+esc(o.after||"")+'</textarea>'
       +'<div class="count"><span><span id="oAfterN">'+nchars(o.after||"")+'</span> 字</span></div></div>'
-    +'<div class="ostep"><h3>📖 本にする<small>ページをめくって読んでみよう。できたら、クラス文庫の「みんなの推し短編集」へ</small></h3>'
+    +'<div class="ostep"><h3>📖 本にする<small>ページをめくって読んでみよう。できたら、クラス文庫の「推し短編集の棚」へ</small></h3>'
       +'<div class="row" style="margin-top:0"><button class="btn main" data-oact="read"'+(o.items.length?'':' disabled')+'>📖 本として読む</button></div>'
       +oshiPubHTML(o,st)+'</div>'
     +'<div class="msg" id="oMsg"></div>'
@@ -1170,7 +1170,7 @@ async function oshiBookData(o){
       if(it.src==="bunko"){ const w=W[it.id]; return {title:it.title,pen:it.pen,genreName:genreOf(it.genre).name,text:w?w.text:(lsGet("bunko_pass")?"（この作品は、いまクラス文庫で読めません）":"（クラス文庫の合言葉を入れると、ここに本文が出ます）"),obi:w&&w.obi,review:r}; }
       const b=bookById(it.id); return {title:b?bTitle(b):it.title,pen:o.editor||"自分",genreName:genreOf(it.genre).name,text:b?bText(b).trim():"（本棚にこの作品がありません）",obi:null,review:r}; })};
 }
-const AN_LABEL={pending:"先生の確認待ちです。",public:"クラス文庫の「みんなの推し短編集」に並んでいます。",hidden:"先生が非公開にしています。",returned:"文庫の編集部から返ってきました。下のメモを見て直し、出し直してください。"};
+const AN_LABEL={pending:"先生の確認待ちです。",public:"クラス文庫の「推し短編集の棚」に並んでいます。",hidden:"先生が非公開にしています。",returned:"文庫の編集部から返ってきました。下のメモを見て直し、出し直してください。"};
 function oshiPubHTML(o,st){
   const ready=st[3]&&st[4]&&st[5]&&o.items.length>=2, p=o.pub, rv=p&&p.status==="returned"&&p.review;
   return '<div class="pubbox" id="oPub">'+(p?esc(AN_LABEL[p.status]||"出しました。"):ready?"できあがったら、クラス文庫に出せます。先生が確認したら、みんなが読めるようになります。":"①〜⑥がそろうと（作品は2つ以上）、クラス文庫に出せます。")
@@ -1190,7 +1190,7 @@ async function oshiPublish(o,x){
     else items.push({src:"own",id:b.id,title:bTitle(b),genre:b.genre,text:bText(b).trim(),review}); }
   x.disabled=true; x.textContent="送っています…";
   try{ const j=await bunkoApi("/oshi/submit",{id:o.pub&&o.pub.id,token:ownerToken(),title:o.title,editor:o.editor,theme:o.theme,cover:o.cover||0,intro:(o.intro||"").trim(),after:(o.after||"").trim(),items});
-    o.pub={id:j.id,status:j.status,at:Date.now()}; oshiTouch(o); renderOshi(); $("oMsg").style.color="var(--ok)"; $("oMsg").textContent="出しました。先生が確認したら、「みんなの推し短編集」に並びます。"; }
+    o.pub={id:j.id,status:j.status,at:Date.now()}; oshiTouch(o); renderOshi(); $("oMsg").style.color="var(--ok)"; $("oMsg").textContent="出しました。先生が確認したら、「推し短編集の棚」に並びます。"; }
   catch(err){ if(String(err.message).includes("合言葉")) lsSet("bunko_pass",""); renderOshi(); $("oMsg").style.color="var(--ng)"; $("oMsg").textContent=String(err.message).includes("fetch")?"うまくつながりませんでした。少し待ってもう一度押してください。":err.message; }
 }
 let anOffArm=0;
@@ -1215,7 +1215,7 @@ const myOshiPub=()=>new Set(SH.oshi.map(o=>o.pub&&o.pub.id).filter(Boolean));
 function anFor(b){ if(!anList||!b.bunko) return []; const mine=myOshiPub(); return anList.filter(a=>!mine.has(a.id)&&(a.works||[]).includes(b.bunko.id)); }
 function renderAnNote(){ const el=$("anNote"); if(!el) return; const L=[];
   for(const b of SH.books) for(const a of anFor(b)) L.push('あなたの作品『'+esc(bTitle(b))+'』が、推し短編集『<b>'+esc(a.title)+'</b>』（編・'+esc(a.editor)+'）に収録されました。');
-  el.innerHTML=L.length?'📕 <b>お知らせ</b><br>'+L.join("<br>")+'<br><span style="font-size:12px;color:var(--sub)">クラス文庫の「みんなの推し短編集」で読めます。</span>':"";
+  el.innerHTML=L.length?'📕 <b>お知らせ</b><br>'+L.join("<br>")+'<br><span style="font-size:12px;color:var(--sub)">クラス文庫の「推し短編集の棚」で読めます。</span>':"";
   el.classList.toggle("hidden",!L.length); }
 $("oshiBody").addEventListener("click",async e=>{
   const x=e.target.closest("button"); if(!x) return; const d=x.dataset, o=curOshi&&oshiOf(curOshi);

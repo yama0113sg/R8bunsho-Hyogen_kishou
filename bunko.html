@@ -92,6 +92,9 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .seg{display:flex;gap:6px;margin:0 0 10px}
 .seg button{padding:7px 14px;border-radius:99px;font-size:13px;border:1px solid var(--edge);color:var(--sub)}
 .seg button.on{color:#15121f;background:#fff;border-color:transparent;font-weight:700}
+.shelfseg{justify-content:center;margin:0 0 14px}
+.shelfseg button{padding:10px 18px;font-size:15px}
+.shelfseg small{margin-left:6px;font-size:12px;opacity:.75;font-weight:500}
 .page{background:#f6f1e7;color:#1d1a16;border-radius:10px;box-shadow:0 20px 50px rgba(0,0,0,.45),inset 0 0 60px rgba(120,90,40,.08);
   font-family:var(--mincho);font-size:18px;line-height:2;white-space:pre-wrap;word-break:break-word}
 .page.tate{writing-mode:vertical-rl;width:100%;height:min(72vh,660px);overflow-x:auto;overflow-y:hidden;padding:36px 30px;line-break:strict}
@@ -203,14 +206,16 @@ h3{font-size:14px;letter-spacing:.15em;color:var(--sub);margin:22px 0 10px;font-
 
   <!-- 棚 -->
   <section id="scShelf" class="hidden fadein">
-    <div class="panel">
-      <div class="shelfhead"><h2>文庫の棚</h2><span id="shelfCount"></span></div>
+    <div class="seg shelfseg" id="shelfSeg"><button data-s="works" class="on">📚 原作の棚<small id="segW"></small></button><button data-s="an">📕 推し短編集の棚<small id="segA"></small></button></div>
+    <div class="panel" id="worksPanel">
+      <div class="shelfhead"><h2>原作の棚</h2><span id="shelfCount"></span></div>
       <div class="shelf" id="shelf"></div>
       <div class="empty hidden" id="empty">まだ本がありません。<br>「起承転結」の本棚で整えた作品を［文庫に出す］と、先生が確認したあとここに並びます。</div>
     </div>
     <div class="panel hidden" id="anPanel">
-      <div class="shelfhead"><h2>みんなの推し短編集</h2><span id="anCount"></span></div>
+      <div class="shelfhead"><h2>推し短編集の棚</h2><span id="anCount"></span></div>
       <div class="anshelf" id="anShelf"></div>
+      <div class="empty hidden" id="anEmpty">まだ推し短編集はありません。<br>「起承転結」の［📕 推し短編集］で編んで文庫に出すと、先生が確認したあとここに並びます。</div>
       <p class="note" style="margin-top:10px">表紙をタップすると、本としてページをめくって読めます。推し短編集は、「起承転結」の［📕 推し短編集］でつくれます。</p>
     </div>
     <div class="row" style="justify-content:space-between"><a class="btn" href="./">← 起承転結へ</a><button class="btn" id="btnReload">↻ 新しく並んだ本を見る</button></div>
@@ -369,15 +374,21 @@ async function loadShelf(){
       +'<span class="t" style="font-size:'+(n=>n<=5?15:n<=8?12:n<=14?11:10)([...w.title].length)+'px">'+esc(w.title)+'</span><span class="p">'+esc(w.pen)+'</span></button></div>'; }).join("");
   $("shelf").classList.toggle("hidden",!works.length); $("empty").classList.toggle("hidden",!!works.length);
   $("shelfCount").textContent=works.length+"冊"+(j.pending?"（ほかに先生の確認待ち "+j.pending+"冊）":"");
-  loadAnShelf();
+  $("segW").textContent=works.length;
+  showShelfTab(); loadAnShelf();
 }
+// 原作の棚と推し短編集の棚を切りかえる（どちらを見ていたかは、この iPad に覚えておく）
+let shelfTab=ls.get("bunko_shelftab")==="an"?"an":"works";
+function showShelfTab(){ $("worksPanel").classList.toggle("hidden",shelfTab!=="works"); $("anPanel").classList.toggle("hidden",shelfTab!=="an");
+  [...$("shelfSeg").children].forEach(b=>b.classList.toggle("on",b.dataset.s===shelfTab)); }
+$("shelfSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; shelfTab=b.dataset.s; ls.set("bunko_shelftab",shelfTab); showShelfTab(); });
 /* ---- みんなの推し短編集 ---- */
 let oshis=[];
 const ocoverHTML=a=>'<div class="ocover c'+(a.cover||0)+'"><div class="ot">'+esc(a.title)+'</div>'+(a.theme?'<div class="oth">'+esc(a.theme)+'</div>':'')+'<div class="oe">編・'+esc(a.editor)+'</div></div>';
 async function loadAnShelf(){
   try{ oshis=(await api("/bunko/oshis")).oshis||[]; }catch(e){ oshis=[]; }
-  $("anPanel").classList.toggle("hidden",!oshis.length);
-  $("anCount").textContent=oshis.length+"冊";
+  $("anCount").textContent=oshis.length+"冊"; $("segA").textContent=oshis.length;
+  $("anEmpty").classList.toggle("hidden",!!oshis.length); $("anShelf").classList.toggle("hidden",!oshis.length);
   $("anShelf").innerHTML=oshis.map(a=>'<button class="anbook" data-an="'+esc(a.id)+'">'+ocoverHTML(a)+'<small>'+a.n+'作品を収録</small></button>').join("");
 }
 $("anShelf").addEventListener("click",e=>{ const b=e.target.closest("[data-an]"); if(b) openAn(b.dataset.an,false,b); });

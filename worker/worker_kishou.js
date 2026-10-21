@@ -825,7 +825,12 @@ export default {
     if (path.startsWith("/bunko")) {
       if (origin !== env.ALLOWED_ORIGIN) return J({ error: "origin" }, headers, 403);
       try { return await bunko(request, env, headers, path, ctx); }
-      catch (e) { return J({ error: String(e.message || e) }, headers, 500); }
+      catch (e) {
+        const m = String(e.message || e);
+        // Cloudflare の無料枠（1日の回数）を使い切ったとき。枠は毎朝9時（日本時間）にもどる
+        if (/limit|exceeded|quota/i.test(m)) return J({ error: "limit", message: "今日は、クラス文庫の1日の利用回数を使い切りました。明日の朝9時にもどります。（書いた作品は、この iPad の本棚に残っています）" }, headers, 503);
+        return J({ error: m }, headers, 500);
+      }
     }
     if (request.method === "GET") {
       return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true }), { headers });
