@@ -330,34 +330,13 @@ input.ptitle{font-size:20px;margin-bottom:12px}
 .ocover.c1{background:linear-gradient(160deg,#fde6ee,#f2b8cb);color:#5a2236}
 .ocover.c2{background:linear-gradient(160deg,#f4efe4,#ddd3bf);color:#2a2620} .ocover.c2::before{content:"";position:absolute;inset:6cqw;border:1px solid rgba(42,38,32,.35)}
 .ocover.c3{background:linear-gradient(170deg,#9fd9ef,#2f6f9a);color:#fff}
-/* 推し方ガチャ（書評の形） */
+/* 書評 */
 .rvitem{margin-top:12px;padding:14px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid var(--edge)}
 .rvitem .rh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .rvitem .rh b{font-family:var(--mincho);font-size:16px}
-.gslot{display:inline-block;min-width:13em;text-align:center;padding:10px 16px;border-radius:12px;background:#000;border:3px double #fff;font-family:"DotGothic16",var(--gothic);font-size:18px;letter-spacing:.1em}
-.gslot.rolling{animation:shake .12s linear infinite}
-@keyframes shake{50%{transform:translateY(-2px)}}
-.gslot.hit{animation:hit .6s ease-out}
-@keyframes hit{0%{box-shadow:0 0 0 0 #fff}40%{box-shadow:0 0 0 12px rgba(255,255,255,.25);transform:scale(1.08)}100%{box-shadow:none;transform:none}}
 .ftip{margin-top:10px;font-size:13px;line-height:1.8;color:#d6d2ea;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--edge)}
 .ftip i{font-style:normal;font-family:var(--mincho);color:var(--sub)}
 .fprev{margin-top:12px;border-radius:12px;overflow:hidden}
-.fprev.news{background:#f3efe4;color:#1d1a16;padding:14px 16px;font-family:var(--mincho)}
-.fprev.news .nh{font-weight:800;font-size:20px;border-bottom:3px double #1d1a16;padding-bottom:6px;margin-bottom:8px}
-.fprev.news .nb{column-count:2;column-gap:18px;font-size:13px;line-height:1.8;text-align:justify}
-.fprev.news .nk{font-size:11px;text-align:right;margin-top:6px}
-.fprev.line{background:#8aa3c8;padding:12px;display:flex;flex-direction:column;gap:8px}
-.fprev.line .bb{max-width:78%;padding:8px 12px;border-radius:16px;font-size:14px;line-height:1.6;background:#9be37b;color:#14210f;align-self:flex-end;border-bottom-right-radius:4px}
-.fprev.line .bb.l{background:#fff;color:#222;align-self:flex-start;border-bottom-left-radius:4px;border-bottom-right-radius:16px}
-.fprev.trailer{background:#000;color:#fff;padding:26px 16px;text-align:center;font-family:var(--mincho)}
-.fprev.trailer.still div{animation:none;opacity:1}
-.fprev.trailer div{font-size:18px;font-weight:700;line-height:1.6;margin:10px 0;opacity:0;animation:tin .8s ease-out forwards}
-@keyframes tin{from{opacity:0;letter-spacing:.4em}to{opacity:1;letter-spacing:.08em}}
-.fprev.radio{background:repeating-linear-gradient(#fffdf6 0 27px,#d9e3f0 27px 28px);color:#2a2620;padding:14px 18px;font-size:14px;line-height:28px}
-.fprev.radio .rn{font-size:12px;color:#5a6b85}
-.fprev.tv{background:linear-gradient(135deg,#ff2e63,#ffb000);padding:14px;display:flex;flex-direction:column;gap:8px}
-.fprev.tv div{background:#fff;color:#d6001c;font-weight:900;font-size:16px;padding:6px 10px;border-radius:6px;box-shadow:3px 3px 0 #000;transform:rotate(-1deg)}
-.fprev.tv div:nth-child(even){background:#ffe600;color:#111;transform:rotate(1deg)}
 .fprev.lecture{background:#fbfaf7;color:#222;padding:16px 20px;font-family:var(--mincho);font-size:13.5px;line-height:1.9;text-align:justify}
 .fprev.lecture .lh{text-align:center;font-weight:700;letter-spacing:.3em;margin-bottom:8px}
 .fprev.lecture .lk{text-align:right;font-size:12px;margin-top:6px}
@@ -1118,38 +1097,23 @@ function renderOshi(){
       +'<p class="label" style="margin:12px 0 6px">編者（ペンネーム）</p><input type="text" id="oEditor" maxlength="20" value="'+esc(o.editor||"")+'" placeholder="ペンネーム" style="font-size:16px;text-align:left">'
       +'<p class="label" style="margin:12px 0 6px">表紙</p><div class="chips" id="oCovers">'+OSHI_COVERS.map((c,i)=>'<button data-ocover="'+i+'"'+((o.cover||0)===i?' class="on"':'')+'>'+c+'</button>').join("")+'</div></div>'
       +'<div id="oPrev">'+oshiCover(o)+'</div></div></div>'
-    +'<div class="ostep"><h3>⑤ 書評<small>作品ごとに「推し方ガチャ」を引いて、その形で推そう</small></h3>'
+    +'<div class="ostep"><h3>⑤ 書評<small>作品ごとに、その作品をすすめる文章を書こう</small></h3>'
       +(o.items.length? o.items.map((it,i)=>rvItemHTML(o,it,i)).join("") : '<p class="gnote" style="margin:0">③に作品を並べると、ここで書評を書けます。</p>')+'</div>'
     +'<div class="msg" id="oMsg"></div>'
     +'<div class="nav"><button class="btn" data-oact="back">← 一覧へ</button><button class="btn danger" data-oact="del">この短編集を消す</button></div>';
 }
-// 推し方ガチャ：書評の「形」
-const RV_FORMS=[
-  {k:"news",name:"📰 新聞の書評欄",tip:"1行目に見出しを書いて、2行目からが本文。落ち着いた文章で、どんな作品か・どこが読みどころかを書く。",ex:"見出しの例：放課後、黒板の猫が教えてくれたこと"},
-  {k:"line",name:"💬 友だちへのLINE",tip:"1行が1つの吹き出し。友だちの返事は、行のはじめに「＞」を付ける。何通かに分けて、だんだん本気で推していく。",ex:"例：ねえ、黒板の猫の話読んだ？／＞まだ／最後がずるいねん"},
-  {k:"trailer",name:"🎬 映画の予告編",tip:"1行ずつ、黒い画面に大きく出る。短い句を重ねて、中身は言いすぎない。最後の行に題名を。",ex:"例：その日、図書室で——／地球儀から、日本が消えた。"},
-  {k:"radio",name:"📻 深夜ラジオのお便り",tip:"「〇〇さん、こんばんは」から始めて、自分の体験として推す。読んだときの自分の様子を入れると強い。",ex:"例：こんばんは。最近、寝る前に読んだ話のことを聞いてください。"},
-  {k:"tv",name:"📺 通販番組",tip:"1行が1つのテロップ。大げさに、でも中身は本気で。「今なら」「なんと」などを使ってOK。",ex:"例：なんと！ 読み終わると黒板を二度見してしまう！"},
-  {k:"lecture",name:"🎓 えらい先生の講評",tip:"かたい言葉で、まじめに推す。「本作は」「〜と言えよう」などを使う。最後は一言でしめる。",ex:"例：本作は、放課後という時間の境目を描いた佳作と言えよう。"},
-];
+// 書評（オーソドックスな形）
 const rvKey=it=>it.src+":"+it.id;
-function rvPreview(form,text,pen,still){ const L=String(text||"").split("\n").map(x=>x.trim()).filter(Boolean); if(!L.length) return "";
-  if(form==="news") return '<div class="fprev news"><div class="nh">'+esc(L[0])+'</div><div class="nb">'+L.slice(1).map(esc).join("<br>")+'</div><div class="nk">（評・'+esc(pen||"")+'）</div></div>';
-  if(form==="line") return '<div class="fprev line">'+L.map(x=>'<div class="bb'+(/^[＞>]/.test(x)?" l":"")+'">'+esc(x.replace(/^[＞>]\s*/,""))+'</div>').join("")+'</div>';
-  if(form==="trailer") return '<div class="fprev trailer'+(still?" still":"")+'">'+L.map((x,i)=>'<div style="animation-delay:'+(i*.6)+'s">'+esc(x)+'</div>').join("")+'</div>';
-  if(form==="radio") return '<div class="fprev radio"><div class="rn">ラジオネーム：'+esc(pen||"")+'</div>'+L.map(esc).join("<br>")+'</div>';
-  if(form==="tv") return '<div class="fprev tv">'+L.map(x=>'<div>'+esc(x)+'</div>').join("")+'</div>';
-  return '<div class="fprev lecture"><div class="lh">講　評</div>'+L.map(esc).join("<br>")+'<div class="lk">'+esc(pen||"")+'</div></div>'; }
-function rvItemHTML(o,it,i){ const r=(o.reviews||{})[rvKey(it)]||{}, f=RV_FORMS.find(z=>z.k===r.form);
+function rvPreview(text,pen){ const L=String(text||"").split("\n").map(x=>x.trim()).filter(Boolean); if(!L.length) return "";
+  return '<div class="fprev lecture"><div class="lh">書　評</div>'+L.map(esc).join("<br>")+'<div class="lk">評・'+esc(pen||"")+'</div></div>'; }
+function rvItemHTML(o,it,i){ const r=(o.reviews||{})[rvKey(it)]||{};
   return '<div class="rvitem" data-ri="'+i+'"><div class="rh"><b>'+KAN[i]+'　『'+esc(it.title)+'』</b><span class="gnote" style="margin:0;font-size:12px">'+esc(it.pen||"")+'</span></div>'
-    +(!f? '<div class="row"><span class="gslot" id="slot'+i+'">？？？？？</span><button class="btn main small" data-rvroll="'+i+'">🎰 推し方ガチャを引く</button></div>'
-      : '<div class="row"><span class="gslot">'+f.name+'</span>'+(r.re?'':'<button class="btn small" data-rvroll="'+i+'">↻ 引き直す（1回だけ）</button>')+(it.src==="bunko"?'<button class="btn small" data-rvq="'+i+'">🤝 推しどころを引き出す</button>':'')+'</div>'
-        +'<div class="ftip"><b>'+f.name+'の書き方</b><br>'+esc(f.tip)+'<br><i>'+esc(f.ex)+'</i></div>'
-        +'<ol class="qs" id="rvqs'+i+'"></ol>'
-        +'<textarea class="rvtext" data-rvi="'+i+'" rows="7" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="ここに書評を書く（150〜400字くらい）">'+esc(r.text||"")+'</textarea>'
-        +'<div class="count"><span class="rvn">'+nchars(r.text||"")+'</span> 字</div>'
-        +'<div class="rvprev">'+rvPreview(f.k,r.text,o.editor)+'</div>')
-    +'</div>'; }
+    +(i===0?'<div class="ftip"><b>書評の書き方（この順で書くと書きやすいよ）</b><br>① どんな話か（最後までは言わない）<br>② 好きな一文を「　」で引く<br>③ なぜそこが好きか<br>④ どんな人に読んでほしいか<br><i>例：放課後の教室で、黒板の猫が動きだす話です。「またね」という一文が好きです。…</i></div>':'')
+    +(it.src==="bunko"?'<div class="row"><button class="btn small" data-rvq="'+i+'">🤝 推しどころを引き出す（AI）</button></div>':'')
+    +'<ol class="qs" id="rvqs'+i+'"></ol>'
+    +'<textarea class="rvtext" data-rvi="'+i+'" rows="7" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="ここに書評を書く（200〜400字くらい）">'+esc(r.text||"")+'</textarea>'
+    +'<div class="count"><span><span class="rvn">'+nchars(r.text||"")+'</span> 字</span></div>'
+    +'<div class="rvprev">'+rvPreview(r.text,o.editor)+'</div></div>'; }
 function oshiCover(o){ return '<div class="ocover c'+(o.cover||0)+'"><div class="ot">'+(esc(o.title)||'<span style="opacity:.45">題名</span>')+'</div>'+(o.theme?'<div class="oth">'+esc(o.theme)+'</div>':'')+'<div class="oe">編・'+(esc(o.editor)||"——")+'</div></div>'; }
 function oshiTouch(o){ o.updated=Date.now(); saveShelf(); }
 $("oshiBody").addEventListener("click",async e=>{
@@ -1172,18 +1136,8 @@ $("oshiBody").addEventListener("click",async e=>{
     if(w&&!o.items.some(z=>z.src===src&&z.id===id)){ o.items.push({src,id,title:w.title,pen:w.pen,genre:w.genre}); oshiTouch(o); }
     renderOshi(); return; }
   if(d.orm!=null){ o.items.splice(+d.orm,1); oshiTouch(o); renderOshi(); return; }
-  if(d.rvroll!=null){ const i=+d.rvroll, it=o.items[i], k=rvKey(it); o.reviews=o.reviews||{}; const r=o.reviews[k]||{};
-    if(r.form&&r.re) return;
-    const box=x.closest(".rvitem"); const sl=box.querySelector(".gslot"); x.disabled=true; sl.classList.add("rolling");
-    const pool=RV_FORMS.filter(z=>z.k!==r.form); let n=0;
-    const tm=setInterval(()=>{ sl.textContent=RV_FORMS[n++%RV_FORMS.length].name; },90);
-    await new Promise(z=>setTimeout(z,1300)); clearInterval(tm);
-    const pick=pool[Math.floor(Math.random()*pool.length)];
-    o.reviews[k]={form:pick.k,text:r.text||"",re:!!r.form}; oshiTouch(o);
-    sl.classList.remove("rolling"); sl.textContent=pick.name; sl.classList.add("hit");
-    await new Promise(z=>setTimeout(z,650)); renderOshi(); const nb=$("oshiBody").querySelector('.rvitem[data-ri="'+i+'"]'); if(nb) nb.scrollIntoView({block:"nearest"}); return; }
   if(d.rvq!=null){ const i=+d.rvq, it=o.items[i]; x.disabled=true; x.textContent="読んでいます…";
-    try{ const j=await bunkoApi("/obi/questions",{workId:it.id}); $("rvqs"+i).innerHTML=(j.qs||[]).map(q=>'<li>'+esc(q)+'</li>').join(""); x.textContent="🤝 推しどころを引き出す"; }
+    try{ const j=await bunkoApi("/obi/questions",{workId:it.id}); $("rvqs"+i).innerHTML=(j.qs||[]).map(q=>'<li>'+esc(q)+'</li>').join(""); x.textContent="🤝 推しどころを引き出す（AI）"; }
     catch(err){ x.textContent="うまくいきませんでした。もう一度"; } x.disabled=false; return; }
   if(d.oup!=null&&+d.oup>0){ const i=+d.oup; [o.items[i-1],o.items[i]]=[o.items[i],o.items[i-1]]; oshiTouch(o); renderOshi(); return; }
   if(d.odn!=null&&+d.odn<o.items.length-1){ const i=+d.odn; [o.items[i+1],o.items[i]]=[o.items[i],o.items[i+1]]; oshiTouch(o); renderOshi(); return; }
@@ -1191,7 +1145,7 @@ $("oshiBody").addEventListener("click",async e=>{
 $("oshiBody").addEventListener("input",e=>{ const o=curOshi&&oshiOf(curOshi); if(!o) return;
   if(e.target.classList.contains("rvtext")){ const i=+e.target.dataset.rvi, it=o.items[i], k=rvKey(it); o.reviews=o.reviews||{}; const r=o.reviews[k]||(o.reviews[k]={});
     r.text=e.target.value; oshiTouch(o); const box=e.target.closest(".rvitem"); box.querySelector(".rvn").textContent=nchars(r.text);
-    box.querySelector(".rvprev").innerHTML=rvPreview(r.form,r.text,o.editor,true); return; }
+    box.querySelector(".rvprev").innerHTML=rvPreview(r.text,o.editor); return; }
   if(e.target.id==="oTheme"){ o.theme=e.target.value.trim(); [...$("oThemes").children].forEach(b=>b.classList.toggle("on",b.dataset.otheme===o.theme)); }
   else if(e.target.id==="oTitle") o.title=e.target.value.trim();
   else if(e.target.id==="oEditor") o.editor=e.target.value.trim();
