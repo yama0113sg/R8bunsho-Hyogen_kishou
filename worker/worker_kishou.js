@@ -487,6 +487,13 @@ async function makeAnReview(env, id) {
   await putAn(kv, cur);
   return true;
 }
+// じゅもんの目次の1行（預けた本棚から作る）
+function spEntry(rec, oldPen) {
+  const sh = rec.shelf || {}, books = Array.isArray(sh.books) ? sh.books : [];
+  const oshi = oshiSummary(sh.oshi);
+  return { code: rec.code, pen: rec.pen || oldPen || (oshi[0] && oshi[0].editor) || "", books: books.length,
+    titles: books.slice(-4).map(b => clip((b && b.final && b.final.title) || (b && b.title) || "", 30)).filter(Boolean), oshi, savedAt: rec.savedAt, created: rec.created };
+}
 // 預けた本棚の推し短編集の進み具合（先生が、クラス全体の途中経過を一覧で見るため）
 function oshiSummary(list) {
   return (Array.isArray(list) ? list : []).slice(0, 10).map(o => {
@@ -595,7 +602,18 @@ async function bunko(request, env, headers, path, ctx) {
       for (const id of Object.keys(by)) await addSubs(id, by[id]);
     }
     await kv.put("idx:w", JSON.stringify(widx));
-    return J({ ok: true, works: Object.keys(widx.items).length, subs, usedList }, headers);
+    // じゅもんの目次も、預けた本棚から作り直す（目次ができる前に預けたじゅもんも拾う）
+    let spells = 0;
+    if (usedList) {
+      const six = await getIdx(kv, "idx:sp");
+      for (const k of await listAll(kv, "sp:")) {
+        const key = k.name.slice(3); if (six.items[key] && six.items[key].oshi) continue;
+        const rec = await kv.get(k.name, { type: "json" }); if (!rec) continue;
+        six.items[key] = spEntry(rec, six.items[key] && six.items[key].pen); spells++;
+      }
+      if (spells) await kv.put("idx:sp", JSON.stringify(six));
+    }
+    return J({ ok: true, works: Object.keys(widx.items).length, subs, spells, usedList }, headers);
   }
   // ── ふっかつのじゅもん：本棚をまるごと預ける ──
   // じゅもんは「ひらがな4語＋数字2けた」。キーは sp:<空白をのぞいたじゅもん>。list() は使わない。
@@ -610,13 +628,12 @@ async function bunko(request, env, headers, path, ctx) {
       for (let i = 0; i < 8; i++) { const c = makeSpell(); if (!(await kv.get("sp:" + normSpell(c)))) { code = c; break; } }
       if (!code) return J({ error: "spell" }, headers, 500);
     } else code = cur.code;
-    const rec = { code, owner: token, shelf: body.shelf, books: body.shelf.books.length, savedAt: Date.now(), created: cur ? cur.created : Date.now() };
+    const rec = { code, owner: token, pen: clip(body.pen, 20).trim(), shelf: body.shelf, books: body.shelf.books.length, savedAt: Date.now(), created: cur ? cur.created : Date.now() };
     await kv.put("sp:" + normSpell(code), JSON.stringify(rec));
     // じゅもんの目次（先生が、ペンネームや題名からじゅもんを探せるように）。中身が大きく変わったときだけ書きかえる
-    const pen = clip(body.pen, 20).trim(), titles = body.shelf.books.slice(-4).map(b => clip((b && b.final && b.final.title) || (b && b.title) || "", 30)).filter(Boolean);
-    const six = await getIdx(kv, "idx:sp"), old = six.items[normSpell(code)], oshi = oshiSummary(body.shelf.oshi);
-    if (!old || old.pen !== pen || old.books !== rec.books || JSON.stringify(old.titles) !== JSON.stringify(titles) || JSON.stringify(old.oshi || []) !== JSON.stringify(oshi) || rec.savedAt - (old.savedAt || 0) > 86400000) {
-      six.items[normSpell(code)] = { code, pen, books: rec.books, titles, oshi, savedAt: rec.savedAt, created: rec.created };
+    const six = await getIdx(kv, "idx:sp"), old = six.items[normSpell(code)], ent = spEntry(rec);
+    if (!old || old.pen !== ent.pen || old.books !== ent.books || JSON.stringify(old.titles) !== JSON.stringify(ent.titles) || JSON.stringify(old.oshi || []) !== JSON.stringify(ent.oshi) || rec.savedAt - (old.savedAt || 0) > 86400000) {
+      six.items[normSpell(code)] = ent;
       await kv.put("idx:sp", JSON.stringify(six));
     }
     return J({ code, savedAt: rec.savedAt, books: rec.books }, headers);
@@ -864,7 +881,15 @@ async function bunko(request, env, headers, path, ctx) {
   }
   // じゅもんの一覧（iPad の本棚が消えた生徒に、じゅもんを教えるため）
   if (path === "/bunko/admin/spells") {
-    return J({ spells: Object.values((await getIdx(kv, "idx:sp")).items).sort((a, b) => b.savedAt - a.savedAt) }, headers);
+    // 推し短編集の進み具合を写す前に預けられたじゅもんは、預けた本棚を読んで、ここで目次に足す（1回だけ）
+    const six = await getIdx(kv, "idx:sp"); let fixed = 0;
+    for (const [k, x] of Object.entries(six.items)) {
+      if (x.oshi) continue;
+      const rec = await kv.get("sp:" + k, { type: "json" }); if (!rec) continue;
+      six.items[k] = spEntry(rec, x.pen); fixed++;
+    }
+    if (fixed) await kv.put("idx:sp", JSON.stringify(six));
+    return J({ spells: Object.values(six.items).sort((a, b) => b.savedAt - a.savedAt) }, headers);
   }
   // 推し短編集の直しメモ：{id} で作り直す／{id, drop:[番号…]} で、先生が要らないメモを外す
   if (path === "/bunko/admin/coach") {
@@ -912,7 +937,7 @@ export default {
       }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {

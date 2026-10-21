@@ -654,7 +654,7 @@ function applyFind(){ const q=$("tFind").value.trim();
   for(const it of $("tpWorks").querySelectorAll(".item")) it.classList.toggle("hidden",!!q&&!it.querySelector(".h").textContent.includes(q)); }
 $("tFind").addEventListener("input",applyFind);
 $("btnReindex").onclick=async()=>{ const b=$("btnReindex"); b.disabled=true; $("reindexMsg").textContent="作り直しています…";
-  try{ const r=await api("/bunko/admin/reindex",{method:"POST",teacher:true,body:{}}); $("reindexMsg").textContent="作り直しました（作品 "+r.works+" 冊）。"; await loadAdmin(true); }
+  try{ const r=await api("/bunko/admin/reindex",{method:"POST",teacher:true,body:{}}); $("reindexMsg").textContent="作り直しました（作品 "+r.works+" 冊"+(r.spells?"・じゅもん "+r.spells+" こ":"")+"）。"; $("osAll").innerHTML=""; await loadAdmin(true); }
   catch(e){ $("reindexMsg").textContent=e.message; } b.disabled=false; };
 let delArm={};
 // 押したあとは、その行をうすくしてから読みこみ直す（いまいる場所はそのまま）
@@ -722,7 +722,7 @@ async function loadOsAll(){ $("osAll").innerHTML='<p class="note">読みこん�
   try{ const L=(await api("/bunko/admin/spells",{teacher:true})).spells||[];
     const rows=[]; for(const x of L) for(const o of (x.oshi||[])) rows.push([x,o]);
     rows.sort((a,b)=>(a[0].pen||"").localeCompare(b[0].pen||"","ja")||(b[1].updated-a[1].updated));
-    $("osAll").innerHTML=rows.length? rows.map(([x,o])=>osRowHTML(x,o)).join("") : '<p class="note">まだありません。（生徒が推し短編集を作って、アプリが自動で預けると、ここに出てきます）</p>'; }
+    $("osAll").innerHTML=rows.length? rows.map(([x,o])=>osRowHTML(x,o)).join("") : '<p class="note">まだありません。生徒がアプリで推し短編集を開いて少し書くと、自動で預けられてここに出てきます。<br>それでも出ない生徒がいるときは、［⚙ 設定］の［目次を作り直す］を押してから、もう一度［↻ 読みこむ］を押してください。</p>'; }
   catch(e){ $("osAll").innerHTML=""; $("tMsg").textContent=e.message; } }
 $("btnOsAll").onclick=loadOsAll;
 const osBText=b=>b&&b.final? String(b.final.text||"") : b? origFlat(b) : "";
