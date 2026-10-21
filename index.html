@@ -334,6 +334,16 @@ input.ptitle{font-size:20px;margin-bottom:12px}
 .annote{margin:0 4px 14px;padding:12px 14px;border-radius:14px;background:linear-gradient(135deg,rgba(255,211,106,.16),rgba(255,255,255,.04));border:1px solid rgba(255,211,106,.4);font-size:14px;line-height:1.8}
 .annote b{color:#ffd36a}
 .pubbox{margin-top:10px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--edge);font-size:14px;line-height:1.8}
+/* 元の作品を読む */
+.wread{position:fixed;inset:0;z-index:150;background:rgba(6,5,12,.88);display:flex;align-items:center;justify-content:center;padding:16px}
+.wread .wbox{width:min(100%,720px);max-height:100%;display:flex;flex-direction:column;background:#fbfaf7;color:#222;border-radius:14px;overflow:hidden}
+.wread .wh{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #ddd}
+.wread .wh b{font-family:var(--mincho);font-size:17px} .wread .wh span{color:#777;font-size:13px;flex:1}
+.wread .wh button{background:#eee;color:#222;border:none}
+.wread .wt{overflow:auto;padding:16px 20px 24px;font-family:var(--mincho);font-size:16px;line-height:2;white-space:pre-wrap}
+.rvsrc{margin-top:10px}
+.rvsrc summary{cursor:pointer;font-size:14px;color:var(--ai)}
+.rvsrcbody{margin-top:8px;max-height:45vh;overflow:auto;padding:12px 16px;border-radius:12px;background:#fbfaf7;color:#222;font-family:var(--mincho);font-size:15px;line-height:1.9;white-space:pre-wrap}
 /* 書評 */
 .rvitem{margin-top:12px;padding:14px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid var(--edge)}
 .rvitem .rh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
@@ -1079,6 +1089,7 @@ function renderOshi(){
     +'<button data-oup="'+i+'"'+(i===0?" disabled":"")+'>↑</button><button data-odn="'+i+'"'+(i===o.items.length-1?" disabled":"")+'>↓</button><button data-orm="'+i+'">✕</button></div>';
   const pickRow=(x,src)=>{ const k=src+":"+x.id, on=mine.has(k);
     return '<div class="aitem" style="--c:'+genreOf(x.genre).c+'"><span class="dot"></span><span class="tt">『'+esc(x.title)+'』<small>'+esc(x.pen||"")+'・'+genreOf(x.genre).name+'</small></span>'
+      +'<button data-oread="'+src+':'+esc(x.id)+'" style="width:auto;padding:0 10px">読む</button>'
       +(on?'<button disabled>✓</button>':'<button data-oadd="'+src+':'+esc(x.id)+'">＋</button>')+'</div>'; };
   const own=SH.books.map(b=>({id:b.id,title:bTitle(b),pen:"自分",genre:b.genre}));
   body.innerHTML='<p class="label">推しの短編集をつくる</p>'
@@ -1125,6 +1136,7 @@ function rvPreview(text,pen){ const L=String(text||"").split("\n").map(x=>x.trim
 function rvItemHTML(o,it,i){ const r=(o.reviews||{})[rvKey(it)]||{};
   return '<div class="rvitem" data-ri="'+i+'"><div class="rh"><b>'+KAN[i]+'　『'+esc(it.title)+'』</b><span class="gnote" style="margin:0;font-size:12px">'+esc(it.pen||"")+'</span></div>'
     +(i===0?'<div class="ftip"><b>書評の書き方（この順で書くと書きやすいよ）</b><br>① どんな話か（最後までは言わない）<br>② 好きな一文を「　」で引く<br>③ なぜそこが好きか<br>④ どんな人に読んでほしいか<br><i>例：放課後の教室で、黒板の猫が動きだす話です。「またね」という一文が好きです。…</i></div>':'')
+    +'<details class="rvsrc" data-rsi="'+i+'"><summary>📖 元の作品を読みながら書く</summary><div class="rvsrcbody">読みこんでいます…</div></details>'
     +(it.src==="bunko"?'<div class="row"><button class="btn small" data-rvq="'+i+'">🤝 推しどころを引き出す（AI）</button></div>':'')
     +'<ol class="qs" id="rvqs'+i+'"></ol>'
     +'<textarea class="rvtext" data-rvi="'+i+'" rows="7" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="ここに書評を書く（200〜400字くらい）">'+esc(r.text||"")+'</textarea>'
@@ -1132,6 +1144,21 @@ function rvItemHTML(o,it,i){ const r=(o.reviews||{})[rvKey(it)]||{};
     +'<div class="rvprev">'+rvPreview(r.text,o.editor)+'</div></div>'; }
 function oshiCover(o){ return '<div class="ocover c'+(o.cover||0)+'"><div class="ot">'+(esc(o.title)||'<span style="opacity:.45">題名</span>')+'</div>'+(o.theme?'<div class="oth">'+esc(o.theme)+'</div>':'')+'<div class="oe">編・'+(esc(o.editor)||"——")+'</div></div>'; }
 function oshiTouch(o){ o.updated=Date.now(); saveShelf(); }
+// 元の作品の本文（文庫の作品は、一度読んだらこの画面を閉じるまで覚えておく）
+const workTextCache={};
+async function workTextOf(src,id){
+  if(src==="own"){ const b=bookById(id); return b?bText(b).trim():"（本棚にこの作品がありません）"; }
+  if(workTextCache[id]) return workTextCache[id];
+  const w=((await bunkoApi("/texts",{ids:[id]})).works||{})[id];
+  if(!w) return "（この作品は、いまクラス文庫で読めません）";
+  return workTextCache[id]=w.text;
+}
+function showWorkText(title,pen,text){
+  const d=document.createElement("div"); d.className="wread";
+  d.innerHTML='<div class="wbox"><div class="wh"><b>『'+esc(title)+'』</b><span>'+esc(pen||"")+'</span><button class="btn small">とじる ✕</button></div><div class="wt">'+esc(text)+'</div></div>';
+  d.addEventListener("click",e=>{ if(e.target===d||e.target.closest(".wh button")) d.remove(); });
+  document.body.appendChild(d);
+}
 const oshiStepsHTML=st=>["① テーマ","② 選ぶ","③ 並べる","④ 題名と表紙","⑤ 書評","⑥ はじめに・あとがき"].map((t,i)=>'<span class="'+(st[i]?"done":"")+'">'+(st[i]?"✓ ":"")+t+'</span>').join("");
 function oshiRefreshState(o){ const st=oshiStepState(o); if($("oSteps")) $("oSteps").innerHTML=oshiStepsHTML(st); if($("oPub")) $("oPub").outerHTML=oshiPubHTML(o,st); }
 // 本として読むためのデータ（文庫の作品は、いまの本文といちばん新しい帯を文庫から取ってくる）
@@ -1208,6 +1235,11 @@ $("oshiBody").addEventListener("click",async e=>{
   if(d.oact==="unpub"){ await oshiWithdraw(o,x); return; }
   if(d.otheme){ o.theme=d.otheme; oshiTouch(o); renderOshi(); return; }
   if(d.ocover!=null){ o.cover=+d.ocover; oshiTouch(o); [...$("oCovers").children].forEach(b=>b.classList.toggle("on",b===x)); $("oPrev").innerHTML=oshiCover(o); return; }
+  if(d.oread){ const [src,...rest]=d.oread.split(":"), id=rest.join(":");
+    const w= src==="bunko"? (bunkoWorks||[]).find(z=>z.id===id) : (b=>b&&{title:bTitle(b),pen:"自分"})(bookById(id)); if(!w) return;
+    x.disabled=true; x.textContent="…";
+    try{ showWorkText(w.title,w.pen,await workTextOf(src,id)); }catch(err){ $("oMsg").textContent="うまく読みこめませんでした。もう一度押してください。"; }
+    x.disabled=false; x.textContent="読む"; return; }
   if(d.oadd){ const [src,...rest]=d.oadd.split(":"), id=rest.join(":");
     const w= src==="bunko"? (bunkoWorks||[]).find(z=>z.id===id) : (b=>b&&{id:b.id,title:bTitle(b),pen:"自分",genre:b.genre})(bookById(id));
     if(w&&!o.items.some(z=>z.src===src&&z.id===id)){ o.items.push({src,id,title:w.title,pen:w.pen,genre:w.genre}); oshiTouch(o); }
@@ -1219,6 +1251,10 @@ $("oshiBody").addEventListener("click",async e=>{
   if(d.oup!=null&&+d.oup>0){ const i=+d.oup; [o.items[i-1],o.items[i]]=[o.items[i],o.items[i-1]]; oshiTouch(o); renderOshi(); return; }
   if(d.odn!=null&&+d.odn<o.items.length-1){ const i=+d.odn; [o.items[i+1],o.items[i]]=[o.items[i],o.items[i+1]]; oshiTouch(o); renderOshi(); return; }
 });
+$("oshiBody").addEventListener("toggle",async e=>{ const dt=e.target; if(!dt.classList||!dt.classList.contains("rvsrc")||!dt.open||dt.dataset.loaded) return;
+  const o=curOshi&&oshiOf(curOshi), it=o&&o.items[+dt.dataset.rsi]; if(!it) return; const box=dt.querySelector(".rvsrcbody");
+  try{ box.textContent=await workTextOf(it.src,it.id); dt.dataset.loaded="1"; }catch(err){ box.textContent="うまく読みこめませんでした。いったん閉じて、もう一度ひらいてください。"; }
+},true);
 $("oshiBody").addEventListener("input",e=>{ const o=curOshi&&oshiOf(curOshi); if(!o) return;
   if(e.target.classList.contains("rvtext")){ const i=+e.target.dataset.rvi, it=o.items[i], k=rvKey(it); o.reviews=o.reviews||{}; const r=o.reviews[k]||(o.reviews[k]={});
     r.text=e.target.value; oshiTouch(o); const box=e.target.closest(".rvitem"); box.querySelector(".rvn").textContent=nchars(r.text);
