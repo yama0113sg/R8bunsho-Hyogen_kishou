@@ -531,6 +531,7 @@ function aiUse(b){ const br=b.brush||{}, hn=Object.values(b.hints||{}).reduce((a
   const bits=["チェンジ "+ch+"回","ヒント "+hn+"回"];
   if(b.bridges) bits.push("つなぎの文 "+Object.keys(b.bridges).length+"か所");
   if(br.pointsN||br.adviceN||br.rewriteN) bits.push("推敲の相棒：直しどころ "+(br.pointsN||0)+"／相談 "+(br.adviceN||0)+"／書きかえ案 "+(br.rewriteN||0));
+  if(br.fixes&&br.fixes.length) bits.push("編集部メモの直し案 "+br.fixes.length+"か所");
   return bits.join("・"); }
 function renderSpShelf(){
   if(!spData){ $("spShelf").innerHTML=""; return; }

@@ -279,6 +279,20 @@ const REWRITE_BASE = `あなたは高校3年生の創作の授業で、生徒の
 ・新しい人物や出来事を足さない。
 ${POLISH_RULES}
 出力は JSON だけ：{"rewrite":"…"}`;
+// 編集部から返された作品の「直し案」：メモの部分を、その子の語り口のまま、載せられる形に書きかえる案を1つ
+const FIX_BASE = `高校3年生のクラス文庫で、生徒の物語に、編集部から「載せる前に、ここを直してほしい」というメモが付きました。
+生徒は直そうとしていますが、どう直せばいいかわからず困っています。メモの部分の直し案を1つ出してください。
+守ること：
+・before は、本文からそのまま抜き出した部分。メモの引用をふくむ一文から二文。120字以内。本文と一字でもちがってはいけない。
+・after は、before と置きかえる文。before の1.5倍より長くしない。
+・生徒の語り口をそのまま残す（一人称、関西弁、ツッコミや笑いの調子、怖さ）。物語の流れは変えない。
+・メモの理由がなくなるように直す。たとえば、実在の学校・先生・部活を思わせるところは架空のものに変える。家庭の事情や亡くなった人を笑いの材料にしない。いじめや暴力を「よかった」「当然」と読める書き方をやめる。
+・新しい事件や人物は足さない。説明や前置きは付けない。
+・暴力の詳しい描写、性的な内容、自傷、差別、実在の人物・作品・商品名には触れない。
+出力は JSON だけ：{"before":"…","after":"…"}`;
+const parseFix = text => t => { const o = jsonOf(t); if (!o) return null;
+  const before = String(o.before || "").trim(), after = String(o.after || "").replace(/[〔〕]/g, "").replace(/\s*\n\s*/g, "").trim();
+  return before && text.includes(before) && after && after !== before && [...after].length <= Math.max(60, [...before].length * 2) ? { before, after } : null; };
 const jsonOf = t => { try { return JSON.parse(String(t || "").replace(/^\s*```(json)?/i, "").replace(/```\s*$/, "").trim()); } catch { return null; } };
 const len = s => [...String(s || "")].length;
 const parsePoints = text => t => {
@@ -694,7 +708,7 @@ export default {
       catch (e) { return J({ error: String(e.message || e) }, headers, 500); }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
@@ -709,6 +723,12 @@ export default {
     const avoid = (Array.isArray(body.avoid) ? body.avoid : []).slice(-6).map(s => String(s).slice(0, 100));
 
     try {
+      if (body.mode === "fix") {
+        const text = String(body.text || "").slice(0, 10000);
+        const note = `メモの引用：${clip(body.quote, 80)}\nなぜ直すか：${clip(body.why, 120)}\n直す方向：${clip(body.how, 120)}`;
+        const { result, model } = await callGemini(env, FIX_BASE, `本文：\n${text}\n\n${note}\n\nJSON で出してください。`, { models: MODELS, parse: parseFix(text), temperature: 0.6, json: true });
+        return new Response(JSON.stringify({ fix: result, model }), { headers });
+      }
       if (body.mode === "polish_points") {
         const text = String(body.text || "").slice(0, 8000);
         const user = `タイトル：『${clip(body.title, 40)}』\nジャンル：${genre}\n\n本文：\n${text}\n\n直しどころを3つ、JSON で出してください。`;

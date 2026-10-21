@@ -511,6 +511,7 @@ input.ptitle{font-size:20px;margin-bottom:12px}
       <p class="gnote" style="margin:0 0 10px">〔 〕の中は、AIが書いたつなぎの文（またはAIが出した展開）です。自分の言葉に書きかえて、〔 〕をはずしてください。</p>
       <div class="row" style="margin-top:0"><button class="btn small" id="btnOrig">はじめの版を見る ▼</button><button class="btn small hidden" id="btnRestart">はじめの版から整え直す</button></div>
       <div class="full orig hidden" id="pOrig"></div>
+      <div class="rvback hidden" id="fixPanel" style="margin-top:14px"></div>
       <div class="buddy" id="buddy">
         <div class="bh"><span>🤝 推敲の相棒（AI）</span><span class="stam" id="stam"></span></div>
         <p class="gnote" style="margin:6px 0 0">AIが直しどころを見つけて、直し方の見本を見せます。直すのは自分です。</p>
@@ -984,6 +985,7 @@ function bookText(b){
   if(b.bridges) s+="AIが書いたつなぎの文（整える前）：\n"+STAGES.filter(st=>b.bridges[st.key]).map(st=>"◆"+st.name+"の前："+b.bridges[st.key]).join("\n")+"\n";
   s+=bindLine(b);
   const br=b.brush; if(br&&(br.pointsN||br.adviceN||br.rewriteN)) s+="推敲の相棒：直しどころ "+(br.pointsN||0)+"回／相談 "+(br.adviceN||0)+"回／書きかえ案 "+(br.rewriteN||0)+"回\n";
+  if(br&&br.fixes&&br.fixes.length) s+="編集部のメモへのAIの直し案（使ったもの）：\n"+br.fixes.map(x=>"◆"+x).join("\n")+"\n";
   if(br&&br.rewrites&&br.rewrites.length) s+="AIの書きかえ案（使ったもの）：\n"+br.rewrites.map(x=>"◆"+x).join("\n")+"\n";
   return s;
 }
@@ -1074,7 +1076,7 @@ function renderShelfViews(){
     $("pBody").disabled=bridging; $("btnPolishDone").disabled=bridging;
     $("pTitle").value=bTitle(b); $("pBody").value=bridging? "AIが、場面と場面のつなぎ目を書いています…" : b.final? b.final.text : seedText(b);
     $("btnRestart").classList.toggle("hidden",!b.final); $("pOrig").innerHTML=origHTML(b);
-    updatePolishCount(b); renderBuddy(b);
+    updatePolishCount(b); renderBuddy(b); renderFix(b);
   }
   if(view==="antho"){ const a=SH.antho.find(x=>x.id===curAntho); if(!a){view="shelf";return renderShelfViews();}
     setTheme(null); $("scAntho").classList.remove("hidden");
@@ -1116,7 +1118,9 @@ function renderBunko(b){
   $("bunkoReview").innerHTML= !rv? "" : '<div class="rvback"><b>📮 文庫の編集部（AI）より</b>'
     +(rv.good?'<div>いいところ：'+esc(rv.good)+'</div>':'')
     +(rv.notes&&rv.notes.length?'<div style="margin-top:6px">載せる前に、ここだけ直してください。</div><ol>'+rv.notes.map(n=>'<li>'+(n.quote?'<span class="q">「'+esc(n.quote)+'」</span><br>':'')+esc(n.why)+'<br>→ '+esc(n.how)+'</li>').join("")+'</ol>':'')
-    +(b.bunko.returnNote?'<div style="margin-top:6px">先生から：'+esc(b.bunko.returnNote)+'</div>':'')+'</div>';
+    +(b.bunko.returnNote?'<div style="margin-top:6px">先生から：'+esc(b.bunko.returnNote)+'</div>':'')
+    +(rv.notes&&rv.notes.length?'<div class="row"><button class="btn small main" id="btnGoFix">🛠 メモを見ながら直す</button></div>':'')+'</div>';
+  const gf=$("btnGoFix"); if(gf) gf.onclick=()=>go("polish",b.id);
 }
 async function refreshBunko(b){ // 本を開いたとき、文庫での状態を確かめる
   if(!b.bunko||!lsGet("bunko_pass")) return;
@@ -1150,6 +1154,35 @@ $("btnBunkoOff").onclick=async()=>{
   catch(e){ $("bunkoMsg").style.color="var(--ng)"; $("bunkoMsg").textContent=e.message; }
   $("btnBunkoOff").textContent="取り下げる"; renderBunko(b);
 };
+/* ---- 編集部のメモで直す（返却された作品だけ） ---- */
+let fixBusy=false;
+function renderFix(b){
+  const rv=b.bunko&&b.bunko.status==="returned"&&b.bunko.review, notes=(rv&&rv.notes)||[], v=$("pBody").value;
+  $("fixPanel").classList.toggle("hidden",!notes.length); if(!notes.length) return;
+  b.fixes=b.fixes||{};
+  $("fixPanel").innerHTML='<b>📮 編集部のメモ</b><div style="margin-top:4px">下のメモの場所を直してから、［✓ 仕上げた］→ 本の画面で［出し直す］を押してください。どう直せばいいか迷ったら、［直し案を見る］を押すと、AIがあなたの書き方のまま直した案を1つ出します。</div>'
+    +notes.map((n,i)=>{ const done=n.quote&&!v.includes(n.quote), f=b.fixes[i];
+      return '<div class="pcard'+(done?" done":"")+'"><div class="qt">'+(n.quote?'「'+esc(n.quote)+'」':'（場所の指定なし）')+'</div><div class="qq">'+esc(n.why)+'<br>→ '+esc(n.how)+'</div>'
+        +(done? '' : f&&v.includes(f.before)
+          ? '<div class="tip"><span class="gnote" style="font-size:12px">いまの文</span><div class="ex" style="text-decoration:line-through;opacity:.7">'+esc(f.before)+'</div><span class="gnote" style="font-size:12px">直し案</span><div class="ex">'+esc(f.after)+'</div></div>'
+            +'<div class="row"><button class="btn small main" data-fixin="'+i+'">本文に〔 〕付きで入れる</button><button class="btn small" data-fixask="'+i+'">別の案を見る</button></div>'
+          : '<div class="row"><button class="btn small" data-fixask="'+i+'"'+(fixBusy?" disabled":"")+'>直し案を見る（AI）</button>'+(n.quote?'<button class="btn small" data-fixfind="'+i+'">本文で探す</button>':'')+'</div>')
+        +'</div>'; }).join("")
+    +'<div class="msg" id="fixMsg"></div>';
+}
+$("fixPanel").addEventListener("click",async e=>{ const x=e.target.closest("button"); if(!x) return; const b=bookById(curBook); if(!b) return;
+  const notes=b.bunko.review.notes, ta=$("pBody");
+  if(x.dataset.fixfind!=null){ const q=notes[+x.dataset.fixfind].quote, i=ta.value.indexOf(q); if(i>=0){ ta.focus(); ta.setSelectionRange(i,i+q.length); } return; }
+  if(x.dataset.fixask!=null){ const i=+x.dataset.fixask, n=notes[i]; fixBusy=true; renderFix(b); $("fixMsg").style.color="var(--sub)"; $("fixMsg").textContent="考えています…";
+    try{ const j=await buddyApi({mode:"fix",genre:b.genre,text:ta.value,quote:n.quote,why:n.why,how:n.how}); b.fixes[i]=j.fix; saveShelf(); fixBusy=false; renderFix(b); }
+    catch(err){ fixBusy=false; renderFix(b); $("fixMsg").style.color="var(--ng)"; $("fixMsg").textContent=err.message; }
+    return; }
+  if(x.dataset.fixin!=null){ const i=+x.dataset.fixin, f=b.fixes[i], v=ta.value, k=v.indexOf(f.before); if(k<0) return;
+    ta.value=v.slice(0,k)+"〔"+f.after+"〕"+v.slice(k+f.before.length);
+    (b.brush=b.brush||{}); (b.brush.fixes=b.brush.fixes||[]).push(f.after); delete b.fixes[i];
+    saveShelf(); polishSave(); updatePolishCount(b); renderBuddy(b); renderFix(b); ta.focus(); ta.setSelectionRange(k,k+f.after.length+2); }
+});
+
 /* ---- 推敲の相棒 ---- */
 const brushOf=b=>b.brush||(b.brush={stamina:BRUSH.stamina,points:[],pointsN:0,adviceN:0,rewriteN:0,rewrites:[],advice:null,rewrite:null});
 let buddyBusy=false;
@@ -1337,7 +1370,7 @@ function polishSave(){ const b=bookById(curBook); if(!b||bridging) return;
   const text=$("pBody").value, title=$("pTitle").value.trim()||b.title;
   if(!b.final && text===seedText(b) && title===b.title) return;   // まだ何も変えていない
   b.final=Object.assign(b.final||{done:false},{text,title,updated:Date.now()}); saveShelf(); }
-$("pBody").addEventListener("input",()=>{ polishSave(); const b=bookById(curBook); if(b){ updatePolishCount(b); renderBuddy(b); } });
+$("pBody").addEventListener("input",()=>{ polishSave(); const b=bookById(curBook); if(b){ updatePolishCount(b); renderBuddy(b); renderFix(b); } });
 $("pTitle").addEventListener("input",polishSave);
 $("btnOrig").onclick=()=>{ const o=$("pOrig"); o.classList.toggle("hidden"); $("btnOrig").textContent=o.classList.contains("hidden")?"はじめの版を見る ▼":"はじめの版をとじる ▲"; };
 $("btnPolishBack").onclick=()=>{ polishSave(); go("book",curBook); };
