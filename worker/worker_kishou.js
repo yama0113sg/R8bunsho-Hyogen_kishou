@@ -381,10 +381,42 @@ async function listAll(kv, prefix) {
   return out;
 }
 const getIdx = async (kv, key) => (await kv.get(key, { type: "json" })) || { items: {} };
+// ── 目次の自動修復 ──
+// 目次（idx:w など）は「読んで、足して、書く」ので、同じ瞬間に2人が書きこむと、片方の書きこみが目次から抜けることがある。
+// 書いてから少しあとに（裏で）読み直し、本体と目次がずれていたら、本体に合わせて直す。kv.later があるとき（ふつうのリクエスト）だけ動く。
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function healLater(kv, fn) {
+  if (!kv.later) return;
+  kv.later((async () => { await sleep(1500 + Math.random() * 1500); try { await fn(); } catch {} })());
+}
+// 1件ぶん：getMeta() が null なら（本体が消えていたら）目次からも消す
+function healIdx(kv, idxKey, id, getMeta) {
+  healLater(kv, async () => {
+    const meta = await getMeta(), ix = await getIdx(kv, idxKey), cur = ix.items[id];
+    if (meta ? JSON.stringify(cur) === JSON.stringify(meta) : !cur) return;
+    if (meta) ix.items[id] = meta; else delete ix.items[id];
+    await kv.put(idxKey, JSON.stringify(ix));
+  });
+}
+// 作品の下の感想・帯：本体があるのに目次にないものを足し、本体がないのに目次にあるものを消す
+function healSubs(kv, workId, entries) {
+  healLater(kv, async () => {
+    const ix = await getIdx(kv, "ix:" + workId); let ch = false;
+    for (const [k, m] of entries) {
+      const v = await kv.get(k);
+      if (v && !ix.items[k]) { ix.items[k] = m; ch = true; }
+      if (!v && ix.items[k]) { delete ix.items[k]; ch = true; }
+    }
+    if (ch) await kv.put("ix:" + workId, JSON.stringify(ix));
+  });
+}
+const wMetaOf = (kv, id) => async () => { const w = await kv.get("w:" + id, { type: "json" }); return w ? workMeta(w) : null; };
+const anMetaOf = (kv, id) => async () => { const a = await kv.get("an:" + id, { type: "json" }); return a ? anMeta(a) : null; };
 async function listWorks(kv) { return Object.values((await getIdx(kv, "idx:w")).items); }
 async function putW(kv, w) {
   await kv.put("w:" + w.id, JSON.stringify(w), { metadata: workMeta(w) });
   const ix = await getIdx(kv, "idx:w"); ix.items[w.id] = workMeta(w); await kv.put("idx:w", JSON.stringify(ix));
+  healIdx(kv, "idx:w", w.id, wMetaOf(kv, w.id));
 }
 // 作品の下の感想・帯（キーは c:<作品id>:… または o:<作品id>:…）
 async function listSub(kv, workId, prefix) {
@@ -394,12 +426,14 @@ async function listSub(kv, workId, prefix) {
 async function putSubs(kv, workId, entries) {   // entries: [[key, value, metadata], …]  目次の書きこみは1回にまとめる
   for (const [k, v, m] of entries) await kv.put(k, JSON.stringify(v), { metadata: m });
   const ix = await getIdx(kv, "ix:" + workId); for (const [k, , m] of entries) ix.items[k] = m; await kv.put("ix:" + workId, JSON.stringify(ix));
+  healSubs(kv, workId, entries.map(([k, , m]) => [k, m]));
 }
 const putSub = (kv, workId, key, value, meta) => putSubs(kv, workId, [[key, value, meta]]);
 async function delSubs(kv, workId, keys) {
   if (!keys.length) return;
   for (const k of keys) await kv.delete(k);
   const ix = await getIdx(kv, "ix:" + workId); for (const k of keys) delete ix.items[k]; await kv.put("ix:" + workId, JSON.stringify(ix));
+  healSubs(kv, workId, keys.map(k => [k, {}]));
 }
 const workMeta = w => ({ id: w.id, pen: w.pen, title: w.title, genre: w.genre, status: w.status,
   rv: w.review ? (w.review.ok ? "ok" : "ng") : null, obi: w.obi == null ? null : w.obi,
@@ -410,6 +444,7 @@ const workView = (w, teacher, mine) => { const v = withoutOwner(w); if (!teacher
 async function deleteWork(kv, id) {
   await kv.delete("w:" + id);
   const ix = await getIdx(kv, "idx:w"); delete ix.items[id]; await kv.put("idx:w", JSON.stringify(ix));
+  healIdx(kv, "idx:w", id, wMetaOf(kv, id));
   for (const k of Object.keys((await getIdx(kv, "ix:" + id)).items)) await kv.delete(k);
   await kv.delete("ix:" + id);
 }
@@ -466,10 +501,12 @@ const anMeta = a => ({ id: a.id, title: a.title, editor: a.editor, theme: a.them
 async function putAn(kv, a) {
   await kv.put("an:" + a.id, JSON.stringify(a));
   const ix = await getIdx(kv, "idx:an"); ix.items[a.id] = anMeta(a); await kv.put("idx:an", JSON.stringify(ix));
+  healIdx(kv, "idx:an", a.id, anMetaOf(kv, a.id));
 }
 async function deleteAn(kv, id) {
   await kv.delete("an:" + id);
   const ix = await getIdx(kv, "idx:an"); delete ix.items[id]; await kv.put("idx:an", JSON.stringify(ix));
+  healIdx(kv, "idx:an", id, anMetaOf(kv, id));
 }
 // 査読のメモは、先生と、返却された本人にだけ見せる
 const anView = (a, teacher, mine) => { const { owner, ...v } = a; if (!teacher && !(mine && a.status === "returned")) { delete v.review; delete v.returnNote; delete v.coach; } return v; };
@@ -566,7 +603,10 @@ async function expandWorks(kv, ids) {
 
 async function bunko(request, env, headers, path, ctx) {
   const later = p => (ctx && ctx.waitUntil) ? ctx.waitUntil(p) : p;   // 先生の操作は待たせずに、裏でAIの感想を作る
-  const kv = env.BUNKO;
+  const B = env.BUNKO;
+  // KV に「あとで裏でやる」口をつけて渡す（目次の自動修復が使う）
+  const kv = B && { get: (...a) => B.get(...a), put: (...a) => B.put(...a), delete: (...a) => B.delete(...a), list: (...a) => B.list(...a),
+    later: ctx && ctx.waitUntil ? p => ctx.waitUntil(p) : null };
   if (!kv || !env.CLASS_PASS || !env.TEACHER_PASS) {
     return J({ error: "setup", message: "（先生へ）Worker に BUNKO・CLASS_PASS・TEACHER_PASS の設定が必要です" }, headers, 500);
   }
@@ -635,6 +675,10 @@ async function bunko(request, env, headers, path, ctx) {
     if (!old || old.pen !== ent.pen || old.books !== ent.books || JSON.stringify(old.titles) !== JSON.stringify(ent.titles) || JSON.stringify(old.oshi || []) !== JSON.stringify(ent.oshi) || rec.savedAt - (old.savedAt || 0) > 86400000) {
       six.items[normSpell(code)] = ent;
       await kv.put("idx:sp", JSON.stringify(six));
+      // 同じ瞬間にほかの生徒も預けていたら、目次から抜けることがある。あとで、抜けていたら足しもどす（中身のちがいは直さない）
+      const key = normSpell(code);
+      healLater(kv, async () => { const ix = await getIdx(kv, "idx:sp"); if (ix.items[key]) return;
+        const r = await kv.get("sp:" + key, { type: "json" }); if (!r) return; ix.items[key] = spEntry(r); await kv.put("idx:sp", JSON.stringify(ix)); });
     }
     return J({ code, savedAt: rec.savedAt, books: rec.books }, headers);
   }
@@ -946,7 +990,7 @@ export default {
       }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true, heal: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
