@@ -1165,7 +1165,7 @@ function rvItemHTML(o,it,i){ const r=(o.reviews||{})[rvKey(it)]||{};
   return '<div class="rvitem" data-ri="'+i+'"><div class="rh"><b>'+KAN[i]+'　『'+esc(it.title)+'』</b><span class="gnote" style="margin:0;font-size:12px">'+esc(it.pen||"")+'</span></div>'
     +(i===0?'<div class="ftip"><b>書評の書き方（この順で書くと書きやすいよ）</b><br>① どんな話か（最後までは言わない）<br>② 好きな一文を「　」で引く<br>③ なぜそこが好きか<br>④ どんな人に読んでほしいか<br><i>例：放課後の教室で、黒板の猫が動きだす話です。「またね」という一文が好きです。…</i></div>':'')
     +'<details class="rvsrc" data-rsi="'+i+'"><summary>📖 元の作品を読みながら書く</summary><div class="rvsrcbody">読みこんでいます…</div></details>'
-    +(it.src==="bunko"?'<div class="row"><button class="btn small" data-rvq="'+i+'">🤝 推しどころを引き出す（AI）</button></div>':'')
+    +'<div class="row"><button class="btn small" data-rvq="'+i+'">🤝 推しどころを引き出す（AI）</button></div>'
     +'<ol class="qs" id="rvqs'+i+'"></ol>'
     +coachFor(o,rvKey(it))+'<textarea class="rvtext" data-rvi="'+i+'" rows="7" style="margin-top:10px;font-family:var(--mincho);line-height:1.8;font-size:15px" placeholder="ここに書評を書く（200〜400字くらい）">'+esc(r.text||"")+'</textarea>'
     +'<div class="count"><span><span class="rvn">'+nchars(r.text||"")+'</span> 字</span></div>'
@@ -1336,7 +1336,10 @@ $("oshiBody").addEventListener("click",async e=>{
     renderOshi(); return; }
   if(d.orm!=null){ o.items.splice(+d.orm,1); oshiTouch(o); renderOshi(); return; }
   if(d.rvq!=null){ const i=+d.rvq, it=o.items[i]; x.disabled=true; x.textContent="読んでいます…";
-    try{ const j=await bunkoApi("/obi/questions",{workId:it.id}); $("rvqs"+i).innerHTML=(j.qs||[]).map(q=>'<li>'+esc(q)+'</li>').join(""); x.textContent="🤝 推しどころを引き出す（AI）"; }
+    const ob=it.src==="own"&&bookById(it.id);
+    if(it.src==="own"&&!ob){ x.textContent="本棚にこの作品がありません"; x.disabled=false; return; }
+    if(!lsGet("bunko_pass")){ x.textContent="合言葉を入れると使えます（②の欄）"; x.disabled=false; return; }
+    try{ const j=await bunkoApi("/obi/questions", it.src==="own"? {title:bTitle(ob),text:bText(ob).trim()} : {workId:it.id}); $("rvqs"+i).innerHTML=(j.qs||[]).map(q=>'<li>'+esc(q)+'</li>').join(""); x.textContent="🤝 推しどころを引き出す（AI）"; }
     catch(err){ x.textContent="うまくいきませんでした。もう一度"; } x.disabled=false; return; }
   if(d.oup!=null&&+d.oup>0){ const i=+d.oup; [o.items[i-1],o.items[i]]=[o.items[i],o.items[i-1]]; oshiTouch(o); renderOshi(); return; }
   if(d.odn!=null&&+d.odn<o.items.length-1){ const i=+d.odn; [o.items[i+1],o.items[i]]=[o.items[i],o.items[i+1]]; oshiTouch(o); renderOshi(); return; }

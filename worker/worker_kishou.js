@@ -783,10 +783,19 @@ async function bunko(request, env, headers, path, ctx) {
     return J({ ok: true }, headers);
   }
   // 帯の相棒：推しどころを引き出す問い
+  // 自分の作品（文庫に出していないもの）は、本文をいっしょに送ってもらう（保存はしない）
   if (path === "/bunko/obi/questions") {
-    const w = await kv.get("w:" + clip(body.workId, 30), { type: "json" });
-    if (!w || w.status !== "public") return J({ error: "notfound" }, headers, 404);
-    const { result } = await callGemini(env, OBIQ_BASE, `タイトル：『${w.title}』\n\n本文：\n${clip(w.text, 6000)}\n\nJSON で出してください。`, { models: HINT_MODELS, parse: parseQs, temperature: 0.8, json: true });
+    let title, text, self = false;
+    if (body.workId) {
+      const w = await kv.get("w:" + clip(body.workId, 30), { type: "json" });
+      if (!w || w.status !== "public") return J({ error: "notfound" }, headers, 404);
+      title = w.title; text = w.text;
+    } else {
+      title = clip(body.title, 40).trim(); text = clip(body.text, 6000).trim(); self = true;
+      if (!text) return J({ error: "empty" }, headers, 400);
+    }
+    const sys = self ? OBIQ_BASE + `\nこの作品は、推薦する生徒が自分で書いた作品です。書いた本人が、自分の作品の推しどころに気づけるような問いにする（「書いたときに一番こだわったのは？」のような、書き手にしか答えられない問いを1つ入れてよい）。` : OBIQ_BASE;
+    const { result } = await callGemini(env, sys, `タイトル：『${title}』\n\n本文：\n${clip(text, 6000)}\n\nJSON で出してください。`, { models: HINT_MODELS, parse: parseQs, temperature: 0.8, json: true });
     return J({ qs: result }, headers);
   }
   if (path === "/bunko/comment") {
@@ -937,7 +946,7 @@ export default {
       }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
