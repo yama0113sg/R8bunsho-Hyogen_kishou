@@ -531,6 +531,46 @@ function spEntry(rec, oldPen) {
   return { code: rec.code, pen: rec.pen || oldPen || (oshi[0] && oshi[0].editor) || "", books: books.length,
     titles: books.slice(-4).map(b => clip((b && b.final && b.final.title) || (b && b.title) || "", 30)).filter(Boolean), oshi, savedAt: rec.savedAt, created: rec.created };
 }
+// ── 提案箱（アプリをよくする提案）──
+// 生徒の書いたことばは、そのまま先生には見せない。AIが、中身は具体的なまま、おだやかなことばに整えてから届ける。
+// 心配な内容（自分やだれかを傷つけるおそれ・いじめなど）があるときは、強いことばを使わずに先生に知らせる。
+const TEIAN_SOFT = `あなたは、高校の授業で使っている Web アプリ（物語を書く「起承転結」と、作品を読み合う「クラス文庫」）について、生徒が書いた「改善の提案」や不満を、先生に届ける前に整える係です。
+先生は、生徒の本音を知りたいけれど、強いことばで傷つきたくないと思っています。
+整え方：
+・生徒が言いたい中身（何がいやか・何が不便か・どうしてほしいか）は、具体的なまま残す。生徒が書いていないことを足さない。
+・悪口、乱暴なことば、皮肉、先生やだれかへの攻撃、汚いことばは取りのぞき、落ち着いた、ていねいなことば（です・ます調）に言いかえる。
+・「全部いや」「やりたくない」「だるい」のように気持ちだけのときは、「〜を負担に感じているようです」のように、気持ちとして中立に書く。そこから読み取れる改善の手がかりがあれば添える。
+・soft：先生に届ける文。生徒の立場から書く（「〜が不便です。〜だとうれしいです。」）。200字以内。
+・points：先生がアプリを直すときの要望の箇条書き。0〜3こ。1つ40字以内。読み取れなければ空。
+・harsh：もとの文に、強いことば・乱暴なことばがあったら true。
+・concern：自分を傷つける、だれかを傷つける、いじめ、学校に来られないほどつらい、など、先生がすぐ気にかけたほうがよい内容があれば true。concernNote に、その内容を強いことばを使わずに40字以内で。なければ false と空。
+・empty：ふざけただけ・意味のない文字だけで、届ける中身がないときは true（soft には「中身のある提案はありませんでした。」と書く）。
+出力は JSON だけ：{"soft":"…","points":["…"],"harsh":false,"concern":false,"concernNote":"","empty":false}`;
+const parseSoft = t => {
+  const o = jsonOf(t); if (!o || typeof o.soft !== "string" || !o.soft.trim()) return null;
+  return { soft: o.soft.trim().slice(0, 300), points: (Array.isArray(o.points) ? o.points : []).map(x => String(x).trim()).filter(x => x && len(x) <= 60).slice(0, 3),
+    harsh: !!o.harsh, concern: !!o.concern, concernNote: String(o.concernNote || "").trim().slice(0, 60), empty: !!o.empty };
+};
+const TEIAN_AREAS = ["書く", "本棚・整える", "推し短編集", "クラス文庫", "ふりかえり", "授業のこと", "その他"];
+const tnMeta = t => ({ id: t.id, owner: t.owner, pen: t.pen, area: t.area, status: t.status, soft: t.soft || "", points: t.points || [],
+  harsh: !!t.harsh, concern: !!t.concern, concernNote: t.concernNote || "", empty: !!t.empty, reply: t.reply || "", created: t.created, updated: t.updated });
+async function putTn(kv, t) {
+  await kv.put("tn:" + t.id, JSON.stringify(t));
+  const ix = await getIdx(kv, "idx:tn"); ix.items[t.id] = tnMeta(t); await kv.put("idx:tn", JSON.stringify(ix));
+  healIdx(kv, "idx:tn", t.id, async () => { const x = await kv.get("tn:" + t.id, { type: "json" }); return x ? tnMeta(x) : null; });
+}
+async function softenTeian(env, kv, id) {
+  const t = await kv.get("tn:" + id, { type: "json" }); if (!t) return false;
+  let result;
+  try { ({ result } = await callGemini(env, TEIAN_SOFT, `機能：${t.area}\n\nいやなところ・こまったところ：\n${t.raw.bad || "（なし）"}\n\nこうなったらいいのに：\n${t.raw.want || "（なし）"}\n\nJSON で出してください。`, { parse: parseSoft, temperature: 0.3, json: true, maxTokens: 2048 })); }
+  catch { return false; }
+  const cur = await kv.get("tn:" + id, { type: "json" }); if (!cur) return false;
+  Object.assign(cur, result, { softAt: Date.now(), updated: Date.now() });
+  await putTn(kv, cur);
+  return true;
+}
+const tnStudentView = m => ({ id: m.id, area: m.area, status: m.status, soft: m.soft, points: m.points, empty: m.empty, reply: m.reply, created: m.created });
+
 // 預けた本棚の推し短編集の進み具合（先生が、クラス全体の途中経過を一覧で見るため）
 function oshiSummary(list) {
   return (Array.isArray(list) ? list : []).slice(0, 10).map(o => {
@@ -745,6 +785,27 @@ async function bunko(request, env, headers, path, ctx) {
     await deleteAn(kv, a.id);
     return J({ ok: true }, headers);
   }
+  // 提案箱：出す（AIが整えてから先生に届く。整えた文を本人にも見せる）
+  if (path === "/bunko/teian") {
+    const token = clip(body.token, 64), bad = clip(body.bad, 800).trim(), want = clip(body.want, 800).trim();
+    if (token.length < 16) return J({ error: "token" }, headers, 400);
+    if (!bad && !want) return J({ error: "empty", message: "どちらかの欄に書いてください。" }, headers, 400);
+    const today = Object.values((await getIdx(kv, "idx:tn")).items).filter(m => m.owner === token && Date.now() - m.created < 86400000).length;
+    if (today >= 10) return J({ error: "many", message: "今日はたくさん出してくれました。続きは、また明日お願いします。" }, headers, 429);
+    const now = Date.now();
+    const t = { id: rid(), owner: token, pen: clip(body.pen, 20).trim(), area: TEIAN_AREAS.includes(body.area) ? body.area : "その他", raw: { bad, want },
+      status: "new", soft: "", points: [], created: now, updated: now };
+    await putTn(kv, t);
+    await softenTeian(env, kv, t.id);   // 本人に「先生にはこう届きます」を見せるため、ここは待つ
+    const m = (await getIdx(kv, "idx:tn")).items[t.id] || tnMeta(t);
+    return J({ teian: tnStudentView(m) }, headers);
+  }
+  // 提案箱：自分が出した提案と、先生からの返事
+  if (path === "/bunko/teian/mine") {
+    const token = clip(body.token, 64);
+    const L = Object.values((await getIdx(kv, "idx:tn")).items).filter(m => token.length >= 16 && m.owner === token).sort((a, b) => b.created - a.created);
+    return J({ teians: L.map(tnStudentView) }, headers);
+  }
   // 公開中の作品の一覧
   if (path === "/bunko/works") {
     const all = await listWorks(kv);
@@ -956,6 +1017,27 @@ async function bunko(request, env, headers, path, ctx) {
     const a = await kv.get("an:" + id, { type: "json" });
     return J({ ok, coach: a && a.coach }, headers);
   }
+  // 提案箱（先生用）：一覧（整えた文だけ。元のことばは /raw で、先生が選んだときだけ）
+  if (path === "/bunko/admin/teian") {
+    const L = Object.values((await getIdx(kv, "idx:tn")).items).sort((a, b) => b.created - a.created).map(({ owner, ...m }) => m);
+    return J({ teians: L }, headers);
+  }
+  if (path === "/bunko/admin/teian/set") {
+    const t = await kv.get("tn:" + clip(body.id, 30), { type: "json" }); if (!t) return J({ error: "notfound" }, headers, 404);
+    if (body.delete) { await kv.delete("tn:" + t.id); const ix = await getIdx(kv, "idx:tn"); delete ix.items[t.id]; await kv.put("idx:tn", JSON.stringify(ix)); return J({ ok: true }, headers); }
+    if (["new", "read", "doing", "done", "no"].includes(body.status)) t.status = body.status;
+    if (typeof body.reply === "string") t.reply = clip(body.reply, 300).trim();
+    t.updated = Date.now(); await putTn(kv, t);
+    return J({ ok: true }, headers);
+  }
+  if (path === "/bunko/admin/teian/redo") {
+    const ok = await softenTeian(env, kv, clip(body.id, 30));
+    return J({ ok, teian: ok ? (({ owner, ...m }) => m)((await getIdx(kv, "idx:tn")).items[clip(body.id, 30)]) : null }, headers);
+  }
+  if (path === "/bunko/admin/teian/raw") {
+    const t = await kv.get("tn:" + clip(body.id, 30), { type: "json" }); if (!t) return J({ error: "notfound" }, headers, 404);
+    return J({ raw: t.raw }, headers);
+  }
   // AIの読み手の顔ぶれ：GET で読む／POST {readers} で保存／POST {reset:true} ではじめの3人にもどす
   if (path === "/bunko/admin/readers") {
     if (request.method === "POST") {
@@ -990,7 +1072,7 @@ export default {
       }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true, heal: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true, heal: true, teian: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {

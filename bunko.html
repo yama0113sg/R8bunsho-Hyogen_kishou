@@ -192,6 +192,13 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .osrow .osh{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;font-size:14px} .osrow .osh b{font-family:var(--mincho);font-size:15px}
 .osbar{height:6px;border-radius:99px;background:rgba(255,255,255,.1);margin:6px 0;overflow:hidden}
 .osbar i{display:block;height:100%;background:linear-gradient(90deg,var(--ok),#9fe3ff)}
+.tnitem.tnnew{border-color:rgba(159,227,255,.5)}
+.tnsoft{margin-top:8px;padding:12px 14px;border-radius:12px;background:#fbfaf7;color:#222;font-size:15px;line-height:1.85}
+.tnpts{margin:6px 0 0;padding-left:1.3em;font-size:13.5px;line-height:1.8}
+.tnconcern{margin-top:8px;padding:8px 12px;border-radius:10px;background:rgba(255,143,163,.12);border:1px solid rgba(255,143,163,.45);color:#ffb3c1;font-size:13.5px}
+.tnst button{font-size:12px;padding:5px 11px}
+.tnreply{margin-top:8px;font-size:14px}
+.tnraw{margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(0,0,0,.3);border:1px dashed var(--edge);font-size:13.5px;line-height:1.8;white-space:pre-wrap}
 .coachbox{margin-top:10px;padding:12px 14px;border-radius:12px;background:rgba(159,227,255,.07);border:1px solid rgba(159,227,255,.3);font-size:14px;line-height:1.8}
 .coachbox ol{margin:8px 0 0;padding-left:1.3em} .coachbox li{margin-bottom:10px}
 .coachbox .cpart{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;background:rgba(159,227,255,.18);color:var(--ai);margin-right:6px}
@@ -244,7 +251,7 @@ h3 small{font-weight:500;letter-spacing:0;margin-left:4px}
       <div class="empty hidden" id="anEmpty">まだ推し短編集はありません。<br>「起承転結」の［📕 推し短編集］で編んで文庫に出すと、先生が確認したあとここに並びます。</div>
       <p class="note" style="margin-top:10px">表紙をタップすると、本としてページをめくって読めます。推し短編集は、「起承転結」の［📕 推し短編集］でつくれます。</p>
     </div>
-    <div class="row" style="justify-content:space-between"><a class="btn" href="./">← 起承転結へ</a><button class="btn" id="btnReload">↻ 新しく並んだ本を見る</button></div>
+    <div class="row" style="justify-content:space-between"><a class="btn" href="./">← 起承転結へ</a><a class="btn" href="teian.html">📮 提案箱</a><button class="btn" id="btnReload">↻ 新しく並んだ本を見る</button></div>
     <div class="msg" id="shelfMsg"></div>
   </section>
 
@@ -320,7 +327,7 @@ h3 small{font-weight:500;letter-spacing:0;margin-left:4px}
       </div>
       <div id="senseiBody" class="hidden">
         <div class="row" style="margin-top:0;justify-content:space-between"><button class="btn small" id="btnTReload">↻ 読みこみ直す</button><button class="btn small" id="btnTClose2">棚へもどる</button></div>
-        <div class="ttabs" id="tTabs"><button data-t="inbox">📥 確認待ち<b class="badge hidden" id="tBadge"></b></button><button data-t="works">📚 作品</button><button data-t="shelf">🧑‍🎓 提出・本棚</button><button data-t="set">⚙ 設定</button></div>
+        <div class="ttabs" id="tTabs"><button data-t="inbox">📥 確認待ち<b class="badge hidden" id="tBadge"></b></button><button data-t="works">📚 作品</button><button data-t="shelf">🧑‍🎓 提出・本棚</button><button data-t="teian">💡 提案<b class="badge hidden" id="tnBadge"></b></button><button data-t="set">⚙ 設定</button></div>
 
         <!-- ① 確認待ち：先生が何か押す必要があるものだけ -->
         <div class="tpane" id="tpInbox">
@@ -351,6 +358,13 @@ h3 small{font-weight:500;letter-spacing:0;margin-left:4px}
             <input id="spFind" placeholder="ペンネームや題名で絞りこむ" style="margin-top:8px">
             <div id="spList" style="margin-top:8px"></div></details>
           <div id="spShelf"></div>
+        </div>
+
+        <!-- 提案箱：生徒からの改善の提案（AIがおだやかなことばに整えたもの） -->
+        <div class="tpane hidden" id="tpTeian">
+          <p class="note" style="margin-top:6px">生徒が［提案箱］（<a href="teian.html" target="_blank" style="color:var(--sub)">teian.html</a>）に出した、アプリへの提案です。<b>AIがおだやかなことばに整えたもの</b>を出しています。元のことばは、ふだんは隠しています。</p>
+          <div class="row" style="margin-top:8px"><button class="btn small" id="btnTnReload">↻ 読みこみ直す</button></div>
+          <div id="tnList" style="margin-top:10px"></div>
         </div>
 
         <!-- ④ 設定：たまにしか使わないもの -->
@@ -639,12 +653,51 @@ async function loadAdmin(keep){
   for(const k in cnt) $("ts"+k).classList.toggle("hidden",!cnt[k]);
   $("tInboxDone").classList.toggle("hidden",!!total);
   $("tBadge").textContent=total; $("tBadge").classList.toggle("hidden",!total);
-  applyFind(); showTTab();
+  applyFind(); showTTab(); loadTeian();
   if(keep){ for(const it of document.querySelectorAll("#tpWorks .item")) if(opened.includes(it.dataset.id||it.dataset.anid)) it.classList.add("open"); window.scrollTo(0,y); }
 }
+// ── 提案箱（先生用） ──
+const TN_ST={new:"まだ読んでいない",read:"読んだ",doing:"直すことにした",done:"直した",no:"今回は見送り"};
+let teians=[], tnArm={};
+async function loadTeian(){
+  try{ teians=(await api("/bunko/admin/teian",{method:"POST",teacher:true,body:{}})).teians||[]; }catch(e){ return; }
+  const nw=teians.filter(t=>t.status==="new").length; $("tnBadge").textContent=nw; $("tnBadge").classList.toggle("hidden",!nw);
+  const order={new:0,read:1,doing:2,done:3,no:4}, L=teians.slice().sort((a,b)=>(order[a.status]-order[b.status])||(b.created-a.created));
+  $("tnList").innerHTML=L.length? L.map(t=>'<div class="item tnitem'+(t.status==="new"?" tnnew":"")+'" data-tn="'+esc(t.id)+'">'
+      +'<div class="h"><b style="font-size:15px">'+esc(t.area)+'</b><span>'+esc(t.pen||"（ペンネームなし）")+'・'+hm(t.created)+'</span></div>'
+      +(t.concern?'<div class="tnconcern">⚠ 気にかけたほうがよさそうな内容があります：'+esc(t.concernNote||"")+'</div>':'')
+      +'<div class="tnsoft">'+(t.soft?esc(t.soft):'<span class="note">AIがまだ整えられていません（元のことばは隠しています）。［AIで整えなおす］を押してください。</span>')+'</div>'
+      +(t.points&&t.points.length?'<ul class="tnpts">'+t.points.map(p=>'<li>'+esc(p)+'</li>').join("")+'</ul>':'')
+      +'<p class="note" style="font-size:12px;margin-top:4px">'+(t.harsh?'元のことばには、強い言いかたがふくまれていました（AIが整えています）。':'')+(t.empty?'中身のある提案ではなかったようです。':'')+'</p>'
+      +'<div class="seg tnst" style="margin-top:8px">'+Object.keys(TN_ST).map(k=>'<button data-tnst="'+k+'"'+(t.status===k?' class="on"':'')+'>'+TN_ST[k]+'</button>').join("")+'</div>'
+      +'<textarea class="tnreply" rows="2" maxlength="300" placeholder="生徒への返事（提案箱のページに出ます。なくてもよい）">'+esc(t.reply||"")+'</textarea>'
+      +'<div class="row" style="margin-top:6px"><button class="btn small main" data-tnact="reply">返事を送る</button>'
+      +'<button class="btn small" data-tnact="redo">AIで整えなおす</button><button class="btn small" data-tnact="raw">元のことばを見る</button><button class="btn small danger" data-tnact="del">削除</button></div>'
+      +'<div class="tnraw hidden"></div></div>').join("")
+    : '<p class="note">まだ提案はありません。</p>';
+}
+$("btnTnReload").onclick=loadTeian;
+$("tnList").addEventListener("click",async e=>{
+  const b=e.target.closest("button"); if(!b) return; const it=b.closest("[data-tn]"), id=it.dataset.tn;
+  try{
+    if(b.dataset.tnst){ b.disabled=true; await api("/bunko/admin/teian/set",{method:"POST",teacher:true,body:{id,status:b.dataset.tnst}}); await loadTeian(); return; }
+    const act=b.dataset.tnact; if(!act) return;
+    if(act==="reply"){ b.disabled=true; const t=teians.find(x=>x.id===id);
+      await api("/bunko/admin/teian/set",{method:"POST",teacher:true,body:{id,reply:it.querySelector(".tnreply").value,status:t&&t.status==="new"?"read":undefined}}); b.textContent="✓ 送りました"; setTimeout(loadTeian,800); return; }
+    if(act==="redo"){ b.disabled=true; b.textContent="整えています…"; const r=await api("/bunko/admin/teian/redo",{method:"POST",teacher:true,body:{id}}); if(!r.ok) $("tMsg").textContent="AIがうまく整えられませんでした。少し待ってもう一度押してください。"; await loadTeian(); return; }
+    if(act==="raw"){ const box=it.querySelector(".tnraw");
+      if(!box.classList.contains("hidden")){ box.classList.add("hidden"); box.innerHTML=""; b.textContent="元のことばを見る"; return; }
+      if(!(Date.now()-(tnArm["raw"+id]||0)<4000)){ tnArm["raw"+id]=Date.now(); b.textContent="強いことばがあるかもしれません。それでも見るなら、もう一度"; setTimeout(()=>{ if(b.isConnected&&box.classList.contains("hidden")) b.textContent="元のことばを見る"; },4000); return; }
+      const r=await api("/bunko/admin/teian/raw",{method:"POST",teacher:true,body:{id}});
+      box.innerHTML='<div class="note" style="font-size:12px">元のことば</div><div>いやなところ：'+esc(r.raw.bad||"（なし）")+'</div><div>こうなったら：'+esc(r.raw.want||"（なし）")+'</div>';
+      box.classList.remove("hidden"); b.textContent="元のことばをかくす"; return; }
+    if(act==="del"){ if(!(Date.now()-(tnArm["del"+id]||0)<3000)){ tnArm["del"+id]=Date.now(); b.textContent="もう一度押すと消えます"; setTimeout(()=>{ if(b.isConnected) b.textContent="削除"; },3000); return; }
+      b.disabled=true; await api("/bunko/admin/teian/set",{method:"POST",teacher:true,body:{id,delete:true}}); await loadTeian(); return; }
+  }catch(err){ $("tMsg").textContent=err.message; b.disabled=false; }
+});
 // タブ（どれを開いていたかは、ページを閉じるまで覚えておく）
 let tTab=ss.get("bunko_ttab")||"inbox";
-function showTTab(){ const P={inbox:"tpInbox",works:"tpWorks",shelf:"tpShelf",set:"tpSet"};
+function showTTab(){ const P={inbox:"tpInbox",works:"tpWorks",shelf:"tpShelf",teian:"tpTeian",set:"tpSet"};
   for(const k in P) $(P[k]).classList.toggle("hidden",k!==tTab);
   [...$("tTabs").children].forEach(b=>b.classList.toggle("on",b.dataset.t===tTab)); }
 $("tTabs").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; tTab=b.dataset.t; ss.set("bunko_ttab",tTab); showTTab(); if(tTab==="shelf"&&!$("osAll").innerHTML) loadOsAll(); });

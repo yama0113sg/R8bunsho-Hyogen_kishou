@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>提案箱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#07060d; --bg1:#12101f; --glass:rgba(255,255,255,.055); --glass2:rgba(255,255,255,.09);
+  --edge:rgba(255,255,255,.12); --ink:#f4f1ff; --sub:#a39fbf; --ai:#9fe3ff; --ok:#5dffb0; --ng:#ff3d5e;
+  --g:#9fe3ff; --g2:#3b6fd9; --gold:#ffd36a;
+  --mincho:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --gothic:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;color:var(--ink);font-family:var(--gothic);-webkit-text-size-adjust:100%}
+body{min-height:100vh;padding:20px 16px 70px;background:var(--bg0);overflow-x:hidden}
+body::before{content:"";position:fixed;inset:-20%;z-index:-2;
+  background:radial-gradient(60% 50% at 20% 10%,color-mix(in srgb,var(--g) 20%,transparent),transparent 70%),
+             radial-gradient(50% 45% at 90% 80%,color-mix(in srgb,var(--g2) 24%,transparent),transparent 70%),
+             linear-gradient(180deg,var(--bg1),var(--bg0))}
+.wrap{max-width:760px;margin:0 auto}
+button{font:inherit;cursor:pointer;border:none;color:var(--ink);background:none}
+.hidden{display:none!important}
+.logo{text-align:center;margin:6px 0 18px}
+.logo h1{font-family:var(--mincho);font-weight:800;font-size:clamp(28px,5.6vw,40px);margin:0;letter-spacing:.24em}
+.logo p{margin:6px 0 0;color:var(--sub);font-size:13px;letter-spacing:.12em}
+.panel{background:var(--glass);border:1px solid var(--edge);border-radius:22px;padding:20px;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 20px 60px rgba(0,0,0,.35);margin-bottom:14px}
+.label{font-size:12px;letter-spacing:.2em;color:var(--sub);margin:0 0 10px}
+.btn{padding:12px 20px;border-radius:14px;font-weight:700;background:var(--glass2);border:1px solid var(--edge);transition:transform .12s}
+.btn:active{transform:scale(.96)}
+.btn:disabled{opacity:.3;cursor:default;transform:none}
+.btn.main{background:linear-gradient(135deg,#fff,var(--g));color:#15121f;border:none}
+.btn.small{padding:7px 13px;font-size:13px;border-radius:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.msg{min-height:1.4em;font-size:14px;color:var(--ng);margin-top:8px;white-space:pre-wrap}
+.note{font-size:13px;color:var(--sub);line-height:1.8;margin:0}
+input,textarea{width:100%;font:inherit;border-radius:14px;border:1px solid var(--edge);background:rgba(5,4,10,.55);color:#fff;padding:12px 14px}
+textarea{line-height:1.8;font-size:16px}
+input:focus,textarea:focus{outline:none;border-color:var(--g)}
+a{color:var(--sub)}
+.lead{font-size:15px;line-height:1.9;margin:0}
+.lead b{color:var(--gold)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{padding:7px 13px;border-radius:99px;border:1px solid var(--edge);font-size:13px;color:var(--sub)}
+.chips button.on{background:#fff;color:#15121f;border-color:transparent;font-weight:700}
+.ex{margin-top:8px;font-size:12.5px;color:var(--sub);line-height:1.8}
+.count{text-align:right;font-size:12px;color:var(--sub);margin-top:4px}
+.how{margin-top:14px;padding:12px 14px;border-radius:14px;background:rgba(159,227,255,.07);border:1px solid rgba(159,227,255,.25);font-size:13px;line-height:1.9;color:#d6d2ea}
+.sent{margin-top:14px;padding:14px 16px;border-radius:14px;background:#fbfaf7;color:#222;font-size:15px;line-height:1.9}
+.sent .h{font-size:12px;letter-spacing:.15em;color:#777;margin-bottom:4px}
+.sent ul{margin:6px 0 0;padding-left:1.3em;font-size:14px}
+.mine{padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid var(--edge);margin-bottom:8px;font-size:14px;line-height:1.8}
+.mine .mh{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--sub)}
+.st{font-size:11px;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.1);color:var(--sub)}
+.st.read{color:#cfe3ff} .st.doing{background:rgba(255,211,106,.18);color:var(--gold)} .st.done{background:rgba(93,255,176,.18);color:var(--ok)}
+.reply{margin-top:6px;padding:8px 12px;border-radius:10px;background:rgba(93,255,176,.08);border:1px solid rgba(93,255,176,.3)}
+.foot{margin-top:24px;text-align:center;font-size:12px;color:var(--sub)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo"><h1>提案箱</h1><p>このアプリを、もっとよくするために</p></div>
+
+  <div class="panel" id="scGate">
+    <p class="label">合言葉</p>
+    <input id="passIn" type="password" autocomplete="off" placeholder="クラス文庫と同じ合言葉" style="font-size:18px;text-align:center">
+    <div class="row"><button class="btn main" id="btnEnter">入る</button></div>
+    <div class="msg" id="gateMsg"></div>
+  </div>
+
+  <div id="scMain" class="hidden">
+    <div class="panel">
+      <p class="lead">書く気が出ない日も、あると思います。<br>そんな日は、物語のかわりに<b>このアプリへの文句や提案</b>を書いてください。<br>「ここがめんどう」「これがいや」で大丈夫。言いかたは気にしなくていいです。</p>
+      <div class="how">📮 書いたことばは、<b style="color:var(--ai)">AIがおだやかなことばに整えてから</b>先生に届きます。言いたい中身はそのまま残ります。<br>
+        送ったあと「先生にはこう届きます」が出るので、たしかめられます。<br>
+        <span style="font-size:12px;color:var(--sub)">※元のことばは、ふだん先生には見せません。心配な内容があるときだけ、先生が読むことがあります。</span></div>
+    </div>
+
+    <div class="panel">
+      <p class="label">どこについて？</p>
+      <div class="chips" id="areas"></div>
+      <p class="label" style="margin-top:16px">いやなところ・めんどうなところ・こまったところ</p>
+      <textarea id="tBad" rows="5" maxlength="800" placeholder="例：ヒントが30秒待たないと出ないのがいや"></textarea>
+      <div class="count"><span id="tBadN">0</span> / 800</div>
+      <p class="label" style="margin-top:6px">こうなったらいいのに（なくてもOK）</p>
+      <textarea id="tWant" rows="4" maxlength="800" placeholder="例：最初からヒントのボタンがあったらいい"></textarea>
+      <div class="count"><span id="tWantN">0</span> / 800</div>
+      <details style="margin-top:6px"><summary class="note" style="cursor:pointer">思いつかないときのヒント</summary>
+        <div class="ex">・いちばん時間がかかった画面はどこ？　そこで何にこまった？<br>・押してみて「え？」となったボタンは？<br>・なくてもいいと思う機能は？<br>・友だちがやっていて、うらやましかったことは？<br>・ゲームやアプリで「これがあったら楽しい」と思うものは？<br>・字数・時間・ルールで、きついと思うところは？</div></details>
+      <p class="label" style="margin-top:16px">ペンネーム（なくてもOK）</p>
+      <input id="tPen" maxlength="20" placeholder="なしでも出せます" style="font-size:16px">
+      <div class="row"><button class="btn main" id="btnSend">📮 提案を出す</button></div>
+      <div class="msg" id="tMsg"></div>
+      <div id="sent"></div>
+    </div>
+
+    <div class="panel">
+      <p class="label">あなたが出した提案と、先生からの返事</p>
+      <div id="mine"><p class="note">読みこんでいます…</p></div>
+      <div class="row"><button class="btn small" id="btnReload">↻ 返事を見る</button></div>
+    </div>
+  </div>
+
+  <div class="foot"><a href="./">← 起承転結へ</a>　<a href="bunko.html">クラス文庫へ</a></div>
+</div>
+
+<script>
+const API="https://kishou.ryousukey0113.workers.dev";
+const AREAS=["書く","本棚・整える","推し短編集","クラス文庫","ふりかえり","授業のこと","その他"];
+const ST={new:"先生がまだ読んでいません",read:"先生が読みました",doing:"直すことにしました",done:"直しました",no:"今回は見送り"};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ls={ get(k){try{return localStorage.getItem(k)||"";}catch(e){return "";}}, set(k,v){try{localStorage.setItem(k,v);}catch(e){}} };
+const md=ts=>{const d=new Date(ts);return (d.getMonth()+1)+"/"+d.getDate();};
+// アプリ・クラス文庫と同じ端末のしるし（自分の提案と返事を見るため）
+function ownerToken(){ let t=ls.get("kishou_owner"); if(t.length<16){ t=[...crypto.getRandomValues(new Uint8Array(16))].map(x=>x.toString(16).padStart(2,"0")).join(""); ls.set("kishou_owner",t); } return t; }
+async function api(path,body){
+  let r,j;
+  try{ r=await fetch(API+path,{method:"POST",headers:{"Content-Type":"application/json","X-Pass":encodeURIComponent(ls.get("bunko_pass"))},body:JSON.stringify(body||{})}); j=await r.json(); }
+  catch(e){ throw new Error("うまくつながりませんでした。少し待ってもう一度ためしてください。"); }
+  if(r.status===401){ const e=new Error("合言葉がちがいます。"); e.auth=true; throw e; }
+  if(!r.ok) throw new Error(j.message||"うまくいきませんでした（"+(j.error||r.status)+"）");
+  return j;
+}
+let area="";
+$("areas").innerHTML=AREAS.map(a=>'<button data-a="'+a+'">'+a+'</button>').join("");
+$("areas").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; area=b.dataset.a; [...$("areas").children].forEach(x=>x.classList.toggle("on",x===b)); });
+["tBad","tWant"].forEach(id=>$(id).addEventListener("input",()=>$(id+"N").textContent=[...$(id).value].length));
+$("tPen").value=ls.get("kishou_pen");
+
+function sentHTML(t){ return '<div class="sent"><div class="h">先生にはこう届きます</div>'+esc(t.soft||"（AIがまだ整えられていません。先生には、整ってから届きます）")
+  +(t.points&&t.points.length?'<ul>'+t.points.map(p=>'<li>'+esc(p)+'</li>').join("")+'</ul>':'')+'</div>'; }
+async function loadMine(){
+  try{ const j=await api("/bunko/teian/mine",{token:ownerToken()}); const L=j.teians||[];
+    $("mine").innerHTML=L.length? L.map(t=>'<div class="mine"><div class="mh"><span>'+md(t.created)+'</span><span>'+esc(t.area)+'</span><span class="st '+t.status+'">'+(ST[t.status]||"")+'</span></div>'
+      +'<div>'+esc(t.soft||"（AIが整えているところです）")+'</div>'
+      +(t.reply?'<div class="reply">先生から：'+esc(t.reply)+'</div>':'')+'</div>').join("") : '<p class="note">まだありません。</p>'; }
+  catch(e){ $("mine").innerHTML='<p class="note">'+esc(e.message)+'</p>'; }
+}
+$("btnReload").onclick=loadMine;
+$("btnSend").onclick=async()=>{
+  const bad=$("tBad").value.trim(), want=$("tWant").value.trim();
+  if(!bad&&!want){ $("tMsg").textContent="どちらかの欄に書いてください。"; return; }
+  $("btnSend").disabled=true; $("tMsg").style.color="var(--sub)"; $("tMsg").textContent="AIが、先生に届けることばに整えています…（10秒ほど）"; $("sent").innerHTML="";
+  try{ const pen=$("tPen").value.trim(); if(pen) ls.set("kishou_pen",pen);
+    const j=await api("/bunko/teian",{token:ownerToken(),area:area||"その他",bad,want,pen});
+    $("tMsg").style.color="var(--ok)"; $("tMsg").textContent="出しました。ありがとう！ 先生が読んだら、下に印がつきます。";
+    $("sent").innerHTML=sentHTML(j.teian); $("tBad").value=""; $("tWant").value=""; $("tBadN").textContent="0"; $("tWantN").textContent="0";
+    loadMine(); }
+  catch(e){ $("tMsg").style.color="var(--ng)"; $("tMsg").textContent=e.message; if(e.auth){ ls.set("bunko_pass",""); show(false); } }
+  $("btnSend").disabled=false;
+};
+function show(on){ $("scGate").classList.toggle("hidden",on); $("scMain").classList.toggle("hidden",!on); if(on) loadMine(); }
+async function enter(){ const p=$("passIn").value.trim(); if(!p) return; ls.set("bunko_pass",p);
+  try{ await api("/bunko/teian/mine",{token:ownerToken()}); show(true); }catch(e){ $("gateMsg").textContent=e.message; if(e.auth) ls.set("bunko_pass",""); } }
+$("btnEnter").onclick=enter;
+$("passIn").addEventListener("keydown",e=>{ if(e.key==="Enter") enter(); });
+show(!!ls.get("bunko_pass"));
+</script>
+</body>
+</html>
