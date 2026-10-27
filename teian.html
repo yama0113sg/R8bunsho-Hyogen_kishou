@@ -51,10 +51,6 @@ a{color:var(--sub)}
 .chips button.on{background:#fff;color:#15121f;border-color:transparent;font-weight:700}
 .ex{margin-top:8px;font-size:12.5px;color:var(--sub);line-height:1.8}
 .count{text-align:right;font-size:12px;color:var(--sub);margin-top:4px}
-.how{margin-top:14px;padding:12px 14px;border-radius:14px;background:rgba(159,227,255,.07);border:1px solid rgba(159,227,255,.25);font-size:13px;line-height:1.9;color:#d6d2ea}
-.sent{margin-top:14px;padding:14px 16px;border-radius:14px;background:#fbfaf7;color:#222;font-size:15px;line-height:1.9}
-.sent .h{font-size:12px;letter-spacing:.15em;color:#777;margin-bottom:4px}
-.sent ul{margin:6px 0 0;padding-left:1.3em;font-size:14px}
 .mine{padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid var(--edge);margin-bottom:8px;font-size:14px;line-height:1.8}
 .mine .mh{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--sub)}
 .st{font-size:11px;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.1);color:var(--sub)}
@@ -65,7 +61,7 @@ a{color:var(--sub)}
 </head>
 <body>
 <div class="wrap">
-  <div class="logo"><h1>提案箱</h1><p>このアプリを、もっとよくするために</p></div>
+  <div class="logo"><h1>提案箱</h1><p>このアプリへの意見・改善案</p></div>
 
   <div class="panel" id="scGate">
     <p class="label">合言葉</p>
@@ -76,32 +72,28 @@ a{color:var(--sub)}
 
   <div id="scMain" class="hidden">
     <div class="panel">
-      <p class="lead">書く気が出ない日も、あると思います。<br>そんな日は、物語のかわりに<b>このアプリへの文句や提案</b>を書いてください。<br>「ここがめんどう」「これがいや」で大丈夫。言いかたは気にしなくていいです。</p>
-      <div class="how">📮 書いたことばは、<b style="color:var(--ai)">AIがおだやかなことばに整えてから</b>先生に届きます。言いたい中身はそのまま残ります。<br>
-        送ったあと「先生にはこう届きます」が出るので、たしかめられます。<br>
-        <span style="font-size:12px;color:var(--sub)">※元のことばは、ふだん先生には見せません。心配な内容があるときだけ、先生が読むことがあります。</span></div>
+      <p class="lead">このアプリは、授業をしながら少しずつ作り直しています。<br>使いにくい点、不要だと思う機能、追加してほしい機能など、<b>率直な意見</b>を募集しています。不満だけでもかまいません。書き方は自由です。<br>出してもらった意見は、実際の改修に使います。</p>
     </div>
 
     <div class="panel">
-      <p class="label">どこについて？</p>
+      <p class="label">対象</p>
       <div class="chips" id="areas"></div>
-      <p class="label" style="margin-top:16px">いやなところ・めんどうなところ・こまったところ</p>
-      <textarea id="tBad" rows="5" maxlength="800" placeholder="例：ヒントが30秒待たないと出ないのがいや"></textarea>
+      <p class="label" style="margin-top:16px">気になる点・不満</p>
+      <textarea id="tBad" rows="5" maxlength="800" placeholder="例：ヒントが出るまでの30秒が長い"></textarea>
       <div class="count"><span id="tBadN">0</span> / 800</div>
-      <p class="label" style="margin-top:6px">こうなったらいいのに（なくてもOK）</p>
-      <textarea id="tWant" rows="4" maxlength="800" placeholder="例：最初からヒントのボタンがあったらいい"></textarea>
+      <p class="label" style="margin-top:6px">改善案（任意）</p>
+      <textarea id="tWant" rows="4" maxlength="800" placeholder="例：ヒントのボタンを最初から押せるようにしてほしい"></textarea>
       <div class="count"><span id="tWantN">0</span> / 800</div>
-      <details style="margin-top:6px"><summary class="note" style="cursor:pointer">思いつかないときのヒント</summary>
-        <div class="ex">・いちばん時間がかかった画面はどこ？　そこで何にこまった？<br>・押してみて「え？」となったボタンは？<br>・なくてもいいと思う機能は？<br>・友だちがやっていて、うらやましかったことは？<br>・ゲームやアプリで「これがあったら楽しい」と思うものは？<br>・字数・時間・ルールで、きついと思うところは？</div></details>
-      <p class="label" style="margin-top:16px">ペンネーム（なくてもOK）</p>
-      <input id="tPen" maxlength="20" placeholder="なしでも出せます" style="font-size:16px">
-      <div class="row"><button class="btn main" id="btnSend">📮 提案を出す</button></div>
+      <details style="margin-top:6px"><summary class="note" style="cursor:pointer">観点の例</summary>
+        <div class="ex">・操作がわかりにくい、手間がかかる画面<br>・字数・時間・回数などの制限<br>・なくてもよいと思う機能<br>・ほかのアプリやゲームにあって、ここにもほしい機能<br>・見た目・デザイン<br>・授業の進め方</div></details>
+      <p class="label" style="margin-top:16px">ペンネーム（任意）</p>
+      <input id="tPen" maxlength="20" placeholder="無記名でも送れます" style="font-size:16px">
+      <div class="row"><button class="btn main" id="btnSend">送信する</button></div>
       <div class="msg" id="tMsg"></div>
-      <div id="sent"></div>
     </div>
 
     <div class="panel">
-      <p class="label">あなたが出した提案と、先生からの返事</p>
+      <p class="label">送った意見と、先生からの返事</p>
       <div id="mine"><p class="note">読みこんでいます…</p></div>
       <div class="row"><button class="btn small" id="btnReload">↻ 返事を見る</button></div>
     </div>
@@ -113,7 +105,9 @@ a{color:var(--sub)}
 <script>
 const API="https://kishou.ryousukey0113.workers.dev";
 const AREAS=["書く","本棚・整える","推し短編集","クラス文庫","ふりかえり","授業のこと","その他"];
-const ST={new:"先生がまだ読んでいません",read:"先生が読みました",doing:"直すことにしました",done:"直しました",no:"今回は見送り"};
+const ST={new:"未読",read:"既読",doing:"対応予定",done:"対応済み",no:"今回は見送り"};
+// 送った文は、この iPad にだけ控えておく（一覧に出すため）
+const myCopy=()=>{ try{ return JSON.parse(ls.get("teian_mine")||"{}"); }catch(e){ return {}; } };
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const ls={ get(k){try{return localStorage.getItem(k)||"";}catch(e){return "";}}, set(k,v){try{localStorage.setItem(k,v);}catch(e){}} };
@@ -134,12 +128,10 @@ $("areas").addEventListener("click",e=>{ const b=e.target.closest("button"); if(
 ["tBad","tWant"].forEach(id=>$(id).addEventListener("input",()=>$(id+"N").textContent=[...$(id).value].length));
 $("tPen").value=ls.get("kishou_pen");
 
-function sentHTML(t){ return '<div class="sent"><div class="h">先生にはこう届きます</div>'+esc(t.soft||"（AIがまだ整えられていません。先生には、整ってから届きます）")
-  +(t.points&&t.points.length?'<ul>'+t.points.map(p=>'<li>'+esc(p)+'</li>').join("")+'</ul>':'')+'</div>'; }
 async function loadMine(){
   try{ const j=await api("/bunko/teian/mine",{token:ownerToken()}); const L=j.teians||[];
     $("mine").innerHTML=L.length? L.map(t=>'<div class="mine"><div class="mh"><span>'+md(t.created)+'</span><span>'+esc(t.area)+'</span><span class="st '+t.status+'">'+(ST[t.status]||"")+'</span></div>'
-      +'<div>'+esc(t.soft||"（AIが整えているところです）")+'</div>'
+      +'<div>'+esc((c=>c? [c.bad,c.want].filter(Boolean).join(" ／ ") : "（この iPad 以外から送ったものです）")(myCopy()[t.id]))+'</div>'
       +(t.reply?'<div class="reply">先生から：'+esc(t.reply)+'</div>':'')+'</div>').join("") : '<p class="note">まだありません。</p>'; }
   catch(e){ $("mine").innerHTML='<p class="note">'+esc(e.message)+'</p>'; }
 }
@@ -147,11 +139,11 @@ $("btnReload").onclick=loadMine;
 $("btnSend").onclick=async()=>{
   const bad=$("tBad").value.trim(), want=$("tWant").value.trim();
   if(!bad&&!want){ $("tMsg").textContent="どちらかの欄に書いてください。"; return; }
-  $("btnSend").disabled=true; $("tMsg").style.color="var(--sub)"; $("tMsg").textContent="AIが、先生に届けることばに整えています…（10秒ほど）"; $("sent").innerHTML="";
+  $("btnSend").disabled=true; $("tMsg").style.color="var(--sub)"; $("tMsg").textContent="送信しています…";
   try{ const pen=$("tPen").value.trim(); if(pen) ls.set("kishou_pen",pen);
     const j=await api("/bunko/teian",{token:ownerToken(),area:area||"その他",bad,want,pen});
-    $("tMsg").style.color="var(--ok)"; $("tMsg").textContent="出しました。ありがとう！ 先生が読んだら、下に印がつきます。";
-    $("sent").innerHTML=sentHTML(j.teian); $("tBad").value=""; $("tWant").value=""; $("tBadN").textContent="0"; $("tWantN").textContent="0";
+    const cp=myCopy(); cp[j.teian.id]={bad,want}; ls.set("teian_mine",JSON.stringify(cp));
+    $("tMsg").style.color="var(--ok)"; $("tMsg").textContent="送信しました。ありがとうございます。"; $("tBad").value=""; $("tWant").value=""; $("tBadN").textContent="0"; $("tWantN").textContent="0";
     loadMine(); }
   catch(e){ $("tMsg").style.color="var(--ng)"; $("tMsg").textContent=e.message; if(e.auth){ ls.set("bunko_pass",""); show(false); } }
   $("btnSend").disabled=false;

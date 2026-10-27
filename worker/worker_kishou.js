@@ -569,7 +569,7 @@ async function softenTeian(env, kv, id) {
   await putTn(kv, cur);
   return true;
 }
-const tnStudentView = m => ({ id: m.id, area: m.area, status: m.status, soft: m.soft, points: m.points, empty: m.empty, reply: m.reply, created: m.created });
+const tnStudentView = m => ({ id: m.id, area: m.area, status: m.status, reply: m.reply, created: m.created });   // 整えた文は本人には返さない
 
 // 預けた本棚の推し短編集の進み具合（先生が、クラス全体の途中経過を一覧で見るため）
 function oshiSummary(list) {
@@ -796,7 +796,7 @@ async function bunko(request, env, headers, path, ctx) {
     const t = { id: rid(), owner: token, pen: clip(body.pen, 20).trim(), area: TEIAN_AREAS.includes(body.area) ? body.area : "その他", raw: { bad, want },
       status: "new", soft: "", points: [], created: now, updated: now };
     await putTn(kv, t);
-    await softenTeian(env, kv, t.id);   // 本人に「先生にはこう届きます」を見せるため、ここは待つ
+    await later(softenTeian(env, kv, t.id));   // 整えるのは裏で（本人は待たない）
     const m = (await getIdx(kv, "idx:tn")).items[t.id] || tnMeta(t);
     return J({ teian: tnStudentView(m) }, headers);
   }
