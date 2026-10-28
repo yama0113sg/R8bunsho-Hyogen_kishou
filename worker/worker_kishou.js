@@ -531,6 +531,15 @@ function spEntry(rec, oldPen) {
   return { code: rec.code, pen: rec.pen || oldPen || (oshi[0] && oshi[0].editor) || "", books: books.length,
     titles: books.slice(-4).map(b => clip((b && b.final && b.final.title) || (b && b.title) || "", 30)).filter(Boolean), oshi, savedAt: rec.savedAt, created: rec.created };
 }
+// ── ふりかえりの問い返し ──
+const FURI_ASK = `高校3年生が、半年間の創作の授業（短い物語を書き、推敲し、クラスで読み合い、友だちの作品で短編集を編んだ）をふりかえる文章を書いています。
+生徒の答えを読んで、もう一歩ふかく考えるための問いを、1つだけ返してください。
+・答えの中のことばや具体的なところを拾って聞く（「さっき書いた『〜』は、なぜ？」「それは、書く前と後でどう変わった？」のように）。
+・50字以内。「？」で終わる。です・ます調でなくてよいが、ていねいに。
+・答えや例文、まとめは書かない。ほめたり評価したりしない。お説教しない。
+・家庭の事情、体や心の不調には踏みこまない。
+出力は JSON だけ：{"ask":"…？"}`;
+const parseFuriAsk = t => { const o = jsonOf(t); const x = String((o && o.ask) || "").trim(); return x && len(x) <= 70 && /[？?]$/.test(x) ? x : null; };
 // ── 提案箱（アプリをよくする提案）──
 // 生徒の書いたことばは、そのまま先生には見せない。AIが、中身は具体的なまま、おだやかなことばに整えてから届ける。
 // 心配な内容（自分やだれかを傷つけるおそれ・いじめなど）があるときは、強いことばを使わずに先生に知らせる。
@@ -888,6 +897,13 @@ async function bunko(request, env, headers, path, ctx) {
     return J({ ok: true }, headers);
   }
   // 帯の相棒：推しどころを引き出す問い
+  // ふりかえり：生徒の答えを読んで、もう一歩ふかめる問いを1つ返す（答えや例文は出さない。保存もしない）
+  if (path === "/bunko/furi/ask") {
+    const q = clip(body.q, 200).trim(), a = clip(body.a, 1500).trim(), prev = (Array.isArray(body.prev) ? body.prev : []).slice(0, 3).map(x => clip(x, 100));
+    if (len(a) < 20) return J({ error: "short", message: "もう少し書いてから押してください。" }, headers, 400);
+    const { result } = await callGemini(env, FURI_ASK, `問い：${q}\n\n生徒の答え：\n${a}` + (prev.length ? `\n\nすでに出した問い（同じことは聞かない）：\n${prev.join("\n")}` : "") + "\n\nJSON で出してください。", { models: HINT_MODELS, parse: parseFuriAsk, temperature: 0.7, json: true });
+    return J({ ask: result }, headers);
+  }
   // 自分の作品（文庫に出していないもの）は、本文をいっしょに送ってもらう（保存はしない）
   if (path === "/bunko/obi/questions") {
     let title, text, self = false;
@@ -1072,7 +1088,7 @@ export default {
       }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true, heal: true, teian: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true, heal: true, teian: true, furi: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {

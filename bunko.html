@@ -199,6 +199,10 @@ a.btn{color:var(--ink);text-decoration:none;display:inline-block}
 .tnst button{font-size:12px;padding:5px 11px}
 .tnreply{margin-top:8px;font-size:14px}
 .tnraw{margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(0,0,0,.3);border:1px dashed var(--edge);font-size:13.5px;line-height:1.8;white-space:pre-wrap}
+.spfuri{margin:10px 0;padding:10px 14px;border-radius:12px;background:rgba(93,255,176,.06);border:1px solid rgba(93,255,176,.3)}
+.spfuri summary{cursor:pointer;font-weight:700}
+.spfq{margin-top:10px} .spfa{font-family:var(--mincho);font-size:15px;line-height:1.85;white-space:pre-wrap;margin-top:2px}
+.spfpk{font-family:var(--mincho);font-size:13.5px;color:var(--ai);margin-top:2px}
 .coachbox{margin-top:10px;padding:12px 14px;border-radius:12px;background:rgba(159,227,255,.07);border:1px solid rgba(159,227,255,.3);font-size:14px;line-height:1.8}
 .coachbox ol{margin:8px 0 0;padding-left:1.3em} .coachbox li{margin-bottom:10px}
 .coachbox .cpart{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;background:rgba(159,227,255,.18);color:var(--ai);margin-right:6px}
@@ -805,8 +809,12 @@ $("tpShelf").addEventListener("click",async e=>{
   pk.disabled=false; pk.textContent=lb; });
 function renderSpShelf(){
   if(!spData){ $("spShelf").innerHTML=""; return; }
-  const bs=(spData.shelf&&spData.shelf.books)||[], os=(spData.shelf&&spData.shelf.oshi)||[];
-  $("spShelf").innerHTML=(os.length?'<p class="note" style="margin:10px 0 4px">推し短編集：'+os.map((o,i)=>'<button class="btn small" data-osopen="'+i+'" style="margin:2px 4px 2px 0">📖 『'+esc(o.title||"題名はまだ")+'』（'+(o.items||[]).length+'作）</button>').join("")+'</p>':'')+'<p class="note" style="margin:8px 0 0">じゅもん「'+esc(spData.code)+'」・'+new Date(spData.savedAt).toLocaleString("ja-JP")+' に預けた本棚・'+bs.length+'冊</p>'
+  const bs=(spData.shelf&&spData.shelf.books)||[], os=(spData.shelf&&spData.shelf.oshi)||[], fu=spData.shelf&&spData.shelf.furi;
+  const fuKeys=fu&&fu.a? Object.keys(fu.a).filter(k=>String(fu.a[k]||"").trim()).sort((x,y)=>(x[0]==="q"?0:1)-(y[0]==="q"?0:1)||x.localeCompare(y)) : [];
+  const fuHTML=fuKeys.length? '<details class="spfuri" open><summary>🌱 ふりかえりシート（'+fuKeys.length+'問）</summary>'+fuKeys.map(k=>{ const pk=fu.pick&&fu.pick[k];
+      return '<div class="spfq"><div class="note" style="font-size:12px">'+esc((fu.qs&&fu.qs[k])||k)+'</div>'+(pk&&pk.text?'<div class="spfpk">'+esc(pk.text)+'</div>':'')
+        +'<div class="spfa">'+esc(fu.a[k])+'</div>'+((fu.ask&&fu.ask[k]||[]).length?'<div class="note" style="font-size:12px;color:var(--ai)">AIの問い返し：'+fu.ask[k].map(esc).join("／")+'</div>':'')+'</div>'; }).join("")+'</details>' : '';
+  $("spShelf").innerHTML=fuHTML+(os.length?'<p class="note" style="margin:10px 0 4px">推し短編集：'+os.map((o,i)=>'<button class="btn small" data-osopen="'+i+'" style="margin:2px 4px 2px 0">📖 『'+esc(o.title||"題名はまだ")+'』（'+(o.items||[]).length+'作）</button>').join("")+'</p>':'')+'<p class="note" style="margin:8px 0 0">じゅもん「'+esc(spData.code)+'」・'+new Date(spData.savedAt).toLocaleString("ja-JP")+' に預けた本棚・'+bs.length+'冊</p>'
     +bs.map((b,i)=>{ const f=b.final, t=(f&&f.title)||b.title, mode=b._m||(f?"diff":"orig");
       return '<div class="spbook" data-i="'+i+'"><div class="h"><b>『'+esc(t)+'』'+(f&&f.done?'<span class="st public">仕上げ</span>':f?'<span class="st pending">整え中</span>':'')+'</b><span class="note">'+genreOf(b.genre).name+'・'+md(b.created||0)+(b.imported?'（取りこみ）':'')+'</span></div>'
         +'<div class="meta">はじめの版 '+nch(origFlat(b))+'字'+(f?' → 仕上げ版 '+nch(String(f.text).replace(/〔[^〕\n]*〕/g,""))+'字':'')+'<br>'+esc(aiUse(b))+(b.bind?'・しばりあり':'')+'</div>'

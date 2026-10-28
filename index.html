@@ -340,6 +340,24 @@ input.ptitle{font-size:20px;margin-bottom:12px}
 .fdt{margin-top:8px;max-height:50vh;overflow:auto;padding:12px 16px;border-radius:12px;background:#fbfaf7;color:#222;font-family:var(--mincho);font-size:15px;line-height:1.9;white-space:pre-wrap}
 .fdt del{color:#b0405a;background:rgba(176,64,90,.08)} .fdt ins{color:#1f7a4d;background:rgba(31,122,77,.1);text-decoration:none}
 .fq{margin:0;padding-left:1.4em;font-size:14px;line-height:1.9}
+.fprog{position:sticky;top:6px;z-index:5;margin:0 0 10px;padding:8px 12px;border-radius:12px;background:rgba(18,16,31,.92);border:1px solid var(--edge);font-size:13px;color:var(--sub);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.fprog b{color:var(--ink)} .fprog .fok{color:var(--ok)}
+.fqbox{margin-top:10px;padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.22);border:1px solid var(--edge)}
+.fqbox.done{border-color:rgba(93,255,176,.35)}
+.fqh{display:flex;gap:8px;align-items:baseline} .fqh b{font-size:14px;letter-spacing:.05em} .fqk{color:var(--sub);font-weight:700} .fqbox.done .fqk{color:var(--ok)}
+.fqq{margin:4px 0 8px;font-size:14px;line-height:1.8;color:#e6e2f5}
+.fta{width:100%;font-family:var(--mincho);font-size:15px;line-height:1.85;border-radius:12px;border:1px solid var(--edge);background:rgba(5,4,10,.55);color:#fff;padding:10px 12px}
+.fqf{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap} .fqn{font-size:12px;color:var(--sub)}
+.fasks{margin:6px 0 0;padding-left:1.3em;color:var(--ai);font-size:14px;line-height:1.8}
+.fsel{width:100%;font:inherit;font-size:14px;padding:9px 10px;border-radius:10px;border:1px solid var(--edge);background:rgba(5,4,10,.55);color:#fff;margin-bottom:8px}
+.fpair{margin:0 0 8px;display:grid;gap:4px;font-family:var(--mincho);font-size:14.5px;line-height:1.8}
+.fpair div{padding:8px 12px;border-radius:10px;background:#fbfaf7;color:#222} .fpair span{font-family:var(--gothic);font-size:11px;color:#888;margin-right:8px}
+.fquote{margin:0 0 8px;padding:10px 14px;border-radius:10px;background:#fbfaf7;color:#222;font-family:var(--mincho);font-size:15.5px;line-height:1.8}
+.fquote small{display:block;font-family:var(--gothic);font-size:11px;color:#888;text-align:right}
+.karte{width:100%;border-collapse:collapse;font-size:13.5px;margin-bottom:6px} .karte th,.karte td{padding:5px 8px;border-bottom:1px solid var(--edge);text-align:left}
+.karte th{color:var(--sub);font-weight:500} .karte td small{display:block;font-size:11px;color:var(--sub)}
+.fwl{margin:0 0 8px;padding-left:1.2em;font-size:14px;line-height:1.8} .fwl small{display:block;font-size:11px;color:var(--sub)} .fwl .aitag{font-size:10px;margin-left:4px;padding:0 5px;border-radius:5px;background:rgba(159,227,255,.18);color:var(--ai)}
+.fend{margin-top:18px;padding-top:14px;border-top:1px dashed var(--edge)}
 .oprog{margin:0 0 14px;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid var(--edge)}
 .oprog .ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;color:var(--sub)}
 .oprog .ph>b{font-size:15px;color:var(--ink);letter-spacing:.1em} .oprog .ph span b{color:var(--ok);font-size:17px}
@@ -1023,6 +1041,7 @@ function plainText(o=S){
 const SKEY="kishou_shelf_v1";   // 「最初からやり直す」では消えない
 let SH=store.get(SKEY)||{books:[],antho:[]};
 if(!SH.oshi) SH.oshi=[];   // 推し短編集
+if(!SH.furi) SH.furi={a:{},ask:{},pick:{}};   // ふりかえりシート（答え・AIの問い返し・選んだ一文）
 const saveShelf=()=>{ store.set(SKEY,SH); markDirty(); };
 let view="write", curBook=null, curAntho=null, bookMode="fin";
 const bookById=id=>SH.books.find(b=>b.id===id);
@@ -1401,8 +1420,12 @@ function furiStats(){
   return { bs, n:bs.length, chars:bs.reduce((a,b)=>a+(b.final?nchars(finText(b)):totals(b).n),0), fin:bs.filter(b=>b.final&&b.final.done).length,
     pub:bs.filter(b=>b.bunko).length, cm:bs.reduce((a,b)=>a+((b.bunko&&b.bunko.comments)||0),0), obi:bs.reduce((a,b)=>a+((b.bunko&&b.bunko.obis)||0),0),
     myObi, oshi:SH.oshi.length, rvAll, binds:bs.filter(b=>bindOf(b)&&bindFinal(b)).length }; }
-function renderFuri(){
-  const st=furiStats(), el=$("furiBody");
+function renderFuri(){   // 記録（上）と、ふりかえりシート（下）。シートは書いている途中に組み直さない
+  $("furiBody").innerHTML='<div id="furiRec"></div><div id="furiSheet"></div>';
+  renderFuriRec(); renderFuriSheet();
+}
+function renderFuriRec(){
+  const st=furiStats(), el=$("furiRec"); if(!el) return;
   const tile=(v,l)=>'<div class="ftile"><b>'+v+'</b><span>'+l+'</span></div>';
   el.innerHTML='<p class="label">ふりかえり　―　ここまでの歩み</p>'
     +(!st.n&&!st.oshi?'<p class="gnote">まだ本棚に作品がありません。本棚が空になってしまったときは、［📚 本棚］の「ふっかつのじゅもん」からよびもどせます。</p>':'')
@@ -1421,20 +1444,113 @@ function renderFuri(){
     +(SH.oshi.length?'<h3 class="fh">編んだ推し短編集</h3>'+SH.oshi.map(o=>{ const rv=Object.values(o.reviews||{}).reduce((a,r)=>a+nchars(r.text||""),0);
         return '<div class="fbook" style="--c:#ffd36a"><div class="fbh"><b>『'+esc(o.title||"題名はまだ")+'』</b><span class="fg">'+o.items.length+'作</span></div>'
           +'<div class="fbm">テーマ：'+esc(o.theme||"まだ")+'・書評 '+rv+'字・はじめに '+nchars(o.intro||"")+'字・あとがき '+nchars(o.after||"")+'字'+(o.pub?'・文庫：'+({pending:"確認待ち",public:"公開中",hidden:"非公開",returned:"返却中"}[o.pub.status]||""):'')+'</div></div>'; }).join(""):'')
-    +'<h3 class="fh">ふりかえりの問い</h3><p class="gnote" style="margin:0 0 6px">上の記録を見ながら、自分のことばで答えてみよう。</p><ol class="fq">'+FURI_Q.map(q=>'<li>'+q+'</li>').join("")+'</ol>'
-    +'<div class="row"><button class="btn small" id="btnFuriCopy">📋 記録をコピー（ロイロに貼る用）</button></div><div class="msg" id="furiMsg" style="color:var(--ok)"></div>';
-  $("btnFuriCopy").onclick=()=>copyText(furiText(),$("btnFuriCopy"),$("furiMsg"),"📋 記録をコピー（ロイロに貼る用）");
+;
 }
 function furiText(){ const st=furiStats();
   let s="【ここまでの歩み】\n書いた物語 "+st.n+"本・"+st.chars+"字／仕上げた本 "+st.fin+"冊／文庫に出した本 "+st.pub+"冊\nもらった感想 "+st.cm+"件・帯 "+st.obi+"本／自分が巻いた帯 "+st.myObi+"本／推し短編集 "+st.oshi+"冊（書評 "+st.rvAll+"字）\n\n【書いた物語】\n";
   for(const b of st.bs){ const t0=totals(b).n, t1=b.final?nchars(finText(b)):0; s+=md(b.created)+"『"+bTitle(b)+"』（"+genreOf(b.genre).name+"）はじめの版 "+t0+"字"+(b.final?" → 仕上げ版 "+t1+"字":"")+"\n"; }
   for(const o of SH.oshi) s+="推し短編集『"+(o.title||"題名はまだ")+"』"+o.items.length+"作\n";
   return s; }
+/* ---- ふりかえりシート ----
+   基本の問い5つ ＋ 早く終わった人の「もう一歩」5つ。答えはこの iPad に保存し、じゅもんにも預ける（先生がじゅもんで見られる）。
+   AIは「もう一歩ふかめる問い」を1つ返すだけ（答えは書かない）。 */
+const FURI_X=[
+  {k:"x_diff", t:"推敲の一文", q:"推敲で書きかえた一文を1つ選ぼう。なぜそう直したのか、直して何が変わったのかを書こう。", pick:"diff"},
+  {k:"x_line", t:"いちばんの一文", q:"自分の作品の中から、いちばん気に入っている一文を選ぼう。なぜその一文なのかを書こう。", pick:"line"},
+  {k:"x_karte", t:"文体カルテ", q:"最初の作品と最近の作品の「書きぐせ」の数字をくらべて、気づいたことを書こう。", karte:true},
+  {k:"x_words", t:"もらったことば", q:"もらった感想や帯のことばの中で、いちばん心に残ったものを選んで、その理由を書こう。", words:true},
+  {k:"x_next", t:"来年の3年生へ", q:"来年この授業を受ける3年生に、物語を書くコツや、このアプリの使いこなし方を伝えよう。"}];
+const FURI_MIN=80;   // 「書けた」とみなす目安の字数
+const furiA=k=>(SH.furi.a[k]||"");
+const furiDone=k=>nchars(furiA(k))>=FURI_MIN;
+// 推敲で変わった文の組（前の文 → 後の文）
+function diffPairs(a,b){ const sp=t=>String(t||"").split(/(?<=[。！？!?」\n])/).map(x=>x.trim()).filter(Boolean);
+  const A=sp(a), B=sp(b), n=A.length, m=B.length, L=Array.from({length:n+1},()=>new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--) L[i][j]= A[i]===B[j]? L[i+1][j+1]+1 : Math.max(L[i+1][j],L[i][j+1]);
+  const out=[]; let i=0,j=0, del=[], ins=[];
+  const flush=()=>{ if(del.length||ins.length) out.push({before:del.join(""),after:ins.join("")}); del=[]; ins=[]; };
+  while(i<n||j<m){ if(i<n&&j<m&&A[i]===B[j]){ flush(); i++; j++; } else if(j>=m||(i<n&&L[i+1][j]>=L[i][j+1])) del.push(A[i++]); else ins.push(B[j++]); }
+  flush(); return out.filter(x=>x.before!==x.after); }
+const sentencesOf=t=>String(t||"").split(/(?<=[。！？!?」])/).map(x=>x.replace(/\s+/g," ").trim()).filter(x=>nchars(x)>=4);
+// 文体カルテ：AIではなく数えるだけ（点数や良し悪しはつけない）
+function karte(t){ t=String(t||"").replace(MARK,""); const ss=sentencesOf(t), n=Math.max(1,ss.length), ch=nchars(t)||1;
+  const kanji=(t.match(/[\u4e00-\u9fff々]/g)||[]).length;
+  return {n:ss.length, avg:Math.round(nchars(ss.join(""))/n), talk:Math.round(ss.filter(x=>/「/.test(x)).length/n*100),
+    comma:(((t.match(/、/g)||[]).length)/n).toFixed(1), kanji:Math.round(kanji/ch*100), ta:Math.round(ss.filter(x=>/た[。！？」]*$/.test(x)).length/n*100)}; }
+const bookTextFor=b=>b.final? finText(b) : flatText(b);
+function karteHTML(){ const bs=SH.books.slice().sort((a,b)=>a.created-b.created); if(!bs.length) return '<p class="gnote">本棚に作品がありません。</p>';
+  const first=bs[0], last=bs.length>1? bs[bs.length-1] : null, A=karte(bookTextFor(first)), B=last&&karte(bookTextFor(last));
+  const row=(l,k,u)=>'<tr><th>'+l+'</th><td>'+A[k]+u+'</td>'+(B?'<td>'+B[k]+u+'</td>':'')+'</tr>';
+  return '<table class="karte"><tr><th></th><td>『'+esc(bTitle(first))+'』<small>'+md(first.created)+'</small></td>'+(B?'<td>『'+esc(bTitle(last))+'』<small>'+md(last.created)+'</small></td>':'')+'</tr>'
+    +row("文の数","n","")+row("一文の平均の長さ","avg","字")+row("会話（「」）のある文","talk","%")+row("一文あたりの読点「、」","comma","こ")+row("漢字の割合","kanji","%")+row("「〜た。」で終わる文","ta","%")+'</table>'
+    +'<p class="gnote" style="margin:4px 0 0;font-size:12px">数えただけの数字です。多い・少ないに、良い・悪いはありません。'+(B?'':'（作品が2つ以上あると、くらべられます）')+'</p>'; }
+function pickHTML(x){ const pk=SH.furi.pick[x.k]||{};
+  if(x.pick==="diff"){ const L=[]; for(const b of SH.books) if(b.final) diffPairs(flatText(b),finText(b)).forEach((p,i)=>L.push({id:b.id+":"+i,b,p}));
+    if(!L.length) return '<p class="gnote">推敲（整える）で書きかえた文がまだありません。</p>';
+    const cur=L.find(z=>z.id===pk.id), cut=t=>t.length>34? t.slice(0,34)+"…" : t;
+    return '<select class="fsel" data-fpick="'+x.k+'"><option value="">― 書きかえた文をえらぶ（'+L.length+'こ）―</option>'+L.map(z=>'<option value="'+esc(z.id)+'"'+(cur&&cur.id===z.id?" selected":"")+'>『'+esc(bTitle(z.b))+'』'+esc(cut(z.p.before||"（新しく足した文）"))+'</option>').join("")+'</select>'
+      +(cur?'<div class="fpair" data-text="'+esc("前：「"+(cur.p.before||"（なかった文）")+"」→ 後：「"+(cur.p.after||"（消した）")+"」（『"+bTitle(cur.b)+"』）")+'"><div><span>前</span>'+(cur.p.before?esc(cur.p.before):'<i>（なかった文）</i>')+'</div><div><span>後</span>'+(cur.p.after?esc(cur.p.after):'<i>（消した）</i>')+'</div></div>':''); }
+  if(x.pick==="line"){ const L=[]; for(const b of SH.books) sentencesOf(bookTextFor(b)).forEach((t,i)=>L.push({id:b.id+":"+i,b,t}));
+    if(!L.length) return '<p class="gnote">本棚に作品がありません。</p>';
+    const cur=L.find(z=>z.id===pk.id), cut=t=>t.length>40? t.slice(0,40)+"…" : t;
+    return '<select class="fsel" data-fpick="'+x.k+'"><option value="">― 一文をえらぶ ―</option>'+SH.books.map(b=>'<optgroup label="『'+esc(bTitle(b))+'』">'+L.filter(z=>z.b===b).map(z=>'<option value="'+esc(z.id)+'"'+(cur&&cur.id===z.id?" selected":"")+'>'+esc(cut(z.t))+'</option>').join("")+'</optgroup>').join("")+'</select>'
+      +(cur?'<div class="fquote" data-text="'+esc("「"+cur.t+"」（『"+bTitle(cur.b)+"』）")+'">「'+esc(cur.t)+'」<small>『'+esc(bTitle(cur.b))+'』</small></div>':''); }
+  return ""; }
+function fqHTML(k,label,q,extra){ const asks=SH.furi.ask[k]||[];
+  return '<div class="fqbox'+(furiDone(k)?" done":"")+'" data-fk="'+k+'"><div class="fqh"><span class="fqk">'+(furiDone(k)?"✓":"○")+'</span><b>'+label+'</b></div><p class="fqq">'+q+'</p>'+(extra||"")
+    +'<textarea class="fta" data-fk="'+k+'" rows="4" placeholder="自分のことばで（'+FURI_MIN+'字くらい〜）">'+esc(furiA(k))+'</textarea>'
+    +'<div class="fqf"><span class="fqn"><span>'+nchars(furiA(k))+'</span> 字</span><button class="btn small" data-fask="'+k+'"'+(asks.length>=3?" disabled":"")+'>🤝 もう一歩（AIが問いを1つ）</button></div>'
+    +'<ul class="fasks">'+asks.map(a=>'<li>'+esc(a)+'</li>').join("")+'</ul></div>'; }
+function furiProgHTML(){ const b=FURI_Q.filter((_,i)=>furiDone("q"+(i+1))).length, x=FURI_X.filter(z=>furiDone(z.k)).length;
+  return '<b>基本の問い '+b+' / 5</b>　<span>もう一歩 '+x+' / 5</span>'+(b===5?'<span class="fok">　基本はできました！ 時間があれば「もう一歩」へ</span>':''); }
+function renderFuriSheet(){ const el=$("furiSheet"); if(!el) return;
+  SH.furi.qs={}; FURI_Q.forEach((q,i)=>SH.furi.qs["q"+(i+1)]=q); FURI_X.forEach(x=>SH.furi.qs[x.k]=x.t+"："+x.q);
+  el.innerHTML='<h3 class="fh">ふりかえりシート</h3><p class="gnote" style="margin:0 0 6px">上の記録を見ながら、自分のことばで答えよう。書いた答えはこの iPad に保存され、じゅもんにも預けられます。</p>'
+    +'<div class="fprog" id="furiProg">'+furiProgHTML()+'</div>'
+    +FURI_Q.map((q,i)=>fqHTML("q"+(i+1),"問い"+(i+1),q)).join("")
+    +'<h3 class="fh">もう一歩（早く終わった人へ）</h3><p class="gnote" style="margin:0 0 6px">どれからでもOK。選んだり、数字を見たりしてから書こう。</p>'
+    +FURI_X.map(x=>fqHTML(x.k,x.t,x.q, x.pick? pickHTML(x) : x.karte? karteHTML() : x.words? '<div class="fwords" id="furiWords"><button class="btn small" id="btnFuriWords">もらったことばを読みこむ</button></div>' : "")).join("")
+    +'<div class="fend"><p class="gnote" style="margin:0 0 8px">できたら、［📋 ふりかえりシートをコピー］でロイロに出そう。最後に［📚 本棚］で、じゅもんを新しくしておくと安心です。</p>'
+    +'<div class="row" style="margin-top:0"><button class="btn main" id="btnFuriSheet">📋 ふりかえりシートをコピー</button><button class="btn small" id="btnFuriCopy">記録だけコピー</button></div><div class="msg" id="furiMsg" style="color:var(--ok)"></div></div>';
+  $("btnFuriCopy").onclick=()=>copyText(furiText(),$("btnFuriCopy"),$("furiMsg"),"記録だけコピー");
+  $("btnFuriSheet").onclick=()=>copyText(furiSheetText(),$("btnFuriSheet"),$("furiMsg"),"📋 ふりかえりシートをコピー");
+  $("btnFuriWords").onclick=loadFuriWords;
+}
+function furiSheetText(){ let s=furiText()+"\n【ふりかえり】\n";
+  FURI_Q.forEach((q,i)=>{ s+="\n問い"+(i+1)+"　"+q+"\n"+(furiA("q"+(i+1)).trim()||"（まだ）")+"\n"; });
+  const xs=FURI_X.filter(x=>furiA(x.k).trim()); if(xs.length) s+="\n【もう一歩】\n";
+  for(const x of xs){ s+="\n"+x.t+"　"+x.q+"\n"; const pk=SH.furi.pick[x.k];
+    if(pk&&pk.text) s+=pk.text+"\n"; s+=furiA(x.k).trim()+"\n"; }
+  return s; }
+// もらったことば：自分が文庫に出した本の、感想と帯を読みこむ
+async function loadFuriWords(){ const el=$("furiWords"); if(!el) return;
+  if(!lsGet("bunko_pass")){ el.innerHTML='<p class="gnote">クラス文庫の合言葉が入っていないので読みこめません。［📚 本棚］の「ふっかつのじゅもん」で合言葉を入れてください。</p>'; return; }
+  el.innerHTML='<p class="gnote">読みこんでいます…</p>'; const out=[];
+  for(const b of SH.books) if(b.bunko){ try{ const j=await bunkoApi("/work?id="+encodeURIComponent(b.bunko.id)+"&token="+ownerToken());
+    for(const c of (j.comments||[])) out.push('<li><b>'+esc(c.name)+'</b>'+(c.ai?'<span class="aitag">AI</span>':'')+'：'+esc(c.text)+'<small>『'+esc(bTitle(b))+'』への感想</small></li>');
+    for(const o of (j.obis||[])) out.push('<li class="ob"><b>'+esc(o.catch)+'</b>　'+esc(o.body)+'<small>推薦・'+esc(o.pen)+'　『'+esc(bTitle(b))+'』の帯</small></li>'); }catch(e){} }
+  el.innerHTML= out.length? '<ul class="fwl">'+out.join("")+'</ul>' : '<p class="gnote">まだ、もらった感想や帯はありませんでした。（文庫に出した本がないときは、推し短編集で書いた書評をふりかえってもOK）</p>'; }
+$("furiBody").addEventListener("input",e=>{ const ta=e.target.closest("textarea.fta"); if(!ta) return; const k=ta.dataset.fk;
+  SH.furi.a[k]=ta.value; SH.furi.updated=Date.now(); saveShelf();
+  const box=ta.closest(".fqbox"); box.querySelector(".fqn span").textContent=nchars(ta.value);
+  const d=furiDone(k); box.classList.toggle("done",d); box.querySelector(".fqk").textContent=d?"✓":"○"; $("furiProg").innerHTML=furiProgHTML(); });
+$("furiBody").addEventListener("change",e=>{ const sel=e.target.closest("select[data-fpick]"); if(!sel) return; const k=sel.dataset.fpick, x=FURI_X.find(z=>z.k===k);
+  const opt=sel.options[sel.selectedIndex]; SH.furi.pick[k]=sel.value?{id:sel.value,text:""}:null; saveShelf();
+  const wrap=document.createElement("div"); wrap.innerHTML=pickHTML(x); sel.parentElement.querySelector(".fpair,.fquote")?.remove(); const extra=wrap.querySelector(".fpair,.fquote");
+  if(extra){ sel.after(extra); SH.furi.pick[k].text=extra.dataset.text; saveShelf(); } });
+$("furiBody").addEventListener("click",async e=>{ const b=e.target.closest("button[data-fask]"); if(!b) return; const k=b.dataset.fask, a=furiA(k).trim();
+  if(nchars(a)<20){ b.textContent="もう少し書いてから押してね"; setTimeout(()=>{ if(b.isConnected) b.textContent="🤝 もう一歩（AIが問いを1つ）"; },2500); return; }
+  if(!lsGet("bunko_pass")){ b.textContent="合言葉が入っていないので使えません"; return; }
+  b.disabled=true; b.textContent="読んでいます…";
+  try{ const j=await bunkoApi("/furi/ask",{q:(SH.furi.qs||{})[k]||"",a,prev:SH.furi.ask[k]||[]});
+    if(j.ask){ (SH.furi.ask[k]=SH.furi.ask[k]||[]).push(j.ask); saveShelf(); b.closest(".fqbox").querySelector(".fasks").insertAdjacentHTML("beforeend",'<li>'+esc(j.ask)+'</li>'); } }
+  catch(err){}
+  b.textContent="🤝 もう一歩（AIが問いを1つ）"; b.disabled=(SH.furi.ask[k]||[]).length>=3; });
 // 感想・帯の数を、クラス文庫から読み直す（ひらいたときに1回だけ）
 let furiLoaded=false;
 async function refreshFuri(){ if(furiLoaded||!lsGet("bunko_pass")) return; furiLoaded=true;
   for(const b of SH.books) if(b.bunko){ try{ await refreshBunko(b); }catch(e){} }
-  if(view==="furi") renderFuri(); }
+  if(view==="furi") renderFuriRec(); }
 /* ---- ふっかつのじゅもん：本棚をまるごと預ける（この iPad の本棚には手を加えない） ---- */
 function renderSpell(){
   const code=lsGet("kishou_spell"), at=+lsGet("kishou_spell_at")||0;
@@ -1458,7 +1574,7 @@ const hasUnsaved=()=>(+lsGet("kishou_dirty")||0)>lastBackup();
 async function spellSave(){
   if(spBusy) throw new Error("いま預けています。"); spBusy=true; const t0=Date.now();
   try{ const j=await bunkoApi("/spell/save",{token:ownerToken(),code:lsGet("kishou_spell"),pen:lsGet("kishou_pen"),
-        shelf:{books:SH.books,antho:SH.antho,oshi:SH.oshi,draft:S.genre?S:null,v:1}});
+        shelf:{books:SH.books,antho:SH.antho,oshi:SH.oshi,furi:SH.furi,draft:S.genre?S:null,v:1}});
     lsSet("kishou_spell",j.code); lsSet("kishou_spell_at",String(j.savedAt)); lsSet("kishou_bk_local",String(t0));
     return j; }
   finally{ spBusy=false; if(view==="shelf") renderSpell(); if(view==="oshi") renderOSave(); }
@@ -1492,6 +1608,8 @@ $("btnSpLoad").onclick=async()=>{
     for(const b of rb){ if(!b||!b.id) continue; if(SH.books.some(x=>x.id===b.id)){ kept++; continue; } SH.books.push(b); added++; }
     for(const a of ra){ if(a&&a.id&&!SH.antho.some(x=>x.id===a.id)) SH.antho.push(a); }
     for(const o of ((j.shelf&&j.shelf.oshi)||[])){ if(o&&o.id&&!SH.oshi.some(x=>x.id===o.id)) SH.oshi.push(o); }
+    const rf=j.shelf&&j.shelf.furi; if(rf&&rf.a){ for(const k in rf.a) if(!(SH.furi.a[k]||"").trim()&&rf.a[k]) SH.furi.a[k]=rf.a[k];   // ふりかえりは、書いていない欄だけもどす
+      for(const k in (rf.ask||{})) if(!(SH.furi.ask[k]||[]).length) SH.furi.ask[k]=rf.ask[k]; for(const k in (rf.pick||{})) if(!SH.furi.pick[k]) SH.furi.pick[k]=rf.pick[k]; }
     const dr=j.shelf&&j.shelf.draft; let drOk=false;
     if(dr&&dr.genre&&!S.genre){ S=dr; save(); drOk=true; }   // 書きかけの物語は、この iPad で何も書いていないときだけもどす
     migrateAntho(); saveShelf(); render();
