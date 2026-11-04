@@ -296,15 +296,13 @@ h3 small{font-weight:500;letter-spacing:0;margin-left:4px}
     <div class="panel"><p class="label">読書カード <span id="anCardN"></span></p><div id="anCards"></div></div>
     <div class="panel" id="anForm">
       <p class="label">読書カードを書く</p>
-      <p class="note" style="margin:0 0 10px">本として読んでから書こう。①〜⑤の順に書くと、1枚のカードになって、この本の下に貼られます。</p>
+      <p class="note" style="margin:0 0 10px">本として読んでから書こう。①〜④の順に書くと、1枚のカードになって、この本の下に貼られます。</p>
       <div class="cfs"><b>① いちばん好きだった作品</b><div class="chips2" id="cfFav"></div></div>
-      <div class="cfs"><b>② 心に残った一文</b><span class="note">（①の作品の中からえらぶ・なくてもよい）</span>
-        <select id="cfLine" class="cfsel" disabled><option value="">― 先に①をえらんでください ―</option></select></div>
-      <div class="cfs"><b>③ 読み終えたときの気分</b><span class="note">（2つまで）</span><div class="chips2" id="cfMood"></div></div>
-      <div class="cfs"><b>④ 書評について</b><span class="note">（なくてもよい）</span>
+      <div class="cfs"><b>② 読み終えたときの気分</b><span class="note">（2つまで）</span><div class="chips2" id="cfMood"></div></div>
+      <div class="cfs"><b>③ 書評について</b><span class="note">（なくてもよい）</span>
         <div class="cfrv hidden" id="cfRvShow"></div>
         <textarea id="cfRv" rows="2" maxlength="200" placeholder="編者の書評の、どこで読みたくなった？ 書評を読んでから本文を読んで、どうだった？"></textarea><div class="count"><span id="cfRvN">0</span> / 200</div></div>
-      <div class="cfs"><b>⑤ 編者へのひとこと</b><span class="note">（必須）</span>
+      <div class="cfs"><b>④ 編者へのひとこと</b><span class="note">（必須）</span>
         <p class="note" style="font-size:12px;margin:2px 0 6px">テーマ・作品のえらび方・並べた順番・はじめに・あとがきで、気づいたことや「うまい」と思ったところを書こう。</p>
         <textarea id="cfMsg" rows="4" maxlength="300" placeholder="例：一作目をこの話にしたのは、入り口として…"></textarea><div class="count"><span id="cfMsgN">0</span> / 300</div></div>
       <div class="cfs"><b>ペンネーム</b><input id="cfName" maxlength="20" placeholder="ペンネーム" style="margin-top:6px"></div>
@@ -566,15 +564,12 @@ function cardHTML(c,no){ const d=new Date(c.created);
 function renderCards(){ const cs=curAn.cards||[];
   $("anCardN").textContent=cs.length?"（"+cs.length+"枚）":"";
   $("anCards").innerHTML=cs.length? '<div class="rcards">'+cs.map((c,i)=>cardHTML(c,i+1)).join("")+'</div>' : '<p class="note">まだ読書カードはありません。最初の1枚を書いてみませんか。</p>'; }
-function cfDraft(){ return {favTitle:cf.fav>=0?curAn.a.items[cf.fav].title:"",line:$("cfLine").value,moods:cf.moods,rvnote:$("cfRv").value.trim(),msg:$("cfMsg").value.trim(),name:$("cfName").value.trim(),created:Date.now()}; }
+function cfDraft(){ return {favTitle:cf.fav>=0?curAn.a.items[cf.fav].title:"",line:"",moods:cf.moods,rvnote:$("cfRv").value.trim(),msg:$("cfMsg").value.trim(),name:$("cfName").value.trim(),created:Date.now()}; }
 function renderCf(){ const a=curAn.a;
   $("cfFav").innerHTML=a.items.map((x,i)=>'<button data-fav="'+i+'"'+(cf.fav===i?' class="on"':'')+'>『'+esc(x.title)+'』</button>').join("");
   $("cfMood").innerHTML=MOODS.map(m=>'<button data-mood="'+m+'"'+(cf.moods.includes(m)?' class="on"':'')+'>'+m+'</button>').join("");
-  const sel=$("cfLine");
-  if(cf.fav<0){ sel.disabled=true; sel.innerHTML='<option value="">― 先に①をえらんでください ―</option>'; $("cfRvShow").classList.add("hidden"); }
-  else { const keep=sel.value, L=sents(anText(cf.fav)); sel.disabled=!L.length;
-    sel.innerHTML='<option value="">― 一文をえらぶ（なくてもよい）―</option>'+L.map(t=>'<option value="'+esc(t)+'"'+(t===keep?" selected":"")+'>'+esc(t.length>60?t.slice(0,60)+"…":t)+'</option>').join("");
-    const rv=a.items[cf.fav].review; $("cfRvShow").classList.toggle("hidden",!rv); $("cfRvShow").innerHTML=rv?'<div class="note" style="font-size:11px">編者の書評『'+esc(a.items[cf.fav].title)+'』</div>'+esc(rv):""; }
+  if(cf.fav<0) $("cfRvShow").classList.add("hidden");
+  else { const rv=a.items[cf.fav].review; $("cfRvShow").classList.toggle("hidden",!rv); $("cfRvShow").innerHTML=rv?'<div class="note" style="font-size:11px">編者の書評『'+esc(a.items[cf.fav].title)+'』</div>'+esc(rv):""; }
   renderCfPrev(); }
 function renderCfPrev(){ $("cfPrev").innerHTML=cardHTML(cfDraft(),(curAn.cards||[]).length+1); $("cfRvN").textContent=[...$("cfRv").value].length; $("cfMsgN").textContent=[...$("cfMsg").value].length; }
 async function openAnPage(id,btn){
@@ -595,10 +590,10 @@ $("btnAnCardGo").onclick=goCardForm;
 $("cfFav").addEventListener("click",e=>{ const b=e.target.closest("[data-fav]"); if(!b) return; cf.fav=+b.dataset.fav; renderCf(); });
 $("cfMood").addEventListener("click",e=>{ const b=e.target.closest("[data-mood]"); if(!b) return; const m=b.dataset.mood;
   if(cf.moods.includes(m)) cf.moods=cf.moods.filter(x=>x!==m); else { if(cf.moods.length>=2) cf.moods.shift(); cf.moods.push(m); } renderCf(); });
-["cfLine","cfRv","cfMsg","cfName"].forEach(id=>$(id).addEventListener("input",renderCfPrev)); $("cfLine").addEventListener("change",renderCfPrev);
+["cfRv","cfMsg","cfName"].forEach(id=>$(id).addEventListener("input",renderCfPrev));
 $("btnCard").onclick=async()=>{ const d=cfDraft(); $("cfOut").style.color="var(--ng)";
   if(cf.fav<0){ $("cfOut").textContent="①で、いちばん好きだった作品をえらんでください。"; return; }
-  if([...d.msg].length<20){ $("cfOut").textContent="⑤の編者へのひとことを、もう少し（20字以上）書いてください。"; return; }
+  if([...d.msg].length<20){ $("cfOut").textContent="④の編者へのひとことを、もう少し（20字以上）書いてください。"; return; }
   if(!d.name){ $("cfOut").textContent="ペンネームを入れてください。"; return; }
   $("btnCard").disabled=true; $("cfOut").style.color="var(--sub)"; $("cfOut").textContent="貼っています…";
   try{ const j=await api("/bunko/oshi/card",{method:"POST",body:{anId:curAn.a.id,token:ownerToken(),name:d.name,fav:cf.fav,line:d.line,moods:d.moods,rvnote:d.rvnote,msg:d.msg}});
