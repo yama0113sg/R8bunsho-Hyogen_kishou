@@ -296,13 +296,12 @@ h3 small{font-weight:500;letter-spacing:0;margin-left:4px}
     <div class="panel"><p class="label">読書カード <span id="anCardN"></span></p><div id="anCards"></div></div>
     <div class="panel" id="anForm">
       <p class="label">読書カードを書く</p>
-      <p class="note" style="margin:0 0 10px">本として読んでから書こう。①〜④の順に書くと、1枚のカードになって、この本の下に貼られます。</p>
-      <div class="cfs"><b>① いちばん好きだった作品</b><div class="chips2" id="cfFav"></div></div>
-      <div class="cfs"><b>② 読み終えたときの気分</b><span class="note">（2つまで）</span><div class="chips2" id="cfMood"></div></div>
-      <div class="cfs"><b>③ 書評について</b><span class="note">（なくてもよい）</span>
-        <div class="cfrv hidden" id="cfRvShow"></div>
+      <p class="note" style="margin:0 0 10px">本として読んでから書こう。①〜③の順に書くと、1枚のカードになって、この本の下に貼られます。</p>
+      <div class="cfs"><b>① 読み終えたときの気分</b><span class="note">（3つまで）</span><div class="chips2" id="cfMood"></div>
+        <input id="cfOther" class="hidden" maxlength="12" placeholder="その他：自分のことばで（12字まで）" style="margin-top:8px;font-size:15px"></div>
+      <div class="cfs"><b>② 書評について</b><span class="note">（なくてもよい）</span>
         <textarea id="cfRv" rows="2" maxlength="200" placeholder="編者の書評の、どこで読みたくなった？ 書評を読んでから本文を読んで、どうだった？"></textarea><div class="count"><span id="cfRvN">0</span> / 200</div></div>
-      <div class="cfs"><b>④ 編者へのひとこと</b><span class="note">（必須）</span>
+      <div class="cfs"><b>③ 編者へのひとこと</b><span class="note">（必須）</span>
         <p class="note" style="font-size:12px;margin:2px 0 6px">テーマ・作品のえらび方・並べた順番・はじめに・あとがきで、気づいたことや「うまい」と思ったところを書こう。</p>
         <textarea id="cfMsg" rows="4" maxlength="300" placeholder="例：一作目をこの話にしたのは、入り口として…"></textarea><div class="count"><span id="cfMsgN">0</span> / 300</div></div>
       <div class="cfs"><b>ペンネーム</b><input id="cfName" maxlength="20" placeholder="ペンネーム" style="margin-top:6px"></div>
@@ -546,8 +545,9 @@ async function loadAnShelf(){
 }
 $("anShelf").addEventListener("click",e=>{ const b=e.target.closest("[data-an]"); if(b) openAnPage(b.dataset.an,b); });
 /* ---- 推し短編集のページと読書カード ---- */
-const MOODS=["泣けた","笑った","ぞくっとした","あたたかい","考えさせられた","もう一度読みたい","ことばがきれい","人にすすめたい"];
-let curAn=null, cf={fav:-1,moods:[]};
+const MOODS=["泣けた","笑った","ぞくっとした","あたたかい","せつない","わくわくした","考えさせられた","意外だった","なつかしい","元気が出た","静かな気持ち","ことばがきれい","もう一度読みたい","続きが読みたい","人にすすめたい"];
+let curAn=null, cf={fav:-1,moods:[],other:false};
+const cfMoods=()=>cf.moods.concat(cf.other&&$("cfOther").value.trim()?[$("cfOther").value.trim()]:[]).slice(0,3);
 const anBook=(a,W,extra)=>Object.assign({title:a.title,editor:a.editor,theme:a.theme,cover:a.cover,intro:a.intro,after:a.after,
   items:a.items.map(x=>{ const w=x.src==="bunko"?W[x.id]:null;
     return {title:x.title,pen:x.pen,genreName:genreOf(x.genre).name,text:x.src==="bunko"?(w?w.text:"（この作品は、いまクラス文庫で読めません）"):x.text,obi:w&&w.obi,review:x.review}; })},extra||{});
@@ -564,18 +564,16 @@ function cardHTML(c,no){ const d=new Date(c.created);
 function renderCards(){ const cs=curAn.cards||[];
   $("anCardN").textContent=cs.length?"（"+cs.length+"枚）":"";
   $("anCards").innerHTML=cs.length? '<div class="rcards">'+cs.map((c,i)=>cardHTML(c,i+1)).join("")+'</div>' : '<p class="note">まだ読書カードはありません。最初の1枚を書いてみませんか。</p>'; }
-function cfDraft(){ return {favTitle:cf.fav>=0?curAn.a.items[cf.fav].title:"",line:"",moods:cf.moods,rvnote:$("cfRv").value.trim(),msg:$("cfMsg").value.trim(),name:$("cfName").value.trim(),created:Date.now()}; }
+function cfDraft(){ return {favTitle:cf.fav>=0?curAn.a.items[cf.fav].title:"",line:"",moods:cfMoods(),rvnote:$("cfRv").value.trim(),msg:$("cfMsg").value.trim(),name:$("cfName").value.trim(),created:Date.now()}; }
 function renderCf(){ const a=curAn.a;
-  $("cfFav").innerHTML=a.items.map((x,i)=>'<button data-fav="'+i+'"'+(cf.fav===i?' class="on"':'')+'>『'+esc(x.title)+'』</button>').join("");
-  $("cfMood").innerHTML=MOODS.map(m=>'<button data-mood="'+m+'"'+(cf.moods.includes(m)?' class="on"':'')+'>'+m+'</button>').join("");
-  if(cf.fav<0) $("cfRvShow").classList.add("hidden");
-  else { const rv=a.items[cf.fav].review; $("cfRvShow").classList.toggle("hidden",!rv); $("cfRvShow").innerHTML=rv?'<div class="note" style="font-size:11px">編者の書評『'+esc(a.items[cf.fav].title)+'』</div>'+esc(rv):""; }
+  $("cfMood").innerHTML=MOODS.map(m=>'<button data-mood="'+m+'"'+(cf.moods.includes(m)?' class="on"':'')+'>'+m+'</button>').join("")+'<button data-mood="__other"'+(cf.other?' class="on"':'')+'>その他…</button>';
+  $("cfOther").classList.toggle("hidden",!cf.other);
   renderCfPrev(); }
 function renderCfPrev(){ $("cfPrev").innerHTML=cardHTML(cfDraft(),(curAn.cards||[]).length+1); $("cfRvN").textContent=[...$("cfRv").value].length; $("cfMsgN").textContent=[...$("cfMsg").value].length; }
 async function openAnPage(id,btn){
   if(btn) btn.disabled=true;
   try{ const j=await api("/bunko/oshi?id="+encodeURIComponent(id)+"&token="+ownerToken()); curAn={a:j.oshi,W:j.works||{},cards:j.cards||[]};
-    const a=curAn.a; cf={fav:-1,moods:[]};
+    const a=curAn.a; cf={fav:-1,moods:[],other:false}; $("cfOther").value="";
     $("anCov").innerHTML=ocoverHTML(a); $("anTitle").textContent="『"+a.title+"』"; $("anMeta").textContent="編・"+a.editor+(a.theme?"　テーマ："+a.theme:"")+"　"+a.items.length+"作品";
     $("anToc").innerHTML=a.items.map(x=>'<li>『'+esc(x.title)+'』<small>'+esc(x.pen||"")+'</small></li>').join("");
     $("cfRv").value=""; $("cfMsg").value=""; $("cfName").value=$("cfName").value||ls.get("kishou_pen"); $("cfOut").textContent=""; $("btnCard").disabled=false;
@@ -587,20 +585,19 @@ const goCardForm=()=>$("anForm").scrollIntoView({behavior:"smooth",block:"start"
 $("btnAnBack").onclick=()=>{ show("scShelf"); loadShelf().catch(()=>{}); };
 $("btnAnRead").onclick=()=>OshiBook.open(anBook(curAn.a,curAn.W,{onEnd:goCardForm,endLabel:"✎ 読書カードを書く"}));
 $("btnAnCardGo").onclick=goCardForm;
-$("cfFav").addEventListener("click",e=>{ const b=e.target.closest("[data-fav]"); if(!b) return; cf.fav=+b.dataset.fav; renderCf(); });
 $("cfMood").addEventListener("click",e=>{ const b=e.target.closest("[data-mood]"); if(!b) return; const m=b.dataset.mood;
-  if(cf.moods.includes(m)) cf.moods=cf.moods.filter(x=>x!==m); else { if(cf.moods.length>=2) cf.moods.shift(); cf.moods.push(m); } renderCf(); });
-["cfRv","cfMsg","cfName"].forEach(id=>$(id).addEventListener("input",renderCfPrev));
+  if(m==="__other"){ cf.other=!cf.other; if(cf.other&&cf.moods.length>=3) cf.moods.shift(); renderCf(); if(cf.other) $("cfOther").focus(); return; }
+  if(cf.moods.includes(m)) cf.moods=cf.moods.filter(x=>x!==m); else { if(cf.moods.length+(cf.other?1:0)>=3) cf.moods.shift(); cf.moods.push(m); } renderCf(); });
+["cfRv","cfMsg","cfName","cfOther"].forEach(id=>$(id).addEventListener("input",renderCfPrev));
 $("btnCard").onclick=async()=>{ const d=cfDraft(); $("cfOut").style.color="var(--ng)";
-  if(cf.fav<0){ $("cfOut").textContent="①で、いちばん好きだった作品をえらんでください。"; return; }
-  if([...d.msg].length<20){ $("cfOut").textContent="④の編者へのひとことを、もう少し（20字以上）書いてください。"; return; }
+  if([...d.msg].length<20){ $("cfOut").textContent="③の編者へのひとことを、もう少し（20字以上）書いてください。"; return; }
   if(!d.name){ $("cfOut").textContent="ペンネームを入れてください。"; return; }
   $("btnCard").disabled=true; $("cfOut").style.color="var(--sub)"; $("cfOut").textContent="貼っています…";
   try{ const j=await api("/bunko/oshi/card",{method:"POST",body:{anId:curAn.a.id,token:ownerToken(),name:d.name,fav:cf.fav,line:d.line,moods:d.moods,rvnote:d.rvnote,msg:d.msg}});
     ls.set("kishou_pen",d.name);
     if(j.card.status==="public"){ curAn.cards.push(j.card); renderCards(); $("cfOut").style.color="var(--ok)"; $("cfOut").textContent="📌 この本に貼りました！ 上の読書カードの列に並んでいます。ほかの推し短編集も読んでみよう。"; }
     else { $("cfOut").style.color="var(--ok)"; $("cfOut").textContent="受けつけました。先生が確認してから貼られます。"; }
-    cf={fav:-1,moods:[]}; $("cfRv").value=""; $("cfMsg").value=""; renderCf(); $("anCards").scrollIntoView({behavior:"smooth",block:"start"}); }
+    cf={fav:-1,moods:[],other:false}; $("cfOther").value=""; $("cfRv").value=""; $("cfMsg").value=""; renderCf(); $("anCards").scrollIntoView({behavior:"smooth",block:"start"}); }
   catch(e){ $("cfOut").style.color="var(--ng)"; $("cfOut").textContent=e.message; }
   $("btnCard").disabled=false; };
 async function openAn(id,teacher,btn){

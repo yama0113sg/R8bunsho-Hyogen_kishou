@@ -637,7 +637,7 @@ async function makeAnCoach(env, id) {
   return true;
 }
 // ── 推し短編集への読書カード ──
-const CARD_MOODS = ["泣けた", "笑った", "ぞくっとした", "あたたかい", "考えさせられた", "もう一度読みたい", "ことばがきれい", "人にすすめたい"];
+const CARD_MOODS = ["泣けた", "笑った", "ぞくっとした", "あたたかい", "せつない", "わくわくした", "考えさせられた", "意外だった", "なつかしい", "元気が出た", "静かな気持ち", "ことばがきれい", "もう一度読みたい", "続きが読みたい", "人にすすめたい"];
 const CARD_CHECK = `高校3年生のクラス文庫で、生徒が友だちの「推し短編集」に読書カード（感想）を書きました。
 だれかを傷つけないかだけを見てください。悪口・からかい、作品や編者をけなす書き方、実在の人物をばかにする内容、性的な内容、差別、個人情報があれば ok を false にして、why に理由を40字以内で書く。なければ ok は true、why は空。感想のうまい・へた、短さは問題にしない。
 出力は JSON だけ：{"ok":true,"why":""}`;
@@ -774,10 +774,11 @@ async function bunko(request, env, headers, path, ctx) {
     if (!a || a.status !== "public") return J({ error: "notfound" }, headers, 404);
     const name = clip(body.name, 20).trim(), msg = clip(body.msg, 300).trim(), fav = Number.isInteger(body.fav) && a.items[body.fav] ? body.fav : -1;
     if (!name || !msg) return J({ error: "empty", message: "ペンネームと、編者へのひとことを書いてください。" }, headers, 400);
+    // 読後の気分は3つまで。一覧にない「その他」も12字まで受けつける
     const card = { id: rid(), anId: a.id, token: clip(body.token, 64), name, fav, favTitle: fav >= 0 ? a.items[fav].title : "", line: clip(body.line, 160).trim(),
-      moods: (Array.isArray(body.moods) ? body.moods : []).filter(m => CARD_MOODS.includes(m)).slice(0, 2), rvnote: clip(body.rvnote, 200).trim(), msg, created: Date.now() };
+      moods: (Array.isArray(body.moods) ? body.moods : []).map(m => clip(m, 12).trim()).filter(Boolean).slice(0, 3), rvnote: clip(body.rvnote, 200).trim(), msg, created: Date.now() };
     let check = null;
-    try { ({ result: check } = await callGemini(env, CARD_CHECK, `推し短編集『${a.title}』（編・${a.editor}）への読書カード\n\n心に残った一文：${card.line}\n書評について：${card.rvnote}\n編者へ：${card.msg}\nペンネーム：${card.name}\n\nJSON で出してください。`, { models: HINT_MODELS, parse: parseAnRv, temperature: 0.2, json: true })); } catch { check = null; }
+    try { ({ result: check } = await callGemini(env, CARD_CHECK, `推し短編集『${a.title}』（編・${a.editor}）への読書カード\n\n読後の気分：${card.moods.join("・")}\n書評について：${card.rvnote}\n編者へ：${card.msg}\nペンネーム：${card.name}\n\nJSON で出してください。`, { models: HINT_MODELS, parse: parseAnRv, temperature: 0.2, json: true })); } catch { check = null; }
     card.status = check && check.ok ? "public" : "pending"; card.why = check ? check.why : "";
     await putSub(kv, "an:" + a.id, "k:" + a.id + ":" + card.id, card, { status: card.status, created: card.created });
     const { token, ...view } = card;
