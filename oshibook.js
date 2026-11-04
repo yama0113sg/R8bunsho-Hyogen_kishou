@@ -116,7 +116,7 @@ function pageHTML(p){
       +(o?'<div class="obk-obi"><div class="oc">'+esc(o.catch)+'</div><div class="ob">'+esc(o.body)+'</div><div class="op">推薦・'+esc(o.pen)+'</div></div>':'')+'</div>'; }
   if(p.kind==="end") return '<div class="obk-end"><h3>『'+esc(b.title)+'』</h3><div>編者　'+esc(b.editor)+'</div>'+(b.theme?'<div>テーマ　'+esc(b.theme)+'</div>':'')
     +'<div style="margin-top:.8em">収録作品</div>'+b.items.map((it,i)=>'<div>'+KAN[i]+'　『'+esc(it.title)+'』　'+esc(it.pen||"")+'</div>').join("")
-    +'<div class="ft">クラス文庫　推し短編集</div></div>';
+    +'<div class="ft">クラス文庫　推し短編集</div>'+(b.onEnd?'<div style="margin-top:1.4em;text-align:center"><button class="obk-todo-go obk-endgo">'+esc(b.endLabel||"✎ 感想を書く")+'</button></div>':'')+'</div>';
   return (p.run?'<div class="obk-run">'+esc(p.run)+'</div>':'')+'<div class="obk-body">'+p.html+'</div>';
 }
 function show(dir){
@@ -147,7 +147,8 @@ async function open(b){
   root.querySelector(".obk-next").onclick=()=>move(1);
   root.querySelector(".obk-prev").onclick=()=>move(-1);
   const pg=root.querySelector(".obk-page");
-  pg.addEventListener("click",e=>{ const go=e.target.closest(".obk-todo-go"); if(go){ const k=go.dataset.k, f=b.onTodo; close(); if(f) f(k); return; }
+  pg.addEventListener("click",e=>{ if(e.target.closest(".obk-endgo")){ const f=b.onEnd; close(); if(f) f(); return; }
+    const go=e.target.closest(".obk-todo-go"); if(go){ const k=go.dataset.k, f=b.onTodo; close(); if(f) f(k); return; }
     const r=pg.getBoundingClientRect(), x=(e.clientX-r.left)/r.width; if(x<.38) move(1); else if(x>.62) move(-1); });
   let sx=null, sy=0;
   pg.addEventListener("touchstart",e=>{ sx=e.touches[0].clientX; sy=e.touches[0].clientY; },{passive:true});

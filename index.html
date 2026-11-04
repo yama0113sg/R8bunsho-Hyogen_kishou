@@ -1271,7 +1271,7 @@ async function oshiBookData(o){
 const AN_LABEL={pending:"先生の確認待ちです。",public:"クラス文庫の「推し短編集の棚」に並んでいます。",hidden:"先生が非公開にしています。",returned:"文庫の編集部から返ってきました。下のメモを見て直し、出し直してください。"};
 function oshiPubHTML(o,st){
   const left=coachLeft(o), ready=st[3]&&st[4]&&st[5]&&o.items.length>=2&&!left, p=o.pub, rv=p&&p.status==="returned"&&p.review&&!p.review.ok&&p.review;
-  return '<div class="pubbox" id="oPub">'+(p?esc(AN_LABEL[p.status]||"出しました。"):ready?"できあがったら、クラス文庫に出せます。先生が確認したら、みんなが読めるようになります。":"①〜⑥がそろうと（作品は2つ以上）、クラス文庫に出せます。")
+  return '<div class="pubbox" id="oPub">'+(p?esc(AN_LABEL[p.status]||"出しました。")+(p.cards?'<div style="margin-top:4px;color:#ffd36a">📌 読書カードが '+p.cards+' 枚 貼られています。クラス文庫の「推し短編集の棚」で、この本を開くと読めます。</div>':''):ready?"できあがったら、クラス文庫に出せます。先生が確認したら、みんなが読めるようになります。":"①〜⑥がそろうと（作品は2つ以上）、クラス文庫に出せます。")
     +(rv?'<div style="margin-top:6px"><b>📮 文庫の編集部（AI）より</b><br>'+esc(rv.why||"")+'</div>':'')+(p&&p.returnNote?'<div style="margin-top:6px">先生から：'+esc(p.returnNote)+'</div>':'')
     +(coachOn(o)?'<div style="margin-top:8px"><b>📮 編集部からの直しメモ</b>　'+(p.coach.notes.length-left)+' / '+p.coach.notes.length+' こ 直しました'
       +(p.coach.good?'<div style="margin-top:4px">よいところ：'+esc(p.coach.good)+'</div>':'')
@@ -1320,7 +1320,7 @@ function refreshCoachCards(o){ if(!coachOn(o)) return;
 // 出した推し短編集の状態を確かめる（ひらいたとき）
 async function refreshOshiPub(o){
   if(!o.pub||!lsGet("bunko_pass")) return;
-  try{ const j=await bunkoApi("/oshi?id="+encodeURIComponent(o.pub.id)+"&token="+ownerToken()); o.pub.status=j.oshi.status; o.pub.review=j.oshi.review||null; o.pub.returnNote=j.oshi.returnNote||"";
+  try{ const j=await bunkoApi("/oshi?id="+encodeURIComponent(o.pub.id)+"&token="+ownerToken()); o.pub.status=j.oshi.status; o.pub.review=j.oshi.review||null; o.pub.returnNote=j.oshi.returnNote||""; o.pub.cards=(j.cards||[]).length;
     const c=j.oshi.status==="returned"&&j.oshi.coach;
     if(c&&(!o.pub.coach||o.pub.coach.at!==c.at)){ // 返ってきた時点の文章を写しておき、直したかどうかをくらべる
       o.pub.coach={good:c.good,at:c.at,notes:c.notes.map(n=>{ const m=/^rv(\d+)$/.exec(n.part), it=m&&o.items[+m[1]-1]; return {...n,key:it?rvKey(it):n.part}; })};

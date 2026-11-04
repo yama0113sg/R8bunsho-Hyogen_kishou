@@ -636,6 +636,20 @@ async function makeAnCoach(env, id) {
   await putAn(kv, cur);
   return true;
 }
+// ── 推し短編集への読書カード ──
+const CARD_MOODS = ["泣けた", "笑った", "ぞくっとした", "あたたかい", "考えさせられた", "もう一度読みたい", "ことばがきれい", "人にすすめたい"];
+const CARD_CHECK = `高校3年生のクラス文庫で、生徒が友だちの「推し短編集」に読書カード（感想）を書きました。
+だれかを傷つけないかだけを見てください。悪口・からかい、作品や編者をけなす書き方、実在の人物をばかにする内容、性的な内容、差別、個人情報があれば ok を false にして、why に理由を40字以内で書く。なければ ok は true、why は空。感想のうまい・へた、短さは問題にしない。
+出力は JSON だけ：{"ok":true,"why":""}`;
+async function anCards(kv, anId, teacher) {
+  const out = [];
+  for (const k of await listSub(kv, "an:" + anId, "k:" + anId + ":")) {
+    if (!k.metadata || (k.metadata.status !== "public" && !teacher)) continue;
+    const c = await kv.get(k.name, { type: "json" }); if (!c) continue;
+    const { token, ...v } = c; out.push(v);
+  }
+  return out.sort((a, b) => a.created - b.created);
+}
 // 文庫の作品の本文と、いちばん新しい公開中の帯をつける（公開中の作品だけ）
 async function expandWorks(kv, ids) {
   const out = {};
@@ -752,7 +766,22 @@ async function bunko(request, env, headers, path, ctx) {
     const a = await kv.get("an:" + clip(id, 30), { type: "json" });
     const mine = !!(a && token && a.owner === token);
     if (!a || (a.status !== "public" && !teacher && !mine)) return J({ error: "notfound" }, headers, 404);
-    return J({ oshi: anView(a, teacher, mine), works: await expandWorks(kv, a.items.filter(x => x.src === "bunko").map(x => x.id)), mine }, headers);
+    return J({ oshi: anView(a, teacher, mine), works: await expandWorks(kv, a.items.filter(x => x.src === "bunko").map(x => x.id)), mine, cards: await anCards(kv, a.id, teacher) }, headers);
+  }
+  // 推し短編集への読書カード（感想）。編集部（AI）が見て問題なければそのまま載る。気になる点があれば先生の確認待ち
+  if (path === "/bunko/oshi/card") {
+    const a = await kv.get("an:" + clip(body.anId, 30), { type: "json" });
+    if (!a || a.status !== "public") return J({ error: "notfound" }, headers, 404);
+    const name = clip(body.name, 20).trim(), msg = clip(body.msg, 300).trim(), fav = Number.isInteger(body.fav) && a.items[body.fav] ? body.fav : -1;
+    if (!name || !msg) return J({ error: "empty", message: "ペンネームと、編者へのひとことを書いてください。" }, headers, 400);
+    const card = { id: rid(), anId: a.id, token: clip(body.token, 64), name, fav, favTitle: fav >= 0 ? a.items[fav].title : "", line: clip(body.line, 160).trim(),
+      moods: (Array.isArray(body.moods) ? body.moods : []).filter(m => CARD_MOODS.includes(m)).slice(0, 2), rvnote: clip(body.rvnote, 200).trim(), msg, created: Date.now() };
+    let check = null;
+    try { ({ result: check } = await callGemini(env, CARD_CHECK, `推し短編集『${a.title}』（編・${a.editor}）への読書カード\n\n心に残った一文：${card.line}\n書評について：${card.rvnote}\n編者へ：${card.msg}\nペンネーム：${card.name}\n\nJSON で出してください。`, { models: HINT_MODELS, parse: parseAnRv, temperature: 0.2, json: true })); } catch { check = null; }
+    card.status = check && check.ok ? "public" : "pending"; card.why = check ? check.why : "";
+    await putSub(kv, "an:" + a.id, "k:" + a.id + ":" + card.id, card, { status: card.status, created: card.created });
+    const { token, ...view } = card;
+    return J({ card: view }, headers);
   }
   // 推し短編集を出す（同じ端末から同じ id で出し直すと、差し替えて確認待ちにもどる）
   if (path === "/bunko/oshi/submit") {
@@ -942,7 +971,12 @@ async function bunko(request, env, headers, path, ctx) {
       }
     }
     const oshis = Object.values((await getIdx(kv, "idx:an")).items).sort((a, b) => b.updated - a.updated);
-    return J({ works, comments, obis, oshis }, headers);
+    const cards = [];
+    for (const a of oshis) for (const k of await listSub(kv, "an:" + a.id, "k:")) {
+      if (!k.metadata || k.metadata.status !== "pending") continue;
+      const c = await kv.get(k.name, { type: "json" }); if (c) { const { token, ...v } = c; cards.push({ ...v, anTitle: a.title }); }
+    }
+    return J({ works, comments, obis, oshis, cards }, headers);
   }
   if (path === "/bunko/admin/set") {
     const st = body.status;
@@ -959,6 +993,11 @@ async function bunko(request, env, headers, path, ctx) {
           if (!(await hasAiComments(kv, w, R.ver))) await later(makeAiComment(env, w, R));
         }
       }
+    } else if (body.kind === "k") {
+      const anId = clip(body.anId, 30), key = "k:" + anId + ":" + clip(body.id, 30);
+      const c = await kv.get(key, { type: "json" }); if (!c) return J({ error: "notfound" }, headers, 404);
+      if (st === "delete") await delSubs(kv, "an:" + anId, [key]);
+      else if (st === "public") { c.status = "public"; await putSub(kv, "an:" + anId, key, c, { status: "public", created: c.created }); }
     } else if (body.kind === "an") {
       const a = await kv.get("an:" + clip(body.id, 30), { type: "json" });
       if (!a) return J({ error: "notfound" }, headers, 404);
@@ -1088,7 +1127,7 @@ export default {
       }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true, heal: true, teian: true, furi: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true, heal: true, teian: true, furi: true, card: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
