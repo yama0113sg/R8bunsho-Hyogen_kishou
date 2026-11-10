@@ -6,7 +6,7 @@
 //  POST {stage, genre, story, avoid}            → {line}   一行を引く
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
 //  POST {mode:"bridge", stage, genre, before, line, after}    → {bridge}   整えるときのつなぎの文
-//  POST {mode:"oshi_ask", role:"coach"|"kohai", oshi, q, a, log:[{ask,ans}]} → {ask}  推しプレゼンのテーマを練る問い返し
+//  POST {mode:"oshi_ask", role:"coach"|"kohai"|"fit", oshi, q, a, log:[{ask,ans}]} → {ask}（fit は {fit,why,ask}）  推しプレゼンのテーマを練る問い返し
 //
 //  ── クラス文庫（/bunko/...）──
 //  KV：BUNKO（KV namespace のバインディング）
@@ -562,7 +562,31 @@ const OSHI_ASK = {
 ・50字以内。「？」で終わる。後輩らしい、ていねいな話しことば。
 ・答えや例文、推しについての情報や知識は書かない。
 出力は JSON だけ：{"ask":"…？"}`,
+  fit: `高校3年生が、1年生（約150人）に向けて5分間の「推しプレゼン」（自分の好きなものを語る発表）を準備しています。
+あなたは、生徒の考えている発表の中身が「推しプレゼン」になっているかを見て、ずれていたら対話でいっしょに直していく相談役です。
+「推しプレゼン」とは：自分が本当に好きな、具体的なもの（人・作品・食べ物・場所・趣味・道具・活動など）の魅力を、知らない人にも伝わるように語る発表。
+よくある「ずれ」：
+・二択の意見や討論になっている（例：付き合うなら顔か性格か、犬派か猫派か）→ 自分の「好き」ではなく「どっちが正しいか」の話になっている
+・一般論や社会問題、雑学の紹介になっている（自分の好きの話がない）
+・範囲が広すぎる（例：「音楽」「スポーツ」）→ 5分で語れない
+・ウケねらいだけで、本人が本当に好きか見えない
+・嫌いなものや悪口が中心になっている
+・発表にふさわしくない内容（暴力・性的・違法・特定の人をからかう など）
+判断：
+・"ok"：推しプレゼンになっている。
+・"close"：だいたいよいが、しぼる・具体的にするとよくなる。
+・"off"：ずれている。
+ずれていても否定しない。その考えの奥にある本人の「好き」を見つける問いを1つ返す（例：「顔か性格か」を考えたなら、「そう考えたきっかけになった、好きな作品やキャラはいる？」のように）。
+ここまでのやりとりがあれば、それをふまえて判断し直す。生徒の答えから推しが見えてきたら、そのことを why で伝える。
+・why：生徒に見せる短いことば（40字以内）。やわらかく、前向きに。「ダメ」「不適切」とは言わない。
+・ask：次に考える問い（50字以内、「？」で終わる）。ok のときは、さらに良くするための問い。
+・答えや例文、推しの候補を代わりに決めることはしない。推しについての情報や知識は書かない。
+・家庭の事情、体や心の不調、恋愛の個人的な体験には踏みこまない。
+出力は JSON だけ：{"fit":"ok|close|off","why":"…","ask":"…？"}`,
 };
+const parseFit = t => { const o = jsonOf(t); if (!o) return null;
+  const fit = ["ok", "close", "off"].includes(o.fit) ? o.fit : null, ask = String(o.ask || "").trim(), why = String(o.why || "").trim();
+  return fit && ask && len(ask) <= 70 && /[？?]$/.test(ask) && len(why) <= 60 ? { fit, why, ask } : null; };
 // ── 提案箱（アプリをよくする提案）──
 // 生徒の書いたことばは、そのまま先生には見せない。AIが、中身は具体的なまま、おだやかなことばに整えてから届ける。
 // 心配な内容（自分やだれかを傷つけるおそれ・いじめなど）があるときは、強いことばを使わずに先生に知らせる。
@@ -1192,13 +1216,17 @@ export default {
       }
 
       if (body.mode === "oshi_ask") {
-        const role = body.role === "kohai" ? "kohai" : "coach";
+        const role = ["kohai", "fit"].includes(body.role) ? body.role : "coach";
         const a = clip(body.a, 800).trim();
         if (len(a) < 8) return new Response(JSON.stringify({ error: "short", message: "もう少し書いてから押してください。" }), { status: 400, headers });
         const log = (Array.isArray(body.log) ? body.log : []).slice(-3)
           .map(x => `AIの問い：${clip(x && x.ask, 100)}\n生徒の答え：${clip(x && x.ans, 400)}`).join("\n\n");
         const user = `推し：${clip(body.oshi, 60) || "（まだ決めていない）"}\n\n考えているテーマ：${clip(body.q, 120)}\n\n生徒の答え：\n${a}`
           + (log ? `\n\nここまでのやりとり（同じことは聞かない）：\n${log}` : "") + "\n\nJSON で出してください。";
+        if (role === "fit") {
+          const { result, model } = await callGemini(env, OSHI_ASK.fit, user, { models: HINT_MODELS, parse: parseFit, temperature: 0.5, json: true, maxTokens: 400 });
+          return new Response(JSON.stringify(Object.assign({ model }, result)), { headers });
+        }
         const { result, model } = await callGemini(env, OSHI_ASK[role], user, { models: HINT_MODELS, parse: parseFuriAsk, temperature: 0.8, json: true, maxTokens: 300 });
         return new Response(JSON.stringify({ ask: result, model }), { headers });
       }

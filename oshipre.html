@@ -63,6 +63,9 @@ textarea{min-height:70px;resize:vertical}
 .askrow{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
 .askrow .note{font-size:12px;color:var(--sub)}
 .btn.ai-btn{padding:8px 14px;font-size:14px;background:linear-gradient(135deg,var(--g),var(--g2));border:none;color:#fff}
+.badge{display:inline-block;font-size:12px;font-weight:900;border-radius:999px;padding:1px 10px;margin:0 6px 4px 0}
+.badge.ok{background:var(--ok);color:#06281a}.badge.close{background:#ffd76a;color:#2e2300}.badge.off{background:#ff9ec7;color:#2e0716}
+.bub .why{display:block;font-size:13px;color:#d6d2ea;margin-bottom:4px}
 .btn:disabled{opacity:.45;cursor:default}
 .check label{display:flex;gap:8px;align-items:flex-start;font-weight:500;font-size:14px;margin:6px 0;cursor:pointer}
 .check input{margin-top:5px;accent-color:var(--g)}
@@ -113,6 +116,11 @@ textarea{min-height:70px;resize:vertical}
     <input type="text" id="oshi" data-k="oshi" placeholder="例：サウナ">
     <label for="why">それを選んだ理由</label>
     <textarea id="why" data-k="why" placeholder="例：5分あっても話し足りないくらい好きだし、知らない1年生にも楽しさを伝えたいから。"></textarea>
+    <div class="talk" style="margin-top:16px">
+      <h3>🧭 推しプレゼンになってる？ AIに相談</h3>
+      <p class="sub">どんな発表にしたいか、ざっくり書いて相談してみよう。ずれていたら、AIが問いかけながら「あなたの推し」をいっしょに探します。</p>
+      <div id="fit"></div>
+    </div>
   </div>
 
   <!-- 3 -->
@@ -197,7 +205,7 @@ paintStars();
 
 // AIと問答（答えは保存しない。AIには、そのとき書いた内容だけを送る）
 const API="https://kishou.ryousukey0113.workers.dev";
-const DAY_MAX=30, ROUND_MAX=3;   // 無料枠を守るため：1台あたり1日30回まで・1つの問いにつき3回まで
+const DAY_MAX=30, ROUND_MAX=3, FIT_MAX=5;   // 無料枠を守るため：1台あたり1日30回まで・1つの問いにつき3回まで
 const TALKS=[
   {id:"t1",title:"好きになったきっかけは？",sub:"いつ・どこで・どんなふうに出会った？ そのとき、どう思った？"},
   {id:"t2",title:"推しの「ここが好き！」はどこ？",sub:"「かっこいい」「楽しい」だけでなく、具体的な場面やエピソードで。"},
@@ -207,16 +215,19 @@ const today=()=>new Date().toLocaleDateString("ja-JP");
 const used=()=>data.aiDay===today()?(data.aiN||0):0;
 const thread=id=>(data["th_"+id]=data["th_"+id]||[]);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const btnLabel=role=>role==="kohai"?"🙋 つっこんでもらう":"🤖 AIに聞いてもらう";
+const btnLabel=role=>role==="kohai"?"🙋 つっこんでもらう":role==="fit"?"🧭 AIに相談する":"🤖 AIに聞いてもらう";
+const FACE={coach:"🤖",kohai:"🙋",fit:"🧭"};
+const FITTXT={ok:"◎ 推しプレゼンになっています",close:"○ あと少し",off:"△ ちょっとずれているかも"};
+const maxOf=role=>role==="fit"?FIT_MAX:ROUND_MAX;
 
 function renderTalk(box,t,role){
-  const id=t.id, th=thread(id);
+  const id=t.id, th=thread(id), MAX=maxOf(role);
   box.innerHTML=(t.title?`<h3>${esc(t.title)}</h3><p class="sub">${esc(t.sub)}</p>`:"")+
     `<textarea data-a placeholder="${esc(t.ph||"思いつくことを、短くてもいいので書いてみよう")}">${esc(data["a_"+id]||"")}</textarea>`+
-    th.map((x,i)=>`<div class="ai"><span class="face">${role==="kohai"?"🙋":"🤖"}</span><div class="bub">${esc(x.ask)}</div></div>
+    th.map((x,i)=>`<div class="ai"><span class="face">${FACE[role]}</span><div class="bub">${x.fit?`<span class="badge ${x.fit}">${FITTXT[x.fit]}</span>`:""}${x.why?`<span class="why">${esc(x.why)}</span>`:""}${esc(x.ask)}</div></div>
       <textarea data-i="${i}" placeholder="この問いに答えてみよう">${esc(x.ans||"")}</textarea>`).join("")+
-    `<div class="askrow"><span class="note">${th.length>=ROUND_MAX?"問い返しはここまで。じっくり答えてみよう":`問い返し ${th.length}/${ROUND_MAX}`}</span>
-      <button class="btn ai-btn" ${th.length>=ROUND_MAX?"disabled":""}>${btnLabel(role)}</button></div>`;
+    `<div class="askrow"><span class="note">${th.length>=MAX?"問い返しはここまで。じっくり答えてみよう":`問い返し ${th.length}/${MAX}`}</span>
+      <button class="btn ai-btn" ${th.length>=MAX?"disabled":""}>${btnLabel(role)}</button></div>`;
   box.querySelector("[data-a]").addEventListener("input",e=>{data["a_"+id]=e.target.value;save();});
   box.querySelectorAll("[data-i]").forEach(el=>el.addEventListener("input",()=>{th[+el.dataset.i].ans=el.value;save();}));
   const btn=box.querySelector(".ai-btn");
@@ -229,17 +240,18 @@ async function ask(box,t,role,btn){
   if(used()>=DAY_MAX){ toast("今日のAIの回数はここまで。また次の授業で"); return; }
   btn.disabled=true; btn.textContent="考え中…";
   const oshi=(data.oshi||"").trim();
-  const q=role==="kohai"
+  const q=role==="fit" ? `選んだ理由：${data.why||"（まだ書いていない）"}`
+    : role==="kohai"
     ? `${data.m1||oshi}の魅力は、${data.m2||"？"}だ。／1年生にどうなってほしいか：${data.who||"？"}／タイトル：${data.ttl||"？"}`
     : t.title;
   // これまでのやりとり（最後の答えは a として送るのと同じもの）
-  const log=th.length?[{ask:role==="kohai"?"いちばん話したいことは？":t.title,ans:first},...th].slice(-3):[];
+  const log=th.length?[{ask:role==="kohai"?"いちばん話したいことは？":role==="fit"?"どんな発表にしたい？":t.title,ans:first},...th].slice(-3):[];
   try{
     const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({mode:"oshi_ask",role,oshi,q,a:latest,log})});
     const j=await r.json().catch(()=>({}));
     if(!r.ok||!j.ask) throw new Error(j.message||"");
-    th.push({ask:j.ask,ans:""});
+    th.push(j.fit?{ask:j.ask,fit:j.fit,why:j.why||"",ans:""}:{ask:j.ask,ans:""});
     data.aiDay=today(); data.aiN=used()+1; save();
     renderTalk(box,t,role);
     const all=box.querySelectorAll("[data-i]"); if(all.length) all[all.length-1].focus();
@@ -248,6 +260,7 @@ async function ask(box,t,role,btn){
     btn.disabled=false; btn.textContent=btnLabel(role);
   }
 }
+renderTalk(document.getElementById("fit"),{id:"f1",ph:"どんな発表にしたい？（例：付き合うなら顔と性格どっちを重視するか）"},"fit");
 const talks=document.getElementById("talks");
 TALKS.forEach(t=>{ const d=document.createElement("div"); d.className="talk"; talks.appendChild(d); renderTalk(d,t,"coach"); });
 const KOHAI={id:"k1",ph:"上のテーマで、いちばん話したいことを一言で（例：入る順番と休み方さえ知れば、だれでも楽しめる）"};
@@ -256,11 +269,13 @@ renderTalk(document.getElementById("kohai"),KOHAI,"kohai");
 // まとめ
 function summary(){
   const g=k=>(data[k]||"").trim()||"（未記入）";
-  const tl=(id,title)=>{ const out=["■ "+title,"　"+g("a_"+id)]; thread(id).forEach(x=>out.push("　AI："+x.ask,"　→ "+((x.ans||"").trim()||"（未記入）"))); return out.join("\n"); };
+  const tl=(id,title)=>{ const out=["■ "+title,"　"+g("a_"+id)]; thread(id).forEach(x=>out.push("　AI："+(x.fit?"["+FITTXT[x.fit]+"] "+(x.why||"")+" ":"")+x.ask,"　→ "+((x.ans||"").trim()||"（未記入）"))); return out.join("\n"); };
   return [
     "【推しプレゼン 準備ワーク①】",
     "■ わたしの推し："+g("oshi"),
     "■ 選んだ理由："+g("why"),
+    "",
+    tl("f1","推しプレゼンになってる？（AIに相談）"),
     "",
     ...TALKS.map(t=>tl(t.id,t.title)),
     "",
