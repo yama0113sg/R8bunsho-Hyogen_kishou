@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>推しプレゼン 準備ワーク</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700;800&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#07060d; --bg1:#12101f; --glass:rgba(255,255,255,.055); --edge:rgba(255,255,255,.12);
+  --ink:#f4f1ff; --sub:#a39fbf; --g:#ff9ec7; --g2:#7a5cff; --ok:#5dffb0;
+  --mincho:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --gothic:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;color:var(--ink);font-family:var(--gothic);-webkit-text-size-adjust:100%}
+body{min-height:100vh;padding:20px 16px 70px;background:var(--bg0);overflow-x:hidden;line-height:1.7}
+body::before{content:"";position:fixed;inset:-20%;z-index:-1;
+  background:radial-gradient(60% 50% at 20% 10%,color-mix(in srgb,var(--g) 22%,transparent),transparent 70%),
+             radial-gradient(50% 45% at 90% 80%,color-mix(in srgb,var(--g2) 28%,transparent),transparent 70%),
+             linear-gradient(180deg,var(--bg1),var(--bg0))}
+.wrap{max-width:760px;margin:0 auto}
+h1{font-family:var(--mincho);font-weight:800;text-align:center;font-size:clamp(26px,6vw,38px);margin:6px 0 2px;letter-spacing:.12em;
+  background:linear-gradient(100deg,#fff 20%,var(--g) 60%,#fff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{text-align:center;color:var(--sub);font-size:13px;margin:0 0 18px}
+.panel{background:var(--glass);border:1px solid var(--edge);border-radius:20px;padding:18px;margin-bottom:16px;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.panel h2{margin:0 0 6px;font-size:18px;display:flex;align-items:center;gap:10px}
+.num{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-family:var(--mincho);
+  font-weight:800;color:#1a1020;background:linear-gradient(145deg,#fff,var(--g))}
+.hint{font-size:13px;color:var(--sub);margin:0 0 12px}
+.info{font-size:14px;color:#d6d2ea}
+.info b{color:var(--g)}
+.info ul{margin:6px 0 0;padding-left:1.3em}
+label{display:block;font-size:13px;font-weight:700;margin:10px 0 4px}
+input[type=text],textarea{width:100%;font:inherit;font-size:16px;color:var(--ink);background:rgba(0,0,0,.3);
+  border:1px solid var(--edge);border-radius:12px;padding:10px 12px;outline:none}
+input[type=text]:focus,textarea:focus{border-color:var(--g)}
+textarea{min-height:70px;resize:vertical}
+.cand{border:1px solid var(--edge);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:rgba(0,0,0,.18)}
+.cand .top{display:flex;gap:8px;align-items:center}
+.cand .top input{flex:1}
+.pick{flex:none;font-size:13px;display:flex;align-items:center;gap:4px;margin:0;white-space:nowrap}
+.stars{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:6px;font-size:13px;color:var(--sub)}
+.stars span{display:inline-flex;align-items:center;gap:4px}
+.stars button{font:inherit;font-size:18px;line-height:1;cursor:pointer;background:none;border:none;color:#555;padding:2px}
+.stars button.on{color:var(--g)}
+.oneline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:15px}
+.oneline input{flex:1 1 180px}
+.q{border-left:3px solid var(--g);background:rgba(0,0,0,.22);border-radius:0 12px 12px 0;padding:10px 14px;margin-bottom:14px}
+.q h3{margin:0;font-size:16px}
+.ex{font-size:13px;background:rgba(255,255,255,.04);border:1px dashed var(--edge);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.ex summary{cursor:pointer;font-weight:700;color:var(--g)}
+.ex p{margin:6px 0}
+.check label{display:flex;gap:8px;align-items:flex-start;font-weight:500;font-size:14px;margin:6px 0;cursor:pointer}
+.check input{margin-top:5px;accent-color:var(--g)}
+.row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.btn{font:inherit;font-weight:700;cursor:pointer;border:1px solid var(--edge);color:var(--ink);background:var(--glass);
+  border-radius:12px;padding:11px 18px}
+.btn.main{background:linear-gradient(135deg,var(--g),var(--g2));border:none;color:#fff}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#000c;border:1px solid var(--edge);
+  padding:8px 16px;border-radius:999px;font-size:13px;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+.saved{text-align:center;font-size:12px;color:var(--sub);margin-top:10px}
+@media print{
+  body{background:#fff;color:#000;padding:0}
+  body::before,.row,.toast,.saved,.ex{display:none}
+  .panel{background:none;border:1px solid #999;backdrop-filter:none;break-inside:avoid}
+  h1{color:#000;-webkit-text-fill-color:#000;background:none}
+  input[type=text],textarea{color:#000;background:#fff;border:1px solid #999}
+  .hint,.info,.lead{color:#333}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>推しプレゼン</h1>
+  <p class="lead">準備ワーク ① ― 推しを決めて、1年生への質問を考えよう</p>
+
+  <div class="panel info">
+    <b>これからの流れ</b>
+    <ul>
+      <li><b>11/11（水）6限</b>：1年生への質問（2問）を提出</li>
+      <li><b>11/18（水）</b>：推しプレゼンのテーマを決定</li>
+      <li><b>11/24（火）</b>：1年生がアンケートに回答 → その結果をプレゼンに使えます</li>
+      <li><b>12/11（金）5・6限</b>：発表本番（1人5分・聞き手は1年生）</li>
+    </ul>
+  </div>
+
+  <!-- 1 -->
+  <div class="panel">
+    <h2><span class="num">1</span>推しの候補を3つ書き出そう</h2>
+    <p class="hint">人・作品・食べ物・場所・趣味・道具…なんでもOK。それぞれ★をつけて比べてみよう。</p>
+    <div id="cands"></div>
+  </div>
+
+  <!-- 2 -->
+  <div class="panel">
+    <h2><span class="num">2</span>ひとつに決めよう</h2>
+    <p class="hint">上の「これにする」を選ぶと、ここに入ります（書きかえてもOK）。</p>
+    <label for="oshi">わたしの推し</label>
+    <input type="text" id="oshi" data-k="oshi" placeholder="例：サウナ">
+    <label for="why">それを選んだ理由</label>
+    <textarea id="why" data-k="why" placeholder="例：5分あっても話し足りないくらい好きだし、知らない1年生にも楽しさを伝えたいから。"></textarea>
+  </div>
+
+  <!-- 3 -->
+  <div class="panel">
+    <h2><span class="num">3</span>いちばん伝えたいことを1文で</h2>
+    <p class="hint">5分で全部は話せません。「これだけは伝えたい！」を1文にしぼろう。</p>
+    <div class="oneline">
+      <input type="text" data-k="m1" placeholder="サウナ" aria-label="推し">
+      <span>の魅力は、</span>
+      <input type="text" data-k="m2" placeholder="終わったあとの最高のスッキリ感" aria-label="魅力">
+      <span>だ。</span>
+    </div>
+    <label for="who">聞いた1年生に、最後どうなってほしい？</label>
+    <input type="text" id="who" data-k="who" placeholder="例：「一回行ってみようかな」と思ってほしい">
+  </div>
+
+  <!-- 4 -->
+  <div class="panel">
+    <h2><span class="num">4</span>1年生への質問を考えよう（2問）</h2>
+    <p class="hint">答えはアンケートで集めて、プレゼンの中で「1年生の◯割が…」と使えます。</p>
+
+    <div class="ex info">
+      <b>よい質問のコツ</b>
+      <ul>
+        <li><b>選んで答える形</b>にする（はい／いいえ・4択・1〜5の数字など）</li>
+        <li>1つの質問で聞くのは<b>1つだけ</b></li>
+        <li>「最高ですよね？」のように<b>答えを誘導しない</b></li>
+        <li>推しを知らない人でも答えられるよう<b>「知らない」も選択肢に</b></li>
+        <li>その答えを<b>プレゼンのどこで使うか</b>決めておく（つかみ？ 本題？）</li>
+      </ul>
+    </div>
+
+    <details class="ex">
+      <summary>見本を見る（推しが「サウナ」の場合）</summary>
+      <p><b>質問①</b> サウナに入ったことがありますか？<br>（ある ／ ない ／ 名前は知っている）<br>
+      <b>理由</b>：入ったことがない人が多ければ、入り方の説明から始める構成にするため。</p>
+      <p><b>質問②</b> サウナのイメージに近いものはどれですか？<br>（暑くてつらい ／ 大人の趣味 ／ 気持ちよさそう ／ よくわからない）<br>
+      <b>理由</b>：いちばん多いイメージを取り上げ、それをくつがえす話をつかみにするため。</p>
+    </details>
+
+    <div class="q">
+      <h3>質問①</h3>
+      <label>質問文</label>
+      <input type="text" data-k="q1" placeholder="例：〇〇を知っていますか？">
+      <label>答えの選択肢</label>
+      <input type="text" data-k="q1c" placeholder="例：よく知っている ／ 名前だけ知っている ／ 知らない">
+      <label>作成の理由（プレゼンのどこで、どう使う？）</label>
+      <textarea data-k="q1r"></textarea>
+    </div>
+
+    <div class="q">
+      <h3>質問②</h3>
+      <label>質問文</label>
+      <input type="text" data-k="q2">
+      <label>答えの選択肢</label>
+      <input type="text" data-k="q2c">
+      <label>作成の理由（プレゼンのどこで、どう使う？）</label>
+      <textarea data-k="q2r"></textarea>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="panel check">
+    <h2><span class="num">5</span>答える1年生の気持ちでチェック</h2>
+    <label><input type="checkbox" data-k="c1">1年生がすぐ意味のわかる言葉になっている（専門用語なし）</label>
+    <label><input type="checkbox" data-k="c2">10秒ほどで答えられる</label>
+    <label><input type="checkbox" data-k="c3">1つの質問で1つのことだけ聞いている</label>
+    <label><input type="checkbox" data-k="c4">答えを誘導していない</label>
+    <label><input type="checkbox" data-k="c5">推しを知らない人でも答えられる</label>
+    <label><input type="checkbox" data-k="c6">答えをプレゼンのどこで使うか決まっている</label>
+  </div>
+
+  <div class="row">
+    <button class="btn main" id="copy">📋 まとめてコピー</button>
+    <button class="btn" id="print">🖨 印刷する</button>
+    <button class="btn" id="clear">🗑 消去</button>
+  </div>
+  <p class="saved">入力はこの端末に自動で保存されます。提出用紙に写すときは「まとめてコピー」が便利です。</p>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY="oshipre_work1";
+let data={};
+try{ data=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ data={}; }
+const save=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(data)); }catch(e){} };
+const toast=m=>{ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); };
+
+// 候補カード
+const SCALES=[["love","好き度"],["talk","5分語れる度"],["know","1年生が知ってそう度"]];
+const cands=document.getElementById("cands");
+for(let i=0;i<3;i++){
+  const d=document.createElement("div"); d.className="cand";
+  d.innerHTML=`<div class="top"><input type="text" data-k="cand${i}" placeholder="候補${i+1}" aria-label="候補${i+1}">
+    <label class="pick"><input type="radio" name="pick" value="${i}">これにする</label></div>
+    <div class="stars">${SCALES.map(([k,n])=>`<span>${n}<span data-s="${k}${i}">${[1,2,3].map(v=>`<button type="button" data-v="${v}" aria-label="${n}${v}">★</button>`).join("")}</span></span>`).join("")}</div>`;
+  cands.appendChild(d);
+}
+const paintStars=()=>document.querySelectorAll("[data-s]").forEach(g=>{
+  const v=data["s_"+g.dataset.s]||0;
+  g.querySelectorAll("button").forEach(b=>b.classList.toggle("on",+b.dataset.v<=v));
+});
+document.querySelectorAll("[data-s] button").forEach(b=>b.addEventListener("click",()=>{
+  const k="s_"+b.parentElement.dataset.s, v=+b.dataset.v;
+  data[k]=(data[k]===v)?0:v; save(); paintStars();
+}));
+
+// 入力欄の保存と復元
+document.querySelectorAll("[data-k]").forEach(el=>{
+  const k=el.dataset.k;
+  if(el.type==="checkbox"){ el.checked=!!data[k]; el.addEventListener("change",()=>{data[k]=el.checked;save();}); }
+  else{ el.value=data[k]||""; el.addEventListener("input",()=>{data[k]=el.value;save();}); }
+});
+document.querySelectorAll("input[name=pick]").forEach(r=>{
+  if(String(data.pick)===r.value) r.checked=true;
+  r.addEventListener("change",()=>{
+    data.pick=r.value;
+    const name=data["cand"+r.value]||"";
+    if(name){ ["oshi","m1"].forEach(k=>{ data[k]=name; document.querySelector(`[data-k=${k}]`).value=name; }); }
+    save();
+  });
+});
+paintStars();
+
+// まとめ
+function summary(){
+  const g=k=>(data[k]||"").trim()||"（未記入）";
+  return [
+    "【推しプレゼン 準備ワーク①】",
+    "■ わたしの推し："+g("oshi"),
+    "■ 選んだ理由："+g("why"),
+    "■ 伝えたいこと："+g("m1")+"の魅力は、"+g("m2")+"だ。",
+    "■ 1年生にどうなってほしいか："+g("who"),
+    "",
+    "■ 質問①："+g("q1"),
+    "　選択肢："+g("q1c"),
+    "　作成の理由："+g("q1r"),
+    "",
+    "■ 質問②："+g("q2"),
+    "　選択肢："+g("q2c"),
+    "　作成の理由："+g("q2r")
+  ].join("\n");
+}
+document.getElementById("copy").addEventListener("click",async()=>{
+  const s=summary();
+  try{ await navigator.clipboard.writeText(s); toast("コピーしました"); }
+  catch(e){ const t=document.createElement("textarea"); t.value=s; document.body.appendChild(t); t.select();
+    try{ document.execCommand("copy"); toast("コピーしました"); }catch(_){ toast("コピーできませんでした"); } t.remove(); }
+});
+document.getElementById("print").addEventListener("click",()=>window.print());
+document.getElementById("clear").addEventListener("click",()=>{
+  if(!confirm("入力した内容をすべて消しますか？")) return;
+  data={}; save(); location.reload();
+});
+</script>
+</body>
+</html>
