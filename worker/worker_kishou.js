@@ -6,7 +6,7 @@
 //  POST {stage, genre, story, avoid}            → {line}   一行を引く
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
 //  POST {mode:"bridge", stage, genre, before, line, after}    → {bridge}   整えるときのつなぎの文
-//  POST {mode:"oshi_ask", role:"coach"|"kohai"|"fit", oshi, q, a, log:[{ask,ans}]} → {ask}（fit は {fit,why,ask}）  推しプレゼンのテーマを練る問い返し
+//  POST {mode:"oshi_ask", role:"coach"|"kohai"|"fit"|"qcheck", oshi, q, a, log:[{ask,ans}]} → {ask}（fit・qcheck は {fit,why,ask}）  推しプレゼンのテーマを練る問い返し
 //
 //  ── クラス文庫（/bunko/...）──
 //  KV：BUNKO（KV namespace のバインディング）
@@ -582,6 +582,22 @@ const OSHI_ASK = {
 ・ask：次に考える問い（50字以内、「？」で終わる）。ok のときは、さらに良くするための問い。
 ・答えや例文、推しの候補を代わりに決めることはしない。推しについての情報や知識は書かない。
 ・家庭の事情、体や心の不調、恋愛の個人的な体験には踏みこまない。
+出力は JSON だけ：{"fit":"ok|close|off","why":"…","ask":"…？"}`,
+  qcheck: `高校3年生が、5分間の「推しプレゼン」（自分の好きなものを語る発表）のために、聞き手の1年生（約150人）へのアンケートの質問を作っています。
+集めた答えは、プレゼンの中で「1年生の◯割が〜と答えました」のように使います。
+あなたは、質問を磨く相談役です。生徒の質問（と、ここまでのやりとり）を見て、判断と問いを返してください。
+見るところ：
+・1年生がすぐ意味のわかる言葉か（専門用語・あいまいな言葉がないか）
+・10秒ほどで答えられる、選んで答える形か。選択肢にもれや重なりがないか。推しを知らない人のための「知らない」があるか
+・1つの質問で1つのことだけ聞いているか。答えを誘導していないか
+・答えをプレゼンのどこで、どう使うかが決まっているか。どんな結果が出ても使えるか
+判断：
+・"ok"：このまま使える。
+・"close"：だいたいよいが、少し直すとよくなる。
+・"off"：直したほうがよいところがある。
+・why：生徒に見せる短いことば（40字以内）。どこが良い／気になるかを具体的に、やわらかく。
+・ask：次に考える問い（50字以内、「？」で終わる）。直した質問文や選択肢を代わりに書かない。
+・個人情報（住所・家族・成績・恋愛経験など）を聞く質問なら、聞かないほうがよいと気づかせる問いにする。
 出力は JSON だけ：{"fit":"ok|close|off","why":"…","ask":"…？"}`,
 };
 const parseFit = t => { const o = jsonOf(t); if (!o) return null;
@@ -1216,15 +1232,15 @@ export default {
       }
 
       if (body.mode === "oshi_ask") {
-        const role = ["kohai", "fit"].includes(body.role) ? body.role : "coach";
+        const role = ["kohai", "fit", "qcheck"].includes(body.role) ? body.role : "coach";
         const a = clip(body.a, 800).trim();
         if (len(a) < 8) return new Response(JSON.stringify({ error: "short", message: "もう少し書いてから押してください。" }), { status: 400, headers });
         const log = (Array.isArray(body.log) ? body.log : []).slice(-3)
           .map(x => `AIの問い：${clip(x && x.ask, 100)}\n生徒の答え：${clip(x && x.ans, 400)}`).join("\n\n");
         const user = `推し：${clip(body.oshi, 60) || "（まだ決めていない）"}\n\n考えているテーマ：${clip(body.q, 120)}\n\n生徒の答え：\n${a}`
           + (log ? `\n\nここまでのやりとり（同じことは聞かない）：\n${log}` : "") + "\n\nJSON で出してください。";
-        if (role === "fit") {
-          const { result, model } = await callGemini(env, OSHI_ASK.fit, user, { models: HINT_MODELS, parse: parseFit, temperature: 0.5, json: true, maxTokens: 400 });
+        if (role === "fit" || role === "qcheck") {
+          const { result, model } = await callGemini(env, OSHI_ASK[role], user, { models: HINT_MODELS, parse: parseFit, temperature: 0.5, json: true, maxTokens: 400 });
           return new Response(JSON.stringify(Object.assign({ model }, result)), { headers });
         }
         const { result, model } = await callGemini(env, OSHI_ASK[role], user, { models: HINT_MODELS, parse: parseFuriAsk, temperature: 0.8, json: true, maxTokens: 300 });
