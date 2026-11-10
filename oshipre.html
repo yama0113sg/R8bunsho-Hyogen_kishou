@@ -66,6 +66,8 @@ textarea{min-height:70px;resize:vertical}
 .badge{display:inline-block;font-size:12px;font-weight:900;border-radius:999px;padding:1px 10px;margin:0 6px 4px 0}
 .badge.ok{background:var(--ok);color:#06281a}.badge.close{background:#ffd76a;color:#2e2300}.badge.off{background:#ff9ec7;color:#2e0716}
 .bub .why{display:block;font-size:13px;color:#d6d2ea;margin-bottom:4px}
+textarea.need{border-color:var(--g);box-shadow:0 0 0 3px color-mix(in srgb,var(--g) 35%,transparent);animation:nudge .5s 2}
+@keyframes nudge{50%{transform:translateX(4px)}}
 .btn:disabled{opacity:.45;cursor:default}
 .check label{display:flex;gap:8px;align-items:flex-start;font-weight:500;font-size:14px;margin:6px 0;cursor:pointer}
 .check input{margin-top:5px;accent-color:var(--g)}
@@ -276,7 +278,12 @@ function renderTalk(box,t,role){
 async function ask(box,t,role,btn){
   const id=t.id, th=thread(id), first=data["a_"+id]||"";
   const latest=th.length?(th[th.length-1].ans||""):first;
-  if([...latest.trim()].length<8){ toast(th.length?"まず、AIの問いに答えてみよう":"もう少し書いてから押してね"); return; }
+  // AIの問いへの答えは、作品名などの短い答えでもよい（2字以上）。はじめの欄だけ8字以上
+  if([...latest.trim()].length<(th.length?2:8)){
+    const all=box.querySelectorAll(th.length?"[data-i]":"[data-a]"), el=all[all.length-1];
+    if(el){ el.classList.remove("need"); void el.offsetWidth; el.classList.add("need"); el.scrollIntoView({behavior:"smooth",block:"center"}); el.focus({preventScroll:true});
+      el.addEventListener("input",()=>el.classList.remove("need"),{once:true}); }
+    toast(th.length?"光っている欄（AIの問いのすぐ下）に答えを書いてから押してね":"もう少し書いてから押してね"); return; }
   if(used()>=DAY_MAX){ toast("今日のAIの回数はここまで。また次の授業で"); return; }
   btn.disabled=true; btn.textContent="考え中…";
   const oshi=(data.oshi||"").trim();
