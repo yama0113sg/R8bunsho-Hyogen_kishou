@@ -6,6 +6,7 @@
 //  POST {stage, genre, story, avoid}            → {line}   一行を引く
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
 //  POST {mode:"bridge", stage, genre, before, line, after}    → {bridge}   整えるときのつなぎの文
+//  POST {mode:"oshi_ask", role:"coach"|"kohai", oshi, q, a, log:[{ask,ans}]} → {ask}  推しプレゼンのテーマを練る問い返し
 //
 //  ── クラス文庫（/bunko/...）──
 //  KV：BUNKO（KV namespace のバインディング）
@@ -540,6 +541,28 @@ const FURI_ASK = `高校3年生が、半年間の創作の授業（短い物語�
 ・家庭の事情、体や心の不調には踏みこまない。
 出力は JSON だけ：{"ask":"…？"}`;
 const parseFuriAsk = t => { const o = jsonOf(t); const x = String((o && o.ask) || "").trim(); return x && len(x) <= 70 && /[？?]$/.test(x) ? x : null; };
+// ── 推しプレゼン：テーマを練る問い返し（保存しない）──
+// coach：生徒の答えから、もう一歩ふかめる問い／kohai：話を聞く1年生になって、素朴な疑問を1つ
+const OSHI_ASK = {
+  coach: `高校3年生が、1年生（約150人）に向けて5分間の「推しプレゼン」（自分の好きなものを語る発表）を準備しています。
+いまは発表のテーマを練っている段階です。あなたは、生徒の考えを引き出す聞き役です。
+生徒の答えを読んで、もう一歩ふかく考えるための問いを、1つだけ返してください。
+・答えの中のことばや具体的なところを拾って聞く（「さっき書いた『〜』って、たとえばどんな場面？」「それは、ほかの〇〇とどこが違う？」のように）。
+・ぼんやりした答えには具体的な場面・数・体験を、ありきたりな答えには「あなただけの」理由を聞く。
+・1年生に伝わるかどうか、5分で話しきれるかどうか、という視点も時々まぜる。
+・50字以内。「？」で終わる。ていねいでやわらかい口調。
+・答えや例文、まとめ、推しについての情報や知識は書かない。ほめたり評価したりしない。お説教しない。
+・家庭の事情、体や心の不調には踏みこまない。推しが発表にふさわしくない内容（暴力・性的・違法など）のときは、別の角度や別の推しを考えるよう、やさしく問いかける。
+出力は JSON だけ：{"ask":"…？"}`,
+  kohai: `高校3年生が、1年生（約150人）に向けて5分間の「推しプレゼン」（自分の好きなものを語る発表）を準備しています。
+あなたは、その発表を聞く1年生の一人です。その推しのことはあまり知りません。
+生徒が書いたテーマを読んで、1年生として素直に思った疑問やつっこみを、1つだけ返してください。
+・「それって、〇〇とどう違うんですか？」「知らない私でも楽しめますか？」「なんでそこまで好きなんですか？」のような、素朴で率直な問い。
+・発表をよくするヒントになる問いにする。意地悪や否定はしない。
+・50字以内。「？」で終わる。後輩らしい、ていねいな話しことば。
+・答えや例文、推しについての情報や知識は書かない。
+出力は JSON だけ：{"ask":"…？"}`,
+};
 // ── 提案箱（アプリをよくする提案）──
 // 生徒の書いたことばは、そのまま先生には見せない。AIが、中身は具体的なまま、おだやかなことばに整えてから届ける。
 // 心配な内容（自分やだれかを傷つけるおそれ・いじめなど）があるときは、強いことばを使わずに先生に知らせる。
@@ -1128,7 +1151,7 @@ export default {
       }
     }
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true, heal: true, teian: true, furi: true, card: true }), { headers });
+      return new Response(JSON.stringify({ ok: true, models: MODELS, hint: true, bridge: true, bunko: !!env.BUNKO, aicomment: true, polish: true, obi: true, ix: true, spell: true, fix: true, oshi: true, autosp: true, coach: true, ospeek: true, ownq: true, heal: true, teian: true, furi: true, card: true, oshiask: true }), { headers });
     }
     if (request.method !== "POST") return new Response("{}", { status: 405, headers });
     if (origin !== env.ALLOWED_ORIGIN) {
@@ -1168,6 +1191,17 @@ export default {
         return new Response(JSON.stringify({ rewrite: result, model }), { headers });
       }
 
+      if (body.mode === "oshi_ask") {
+        const role = body.role === "kohai" ? "kohai" : "coach";
+        const a = clip(body.a, 800).trim();
+        if (len(a) < 8) return new Response(JSON.stringify({ error: "short", message: "もう少し書いてから押してください。" }), { status: 400, headers });
+        const log = (Array.isArray(body.log) ? body.log : []).slice(-3)
+          .map(x => `AIの問い：${clip(x && x.ask, 100)}\n生徒の答え：${clip(x && x.ans, 400)}`).join("\n\n");
+        const user = `推し：${clip(body.oshi, 60) || "（まだ決めていない）"}\n\n考えているテーマ：${clip(body.q, 120)}\n\n生徒の答え：\n${a}`
+          + (log ? `\n\nここまでのやりとり（同じことは聞かない）：\n${log}` : "") + "\n\nJSON で出してください。";
+        const { result, model } = await callGemini(env, OSHI_ASK[role], user, { models: HINT_MODELS, parse: parseFuriAsk, temperature: 0.8, json: true, maxTokens: 300 });
+        return new Response(JSON.stringify({ ask: result, model }), { headers });
+      }
       if (body.mode === "bridge") {
         const before = String(body.before || "").slice(-600);
         const after = String(body.after || "").slice(0, 400);

@@ -54,6 +54,16 @@ textarea{min-height:70px;resize:vertical}
 .ex{font-size:13px;background:rgba(255,255,255,.04);border:1px dashed var(--edge);border-radius:12px;padding:10px 12px;margin-bottom:12px}
 .ex summary{cursor:pointer;font-weight:700;color:var(--g)}
 .ex p{margin:6px 0}
+.talk{border-left:3px solid var(--g);background:rgba(0,0,0,.22);border-radius:0 12px 12px 0;padding:10px 14px;margin-bottom:14px}
+.talk h3{margin:0 0 2px;font-size:16px}
+.talk .sub{font-size:12px;color:var(--sub);margin:0 0 6px}
+.ai{display:flex;gap:8px;align-items:flex-start;margin:12px 0 4px}
+.ai .face{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:16px;background:linear-gradient(145deg,#fff,var(--g))}
+.ai .bub{background:rgba(255,158,199,.12);border:1px solid color-mix(in srgb,var(--g) 40%,transparent);border-radius:4px 14px 14px 14px;padding:8px 12px;font-size:15px}
+.askrow{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.askrow .note{font-size:12px;color:var(--sub)}
+.btn.ai-btn{padding:8px 14px;font-size:14px;background:linear-gradient(135deg,var(--g),var(--g2));border:none;color:#fff}
+.btn:disabled{opacity:.45;cursor:default}
 .check label{display:flex;gap:8px;align-items:flex-start;font-weight:500;font-size:14px;margin:6px 0;cursor:pointer}
 .check input{margin-top:5px;accent-color:var(--g)}
 .row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
@@ -66,7 +76,8 @@ textarea{min-height:70px;resize:vertical}
 .saved{text-align:center;font-size:12px;color:var(--sub);margin-top:10px}
 @media print{
   body{background:#fff;color:#000;padding:0}
-  body::before,.row,.toast,.saved,.ex{display:none}
+  body::before,.row,.toast,.saved,.ex,.askrow{display:none}
+  .ai .bub{background:none;border:1px solid #999}
   .panel{background:none;border:1px solid #999;backdrop-filter:none;break-inside:avoid}
   h1{color:#000;-webkit-text-fill-color:#000;background:none}
   input[type=text],textarea{color:#000;background:#fff;border:1px solid #999}
@@ -77,15 +88,13 @@ textarea{min-height:70px;resize:vertical}
 <body>
 <div class="wrap">
   <h1>推しプレゼン</h1>
-  <p class="lead">準備ワーク ① ― 推しを決めて、1年生への質問を考えよう</p>
+  <p class="lead">準備ワーク ① ― 推しを決めて、テーマを練ろう</p>
 
   <div class="panel info">
     <b>これからの流れ</b>
     <ul>
-      <li><b>11/11（水）6限</b>：1年生への質問（2問）を提出</li>
-      <li><b>11/18（水）</b>：推しプレゼンのテーマを決定</li>
-      <li><b>11/24（火）</b>：1年生がアンケートに回答 → その結果をプレゼンに使えます</li>
-      <li><b>12/11（金）5・6限</b>：発表本番（1人5分・聞き手は1年生）</li>
+            <li><b>11/18（水）</b>：推しプレゼンのテーマを決定</li>
+            <li><b>12/11（金）5・6限</b>：発表本番（1人5分・聞き手は1年生）</li>
     </ul>
   </div>
 
@@ -108,8 +117,15 @@ textarea{min-height:70px;resize:vertical}
 
   <!-- 3 -->
   <div class="panel">
-    <h2><span class="num">3</span>いちばん伝えたいことを1文で</h2>
-    <p class="hint">5分で全部は話せません。「これだけは伝えたい！」を1文にしぼろう。</p>
+    <h2><span class="num">3</span>AIと問答して、推しを掘り下げよう</h2>
+    <p class="hint">答えを書いて「AIに聞いてもらう」を押すと、AIが問い返してきます。答えは教えてくれません。考えるのはあなたです。1つの問いにつき、問い返しは3回まで。</p>
+    <div id="talks"></div>
+  </div>
+
+  <!-- 4 -->
+  <div class="panel">
+    <h2><span class="num">4</span>テーマを1文にまとめよう</h2>
+    <p class="hint">5分で全部は話せません。3の問答をふりかえって、「これだけは伝えたい！」を1文にしぼろう。</p>
     <div class="oneline">
       <input type="text" data-k="m1" placeholder="サウナ" aria-label="推し">
       <span>の魅力は、</span>
@@ -118,62 +134,13 @@ textarea{min-height:70px;resize:vertical}
     </div>
     <label for="who">聞いた1年生に、最後どうなってほしい？</label>
     <input type="text" id="who" data-k="who" placeholder="例：「一回行ってみようかな」と思ってほしい">
-  </div>
-
-  <!-- 4 -->
-  <div class="panel">
-    <h2><span class="num">4</span>1年生への質問を考えよう（2問）</h2>
-    <p class="hint">答えはアンケートで集めて、プレゼンの中で「1年生の◯割が…」と使えます。</p>
-
-    <div class="ex info">
-      <b>よい質問のコツ</b>
-      <ul>
-        <li><b>選んで答える形</b>にする（はい／いいえ・4択・1〜5の数字など）</li>
-        <li>1つの質問で聞くのは<b>1つだけ</b></li>
-        <li>「最高ですよね？」のように<b>答えを誘導しない</b></li>
-        <li>推しを知らない人でも答えられるよう<b>「知らない」も選択肢に</b></li>
-        <li>その答えを<b>プレゼンのどこで使うか</b>決めておく（つかみ？ 本題？）</li>
-      </ul>
+    <label for="ttl">発表タイトル（仮）</label>
+    <input type="text" id="ttl" data-k="ttl" placeholder="例：90分で人生が整う ― サウナのすすめ">
+    <div class="talk" style="margin-top:16px">
+      <h3>🙋 1年生につっこんでもらう</h3>
+      <p class="sub">AIが「話を聞く1年生」になって、素朴な疑問をぶつけてきます。答えながら、上のテーマを書き直していこう。</p>
+      <div id="kohai"></div>
     </div>
-
-    <details class="ex">
-      <summary>見本を見る（推しが「サウナ」の場合）</summary>
-      <p><b>質問①</b> サウナに入ったことがありますか？<br>（ある ／ ない ／ 名前は知っている）<br>
-      <b>理由</b>：入ったことがない人が多ければ、入り方の説明から始める構成にするため。</p>
-      <p><b>質問②</b> サウナのイメージに近いものはどれですか？<br>（暑くてつらい ／ 大人の趣味 ／ 気持ちよさそう ／ よくわからない）<br>
-      <b>理由</b>：いちばん多いイメージを取り上げ、それをくつがえす話をつかみにするため。</p>
-    </details>
-
-    <div class="q">
-      <h3>質問①</h3>
-      <label>質問文</label>
-      <input type="text" data-k="q1" placeholder="例：〇〇を知っていますか？">
-      <label>答えの選択肢</label>
-      <input type="text" data-k="q1c" placeholder="例：よく知っている ／ 名前だけ知っている ／ 知らない">
-      <label>作成の理由（プレゼンのどこで、どう使う？）</label>
-      <textarea data-k="q1r"></textarea>
-    </div>
-
-    <div class="q">
-      <h3>質問②</h3>
-      <label>質問文</label>
-      <input type="text" data-k="q2">
-      <label>答えの選択肢</label>
-      <input type="text" data-k="q2c">
-      <label>作成の理由（プレゼンのどこで、どう使う？）</label>
-      <textarea data-k="q2r"></textarea>
-    </div>
-  </div>
-
-  <!-- 5 -->
-  <div class="panel check">
-    <h2><span class="num">5</span>答える1年生の気持ちでチェック</h2>
-    <label><input type="checkbox" data-k="c1">1年生がすぐ意味のわかる言葉になっている（専門用語なし）</label>
-    <label><input type="checkbox" data-k="c2">10秒ほどで答えられる</label>
-    <label><input type="checkbox" data-k="c3">1つの質問で1つのことだけ聞いている</label>
-    <label><input type="checkbox" data-k="c4">答えを誘導していない</label>
-    <label><input type="checkbox" data-k="c5">推しを知らない人でも答えられる</label>
-    <label><input type="checkbox" data-k="c6">答えをプレゼンのどこで使うか決まっている</label>
   </div>
 
   <div class="row">
@@ -228,23 +195,80 @@ document.querySelectorAll("input[name=pick]").forEach(r=>{
 });
 paintStars();
 
+// AIと問答（答えは保存しない。AIには、そのとき書いた内容だけを送る）
+const API="https://kishou.ryousukey0113.workers.dev";
+const DAY_MAX=30, ROUND_MAX=3;   // 無料枠を守るため：1台あたり1日30回まで・1つの問いにつき3回まで
+const TALKS=[
+  {id:"t1",title:"好きになったきっかけは？",sub:"いつ・どこで・どんなふうに出会った？ そのとき、どう思った？"},
+  {id:"t2",title:"推しの「ここが好き！」はどこ？",sub:"「かっこいい」「楽しい」だけでなく、具体的な場面やエピソードで。"},
+  {id:"t3",title:"知らない1年生に、30秒で説明すると？",sub:"推しのことをまったく知らない人に向けて、どう説明する？"},
+];
+const today=()=>new Date().toLocaleDateString("ja-JP");
+const used=()=>data.aiDay===today()?(data.aiN||0):0;
+const thread=id=>(data["th_"+id]=data["th_"+id]||[]);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const btnLabel=role=>role==="kohai"?"🙋 つっこんでもらう":"🤖 AIに聞いてもらう";
+
+function renderTalk(box,t,role){
+  const id=t.id, th=thread(id);
+  box.innerHTML=(t.title?`<h3>${esc(t.title)}</h3><p class="sub">${esc(t.sub)}</p>`:"")+
+    `<textarea data-a placeholder="${esc(t.ph||"思いつくことを、短くてもいいので書いてみよう")}">${esc(data["a_"+id]||"")}</textarea>`+
+    th.map((x,i)=>`<div class="ai"><span class="face">${role==="kohai"?"🙋":"🤖"}</span><div class="bub">${esc(x.ask)}</div></div>
+      <textarea data-i="${i}" placeholder="この問いに答えてみよう">${esc(x.ans||"")}</textarea>`).join("")+
+    `<div class="askrow"><span class="note">${th.length>=ROUND_MAX?"問い返しはここまで。じっくり答えてみよう":`問い返し ${th.length}/${ROUND_MAX}`}</span>
+      <button class="btn ai-btn" ${th.length>=ROUND_MAX?"disabled":""}>${btnLabel(role)}</button></div>`;
+  box.querySelector("[data-a]").addEventListener("input",e=>{data["a_"+id]=e.target.value;save();});
+  box.querySelectorAll("[data-i]").forEach(el=>el.addEventListener("input",()=>{th[+el.dataset.i].ans=el.value;save();}));
+  const btn=box.querySelector(".ai-btn");
+  btn.addEventListener("click",()=>ask(box,t,role,btn));
+}
+async function ask(box,t,role,btn){
+  const id=t.id, th=thread(id), first=data["a_"+id]||"";
+  const latest=th.length?(th[th.length-1].ans||""):first;
+  if([...latest.trim()].length<8){ toast(th.length?"まず、AIの問いに答えてみよう":"もう少し書いてから押してね"); return; }
+  if(used()>=DAY_MAX){ toast("今日のAIの回数はここまで。また次の授業で"); return; }
+  btn.disabled=true; btn.textContent="考え中…";
+  const oshi=(data.oshi||"").trim();
+  const q=role==="kohai"
+    ? `${data.m1||oshi}の魅力は、${data.m2||"？"}だ。／1年生にどうなってほしいか：${data.who||"？"}／タイトル：${data.ttl||"？"}`
+    : t.title;
+  // これまでのやりとり（最後の答えは a として送るのと同じもの）
+  const log=th.length?[{ask:role==="kohai"?"いちばん話したいことは？":t.title,ans:first},...th].slice(-3):[];
+  try{
+    const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({mode:"oshi_ask",role,oshi,q,a:latest,log})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.ask) throw new Error(j.message||"");
+    th.push({ask:j.ask,ans:""});
+    data.aiDay=today(); data.aiN=used()+1; save();
+    renderTalk(box,t,role);
+    const all=box.querySelectorAll("[data-i]"); if(all.length) all[all.length-1].focus();
+  }catch(e){
+    toast(e.message||"AIにつながりませんでした。少し待ってもう一度");
+    btn.disabled=false; btn.textContent=btnLabel(role);
+  }
+}
+const talks=document.getElementById("talks");
+TALKS.forEach(t=>{ const d=document.createElement("div"); d.className="talk"; talks.appendChild(d); renderTalk(d,t,"coach"); });
+const KOHAI={id:"k1",ph:"上のテーマで、いちばん話したいことを一言で（例：入る順番と休み方さえ知れば、だれでも楽しめる）"};
+renderTalk(document.getElementById("kohai"),KOHAI,"kohai");
+
 // まとめ
 function summary(){
   const g=k=>(data[k]||"").trim()||"（未記入）";
+  const tl=(id,title)=>{ const out=["■ "+title,"　"+g("a_"+id)]; thread(id).forEach(x=>out.push("　AI："+x.ask,"　→ "+((x.ans||"").trim()||"（未記入）"))); return out.join("\n"); };
   return [
     "【推しプレゼン 準備ワーク①】",
     "■ わたしの推し："+g("oshi"),
     "■ 選んだ理由："+g("why"),
-    "■ 伝えたいこと："+g("m1")+"の魅力は、"+g("m2")+"だ。",
+    "",
+    ...TALKS.map(t=>tl(t.id,t.title)),
+    "",
+    "■ テーマ："+g("m1")+"の魅力は、"+g("m2")+"だ。",
     "■ 1年生にどうなってほしいか："+g("who"),
+    "■ 発表タイトル（仮）："+g("ttl"),
     "",
-    "■ 質問①："+g("q1"),
-    "　選択肢："+g("q1c"),
-    "　作成の理由："+g("q1r"),
-    "",
-    "■ 質問②："+g("q2"),
-    "　選択肢："+g("q2c"),
-    "　作成の理由："+g("q2r")
+    tl("k1","1年生のつっこみ（いちばん話したいこと）")
   ].join("\n");
 }
 document.getElementById("copy").addEventListener("click",async()=>{
