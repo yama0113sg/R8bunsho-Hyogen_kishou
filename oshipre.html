@@ -151,6 +151,43 @@ textarea{min-height:70px;resize:vertical}
     </div>
   </div>
 
+  <!-- 5 -->
+  <div class="panel">
+    <h2><span class="num">5</span>1年生への質問を、AIと磨こう</h2>
+    <p class="hint">提出する2問を、AIに見てもらいながら直していこう。直した質問は、問い返しの答え欄に書き直していけばOK。</p>
+    <div class="ex info">
+      <b>よい質問のコツ</b>
+      <ul>
+        <li><b>選んで答える形</b>（はい／いいえ・4択・1〜5の数字など）。<b>「知らない」</b>も選択肢に</li>
+        <li>1つの質問で聞くのは<b>1つだけ</b>。「最高ですよね？」のように<b>誘導しない</b></li>
+        <li>答えを<b>プレゼンのどこで使うか</b>決めておく（つかみ？ 本題？）</li>
+      </ul>
+    </div>
+    <div class="talk"><div id="q1"></div></div>
+    <div class="talk"><div id="q2"></div></div>
+  </div>
+
+  <!-- 6 -->
+  <div class="panel">
+    <h2><span class="num">6</span>5分の構成を組んでみよう</h2>
+    <p class="hint">まだざっくりでOK。どの順番で話すと、1年生が最後まで聞いてくれるかな？</p>
+    <label>つかみ（〜30秒）：最初のひとことで、どう引きこむ？</label>
+    <input type="text" data-k="st0" placeholder="例：「サウナって、ただ暑いだけだと思ってませんか？」と問いかける">
+    <label>本題①</label>
+    <input type="text" data-k="st1" placeholder="例：アンケート結果「入ったことがない人が7割」を紹介">
+    <label>本題②</label>
+    <input type="text" data-k="st2" placeholder="例：自分がハマったきっかけ（最初は嫌いだった話）">
+    <label>本題③</label>
+    <input type="text" data-k="st3" placeholder="例：初心者向けの入り方3ステップ">
+    <label>まとめ（〜30秒）：最後に何を残す？</label>
+    <input type="text" data-k="st4" placeholder="例：「まず一回、90分だけ試してみて」">
+    <div class="talk" style="margin-top:16px">
+      <h3>🤖 構成をAIに見てもらう</h3>
+      <p class="sub">構成で迷っているところ・不安なところを書いて相談しよう。AIは上の構成も読んで問い返します。</p>
+      <div id="s1"></div>
+    </div>
+  </div>
+
   <div class="row">
     <button class="btn main" id="copy">📋 まとめてコピー</button>
     <button class="btn" id="print">🖨 印刷する</button>
@@ -205,7 +242,7 @@ paintStars();
 
 // AIと問答（答えは保存しない。AIには、そのとき書いた内容だけを送る）
 const API="https://kishou.ryousukey0113.workers.dev";
-const DAY_MAX=30, ROUND_MAX=3, FIT_MAX=5;   // 無料枠を守るため：1台あたり1日30回まで・1つの問いにつき3回まで
+const DAY_MAX=40, ROUND_MAX=3, FIT_MAX=5;   // 無料枠を守るため：1台あたり1日40回まで・1つの問いにつき3回まで（相談・質問は5回）
 const TALKS=[
   {id:"t1",title:"好きになったきっかけは？",sub:"いつ・どこで・どんなふうに出会った？ そのとき、どう思った？"},
   {id:"t2",title:"推しの「ここが好き！」はどこ？",sub:"「かっこいい」「楽しい」だけでなく、具体的な場面やエピソードで。"},
@@ -215,16 +252,19 @@ const today=()=>new Date().toLocaleDateString("ja-JP");
 const used=()=>data.aiDay===today()?(data.aiN||0):0;
 const thread=id=>(data["th_"+id]=data["th_"+id]||[]);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const btnLabel=role=>role==="kohai"?"🙋 つっこんでもらう":role==="fit"?"🧭 AIに相談する":"🤖 AIに聞いてもらう";
-const FACE={coach:"🤖",kohai:"🙋",fit:"🧭"};
-const FITTXT={ok:"◎ 推しプレゼンになっています",close:"○ あと少し",off:"△ ちょっとずれているかも"};
-const maxOf=role=>role==="fit"?FIT_MAX:ROUND_MAX;
+const btnLabel=role=>role==="kohai"?"🙋 つっこんでもらう":role==="fit"?"🧭 AIに相談する":role==="qcheck"?"📝 AIに見てもらう":"🤖 AIに聞いてもらう";
+const FACE={coach:"🤖",kohai:"🙋",fit:"🧭",qcheck:"📝"};
+const FITTXTS={
+  fit:{ok:"◎ 推しプレゼンになっています",close:"○ あと少し",off:"△ ちょっとずれているかも"},
+  qcheck:{ok:"◎ このまま使えそう",close:"○ あと少し",off:"△ 直したいところあり"}};
+const fitTxt=(role,f)=>(FITTXTS[role]||FITTXTS.fit)[f]||"";
+const maxOf=role=>(role==="fit"||role==="qcheck")?FIT_MAX:ROUND_MAX;
 
 function renderTalk(box,t,role){
   const id=t.id, th=thread(id), MAX=maxOf(role);
   box.innerHTML=(t.title?`<h3>${esc(t.title)}</h3><p class="sub">${esc(t.sub)}</p>`:"")+
     `<textarea data-a placeholder="${esc(t.ph||"思いつくことを、短くてもいいので書いてみよう")}">${esc(data["a_"+id]||"")}</textarea>`+
-    th.map((x,i)=>`<div class="ai"><span class="face">${FACE[role]}</span><div class="bub">${x.fit?`<span class="badge ${x.fit}">${FITTXT[x.fit]}</span>`:""}${x.why?`<span class="why">${esc(x.why)}</span>`:""}${esc(x.ask)}</div></div>
+    th.map((x,i)=>`<div class="ai"><span class="face">${FACE[role]}</span><div class="bub">${x.fit?`<span class="badge ${x.fit}">${fitTxt(role,x.fit)}</span>`:""}${x.why?`<span class="why">${esc(x.why)}</span>`:""}${esc(x.ask)}</div></div>
       <textarea data-i="${i}" placeholder="この問いに答えてみよう">${esc(x.ans||"")}</textarea>`).join("")+
     `<div class="askrow"><span class="note">${th.length>=MAX?"問い返しはここまで。じっくり答えてみよう":`問い返し ${th.length}/${MAX}`}</span>
       <button class="btn ai-btn" ${th.length>=MAX?"disabled":""}>${btnLabel(role)}</button></div>`;
@@ -240,12 +280,12 @@ async function ask(box,t,role,btn){
   if(used()>=DAY_MAX){ toast("今日のAIの回数はここまで。また次の授業で"); return; }
   btn.disabled=true; btn.textContent="考え中…";
   const oshi=(data.oshi||"").trim();
-  const q=role==="fit" ? `選んだ理由：${data.why||"（まだ書いていない）"}`
+  const q=t.q ? t.q() : role==="fit" ? `選んだ理由：${data.why||"（まだ書いていない）"}`
     : role==="kohai"
     ? `${data.m1||oshi}の魅力は、${data.m2||"？"}だ。／1年生にどうなってほしいか：${data.who||"？"}／タイトル：${data.ttl||"？"}`
     : t.title;
   // これまでのやりとり（最後の答えは a として送るのと同じもの）
-  const log=th.length?[{ask:role==="kohai"?"いちばん話したいことは？":role==="fit"?"どんな発表にしたい？":t.title,ans:first},...th].slice(-3):[];
+  const log=th.length?[{ask:t.first||(role==="kohai"?"いちばん話したいことは？":role==="fit"?"どんな発表にしたい？":t.title),ans:first},...th].slice(-3):[];
   try{
     const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({mode:"oshi_ask",role,oshi,q,a:latest,log})});
@@ -265,11 +305,19 @@ const talks=document.getElementById("talks");
 TALKS.forEach(t=>{ const d=document.createElement("div"); d.className="talk"; talks.appendChild(d); renderTalk(d,t,"coach"); });
 const KOHAI={id:"k1",ph:"上のテーマで、いちばん話したいことを一言で（例：入る順番と休み方さえ知れば、だれでも楽しめる）"};
 renderTalk(document.getElementById("kohai"),KOHAI,"kohai");
+const theme=()=>`テーマ：${data.m1||data.oshi||"？"}の魅力は、${data.m2||"？"}だ。`;
+const QS=[1,2].map(n=>({id:"q"+n,title:`質問${"①②"[n-1]}`,sub:"質問文・選択肢・プレゼンのどこで使うか、を書こう",first:"質問文・選択肢・使い方は？",
+  ph:"例：サウナに入ったことがありますか？（ある／ない／名前は知っている）→ ない人が多ければ、入り方の説明から始める",
+  q:()=>`1年生への質問${"①②"[n-1]}（${theme()}）`}));
+QS.forEach(t=>renderTalk(document.getElementById(t.id),t,"qcheck"));
+const STRUCT={id:"s1",first:"構成で迷っているところは？",ph:"例：本題の順番をどうするか迷っている／5分もつか不安",
+  q:()=>`5分の構成（${theme()}）／つかみ：${data.st0||"？"}／本題①：${data.st1||"？"}／本題②：${data.st2||"？"}／本題③：${data.st3||"？"}／まとめ：${data.st4||"？"}`};
+renderTalk(document.getElementById("s1"),STRUCT,"coach");
 
 // まとめ
 function summary(){
   const g=k=>(data[k]||"").trim()||"（未記入）";
-  const tl=(id,title)=>{ const out=["■ "+title,"　"+g("a_"+id)]; thread(id).forEach(x=>out.push("　AI："+(x.fit?"["+FITTXT[x.fit]+"] "+(x.why||"")+" ":"")+x.ask,"　→ "+((x.ans||"").trim()||"（未記入）"))); return out.join("\n"); };
+  const tl=(id,title)=>{ const out=["■ "+title,"　"+g("a_"+id)]; thread(id).forEach(x=>out.push("　AI："+(x.fit?"["+fitTxt(id[0]==="q"?"qcheck":"fit",x.fit)+"] "+(x.why||"")+" ":"")+x.ask,"　→ "+((x.ans||"").trim()||"（未記入）"))); return out.join("\n"); };
   return [
     "【推しプレゼン 準備ワーク①】",
     "■ わたしの推し："+g("oshi"),
@@ -283,7 +331,13 @@ function summary(){
     "■ 1年生にどうなってほしいか："+g("who"),
     "■ 発表タイトル（仮）："+g("ttl"),
     "",
-    tl("k1","1年生のつっこみ（いちばん話したいこと）")
+    tl("k1","1年生のつっこみ（いちばん話したいこと）"),
+    "",
+    ...QS.map(t=>tl(t.id,"1年生への"+t.title)),
+    "",
+    "■ 5分の構成",
+    "　つかみ："+g("st0"),"　本題①："+g("st1"),"　本題②："+g("st2"),"　本題③："+g("st3"),"　まとめ："+g("st4"),
+    tl("s1","構成の相談")
   ].join("\n");
 }
 document.getElementById("copy").addEventListener("click",async()=>{
