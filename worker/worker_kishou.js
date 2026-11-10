@@ -1234,7 +1234,8 @@ export default {
       if (body.mode === "oshi_ask") {
         const role = ["kohai", "fit", "qcheck"].includes(body.role) ? body.role : "coach";
         const a = clip(body.a, 800).trim();
-        if (len(a) < 8) return new Response(JSON.stringify({ error: "short", message: "もう少し書いてから押してください。" }), { status: 400, headers });
+        // AIの問いへの答え（log があるとき）は、作品名などの短い答えでもよい
+        if (len(a) < (Array.isArray(body.log) && body.log.length ? 2 : 8)) return new Response(JSON.stringify({ error: "short", message: "もう少し書いてから押してください。" }), { status: 400, headers });
         const log = (Array.isArray(body.log) ? body.log : []).slice(-3)
           .map(x => `AIの問い：${clip(x && x.ask, 100)}\n生徒の答え：${clip(x && x.ans, 400)}`).join("\n\n");
         const user = `推し：${clip(body.oshi, 60) || "（まだ決めていない）"}\n\n考えているテーマ：${clip(body.q, 120)}\n\n生徒の答え：\n${a}`
