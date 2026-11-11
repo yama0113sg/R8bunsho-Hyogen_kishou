@@ -82,7 +82,7 @@ function cors(origin, env) {
   return {
     "Access-Control-Allow-Origin": origin === allowed ? allowed : "null",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Pass, X-Teacher",
+    "Access-Control-Allow-Headers": "Content-Type, X-Pass, X-Teacher, X-Op",
     "Content-Type": "application/json; charset=utf-8",
   };
 }
@@ -1308,7 +1308,11 @@ export default {
     const headers = cors(origin, env);
 
     if (request.method === "OPTIONS") return new Response(null, { headers });
-    const path = new URL(request.url).pathname.replace(/\/+$/, "");
+    let path = new URL(request.url).pathname.replace(/\/+$/, "");
+    // 推しプレゼンの提出・預ける・呼び出す・先生用の一覧は、ルート（AIの相談と同じアドレス）に X-Op をつけて送ってくる。
+    // 学校の Web フィルタが、新しいアドレス（/bunko/oshipre/…）を「カテゴリが取得できない」として止めることがあったため
+    const op = request.headers.get("X-Op") || "";
+    if (!path && ["submit", "save", "load", "list", "spells"].includes(op)) path = "/bunko/oshipre/" + op;
     if (path.startsWith("/bunko")) {
       if (origin !== env.ALLOWED_ORIGIN) return J({ error: "origin" }, headers, 403);
       try { return await bunko(request, env, headers, path, ctx); }
