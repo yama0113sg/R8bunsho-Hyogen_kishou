@@ -6,6 +6,7 @@
 //  POST {stage, genre, story, avoid}            → {line}   一行を引く
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
 //  POST {mode:"bridge", stage, genre, before, line, after}    → {bridge}   整えるときのつなぎの文
+//  ※ oshi_ask は推しプレゼン（R8bunsho-Hyogen_oshipre）のページが使う
 //  POST {mode:"oshi_ask", role:"coach"|"kohai"|"fit"|"qcheck", oshi, q, a, log:[{ask,ans}]} → {ask}（fit・qcheck は {fit,why,ask}）  推しプレゼンのテーマを練る問い返し
 //
 //  ── クラス文庫（/bunko/...）──
