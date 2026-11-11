@@ -23,9 +23,9 @@ const MODELS = [
 ];
 // ヒントは lite だけで回す（lite でない Flash は1日20回しかないため）
 const HINT_MODELS = MODELS.slice(0, 2);
-// 推しプレゼンの「テーマを尖らせる」（spice）だけは、問いの質を上げたいので Flash を先に使う。
-// Flash の1日の上限に達したら（429 など）、callGemini がそのまま lite に切りかえる。
-const SPICE_MODELS = ["gemini-flash-latest", ...HINT_MODELS];
+// 推しプレゼンの「テーマを尖らせる」（spice）も lite で回す。
+// （Flash を先に試したが、本番で答えまで2分以上かかり、結局 lite が答えていたため、2026-11-11 にやめた）
+const SPICE_MODELS = HINT_MODELS;
 
 const GENRES = {
   nichijo: "日常（なにげない学校生活や街の出来事）",
@@ -1274,8 +1274,7 @@ export default {
           + (log ? `\n\nここまでのやりとり（同じことは聞かない）：\n${log}` : "") + "\n\nJSON で出してください。";
         if (role === "fit" || role === "qcheck" || role === "spice") {
           const { result, model } = await callGemini(env, OSHI_ASK[role], user, role === "spice"
-            // Flash は答える前に考えるぶんのトークンも使うので、上限を大きめにする
-            ? { models: SPICE_MODELS, parse: parseFitWide, temperature: 0.5, json: true, maxTokens: 2048 }
+            ? { models: SPICE_MODELS, parse: parseFitWide, temperature: 0.5, json: true, maxTokens: 600 }
             : { models: HINT_MODELS, parse: parseFit, temperature: 0.5, json: true, maxTokens: 400 });
           return new Response(JSON.stringify(Object.assign({ model }, result)), { headers });
         }
