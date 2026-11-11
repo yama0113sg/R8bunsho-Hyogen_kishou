@@ -631,6 +631,10 @@ const OSHI_ASK = {
 const parseFit = t => { const o = jsonOf(t); if (!o) return null;
   const fit = ["ok", "close", "off"].includes(o.fit) ? o.fit : null, ask = String(o.ask || "").trim(), why = String(o.why || "").trim();
   return fit && ask && len(ask) <= 70 && /[？?]$/.test(ask) && len(why) <= 60 ? { fit, why, ask } : null; };
+// spice は3つのものさしにふれるぶん why が長くなりやすいので、少しゆるく受けとる
+const parseFitWide = t => { const o = jsonOf(t); if (!o) return null;
+  const fit = ["ok", "close", "off"].includes(o.fit) ? o.fit : null, ask = String(o.ask || "").trim(), why = String(o.why || "").trim();
+  return fit && ask && len(ask) <= 90 && /[？?]$/.test(ask) && len(why) <= 90 ? { fit, why, ask } : null; };
 // ── 提案箱（アプリをよくする提案）──
 // 生徒の書いたことばは、そのまま先生には見せない。AIが、中身は具体的なまま、おだやかなことばに整えてから届ける。
 // 心配な内容（自分やだれかを傷つけるおそれ・いじめなど）があるときは、強いことばを使わずに先生に知らせる。
@@ -1269,7 +1273,10 @@ export default {
         const user = `推し：${clip(body.oshi, 60) || "（まだ決めていない）"}\n\n考えているテーマ：${clip(body.q, role === "spice" ? 300 : 120)}\n\n生徒の答え：\n${a}`
           + (log ? `\n\nここまでのやりとり（同じことは聞かない）：\n${log}` : "") + "\n\nJSON で出してください。";
         if (role === "fit" || role === "qcheck" || role === "spice") {
-          const { result, model } = await callGemini(env, OSHI_ASK[role], user, { models: role === "spice" ? SPICE_MODELS : HINT_MODELS, parse: parseFit, temperature: 0.5, json: true, maxTokens: 400 });
+          const { result, model } = await callGemini(env, OSHI_ASK[role], user, role === "spice"
+            // Flash は答える前に考えるぶんのトークンも使うので、上限を大きめにする
+            ? { models: SPICE_MODELS, parse: parseFitWide, temperature: 0.5, json: true, maxTokens: 2048 }
+            : { models: HINT_MODELS, parse: parseFit, temperature: 0.5, json: true, maxTokens: 400 });
           return new Response(JSON.stringify(Object.assign({ model }, result)), { headers });
         }
         const { result, model } = await callGemini(env, OSHI_ASK[role], user, { models: HINT_MODELS, parse: parseFuriAsk, temperature: 0.8, json: true, maxTokens: 300 });
