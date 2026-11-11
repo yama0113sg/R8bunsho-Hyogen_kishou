@@ -6,7 +6,7 @@
 //  POST {stage, genre, story, avoid}            → {line}   一行を引く
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
 //  POST {mode:"bridge", stage, genre, before, line, after}    → {bridge}   整えるときのつなぎの文
-//  ※ oshi_ask は推しプレゼン（R8bunsho-Hyogen_oshipre）のページが使う
+//  ※ oshi_ask と /bunko/oshipre/* は推しプレゼン（R8bunsho-Hyogen_oshipre）のページが使う
 //  POST {mode:"oshi_ask", role:"coach"|"kohai"|"fit"|"qcheck"|"spice", oshi, q, a, log:[{ask,ans}]} → {ask}（fit・qcheck・spice は {fit,why,ask}）  推しプレゼンのテーマを練る問い返し
 //
 //  ── クラス文庫（/bunko/...）──
@@ -1054,6 +1054,31 @@ async function bunko(request, env, headers, path, ctx) {
     return J({ ok: true }, headers);
   }
 
+  // ── 推しプレゼン（R8bunsho-Hyogen_oshipre）の提出 ──
+  // 1年生への質問（Classi のアンケートに写す）と、テーマ。端末ごとの token で上書きする（出し直しOK）
+  if (path === "/bunko/oshipre/submit") {
+    const token = clip(body.token, 64), kind = body.kind;
+    if (token.length < 16 || !["q", "theme"].includes(kind)) return J({ error: "bad" }, headers, 400);
+    const who = { cls: clip(body.cls, 10).trim(), no: clip(body.no, 10).trim(), name: clip(body.name, 20).trim() };
+    if (!who.cls || !who.no || !who.name) return J({ error: "who", message: "組・番号・名前を書いてください。" }, headers, 400);
+    let data;
+    if (kind === "q") {
+      const qs = (Array.isArray(body.qs) ? body.qs : []).slice(0, 2).map(q => ({
+        type: ["single", "multi", "text"].includes(q && q.type) ? q.type : "single",
+        text: clip(q && q.text, 300).trim(),
+        opts: (Array.isArray(q && q.opts) ? q.opts : []).map(o => clip(o, 80).trim()).filter(Boolean).slice(0, 12),
+        use: clip(q && q.use, 200).trim() }));
+      if (qs.length < 2 || qs.some(q => !q.text || (q.type !== "text" && q.opts.length < 2)))
+        return J({ error: "empty", message: "2問とも、設問文と選択肢（2つ以上）を書いてください。記述形式なら選択肢はいりません。" }, headers, 400);
+      data = { qs };
+    } else {
+      data = { fin: clip(body.fin, 200).trim(), fttl: clip(body.fttl, 100).trim(), intro: clip(body.intro, 100).trim(), who: clip(body.who, 200).trim() };
+      if (!data.fin || !data.fttl) return J({ error: "empty", message: "テーマとタイトルを書いてください。" }, headers, 400);
+    }
+    const key = "op:" + kind + ":" + token, old = await kv.get(key, { type: "json" }), now = Date.now();
+    await kv.put(key, JSON.stringify({ kind, who, data, created: old ? old.created : now, updated: now }));
+    return J({ ok: true, updated: now }, headers);
+  }
   // ── ここから先生用 ──
   if (!teacher) return J({ error: "teacher" }, headers, 401);
   if (path === "/bunko/admin") {
@@ -1201,6 +1226,17 @@ async function bunko(request, env, headers, path, ctx) {
     }
     const R = await getReaders(kv);
     return J({ readers: R.readers, custom: R.custom }, headers);
+  }
+  // 先生：推しプレゼンの提出の一覧
+  if (path === "/bunko/oshipre/list") {
+    const out = [];
+    let cursor;
+    do {
+      const r = await kv.list({ prefix: "op:", cursor });
+      for (const k of r.keys) { const v = await kv.get(k.name, { type: "json" }); if (v) out.push(v); }
+      cursor = r.list_complete ? null : r.cursor;
+    } while (cursor);
+    return J({ items: out }, headers);
   }
   return J({ error: "path" }, headers, 404);
 }
