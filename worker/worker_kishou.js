@@ -6,7 +6,7 @@
 //  POST {stage, genre, story, avoid}            → {line}   一行を引く
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
 //  POST {mode:"bridge", stage, genre, before, line, after}    → {bridge}   整えるときのつなぎの文
-//  ※ oshi_ask と /bunko/oshipre/* は推しプレゼン（R8bunsho-Hyogen_oshipre）のページが使う
+//  ※ oshi_ask と /bunko/oshipre/*（submit・save・load／先生：list・spells）は推しプレゼン（R8bunsho-Hyogen_oshipre）のページが使う
 //  POST {mode:"oshi_ask", role:"coach"|"kohai"|"fit"|"qcheck"|"spice", oshi, q, a, log:[{ask,ans}]} → {ask}（fit・qcheck・spice は {fit,why,ask}）
 //  POST {mode:"oshi_qformat", first, log:[{ask,ans}]} → {type,text,opts,use}  1年生への質問を Classi のアンケートの形に整える  推しプレゼンのテーマを練る問い返し
 //
@@ -1095,6 +1095,30 @@ async function bunko(request, env, headers, path, ctx) {
     await kv.put(key, JSON.stringify({ kind, who, data, created: old ? old.created : now, updated: now }));
     return J({ ok: true, updated: now }, headers);
   }
+  // 推しプレゼン：ワークをまるごと預ける（ふっかつのじゅもん）。端末の中の保存が主で、これは控え
+  if (path === "/bunko/oshipre/save") {
+    const token = clip(body.token, 64);
+    if (token.length < 16 || !body.work || typeof body.work !== "object") return J({ error: "empty" }, headers, 400);
+    const raw = JSON.stringify(body.work);
+    if (raw.length > 400000) return J({ error: "big", message: "ワークが大きすぎて預けられませんでした。" }, headers, 400);
+    const who = { cls: clip(body.cls, 10).trim(), no: clip(body.no, 10).trim(), name: clip(body.name, 20).trim() };
+    let code = normSpell(body.code || ""), cur = code ? await kv.get("ops:" + code, { type: "json" }) : null;
+    if (cur && cur.owner !== token) { code = ""; cur = null; }   // 他の人のじゅもんには上書きしない
+    if (!cur) {
+      code = "";
+      for (let i = 0; i < 8; i++) { const c = makeSpell(); if (!(await kv.get("ops:" + normSpell(c)))) { code = c; break; } }
+      if (!code) return J({ error: "spell" }, headers, 500);
+    } else code = cur.code;
+    const now = Date.now();
+    await kv.put("ops:" + normSpell(code), JSON.stringify({ code, owner: token, who, work: body.work, savedAt: now, created: cur ? cur.created : now }));
+    return J({ ok: true, code, savedAt: now }, headers);
+  }
+  // じゅもんで呼び出す（別の端末・Safari とホーム画面のアプリなど）。呼び出した端末は、同じ token で続きを預ける
+  if (path === "/bunko/oshipre/load") {
+    const rec = await kv.get("ops:" + normSpell(body.code || ""), { type: "json" });
+    if (!rec) return J({ error: "nf", message: "そのじゅもんは見つかりませんでした。" }, headers, 404);
+    return J({ code: rec.code, owner: rec.owner, who: rec.who, work: rec.work, savedAt: rec.savedAt }, headers);
+  }
   // ── ここから先生用 ──
   if (!teacher) return J({ error: "teacher" }, headers, 401);
   if (path === "/bunko/admin") {
@@ -1243,13 +1267,34 @@ async function bunko(request, env, headers, path, ctx) {
     const R = await getReaders(kv);
     return J({ readers: R.readers, custom: R.custom }, headers);
   }
+  // 先生：推しプレゼンの生徒の一覧（じゅもん・進み具合）。ワークの中身は重いので、要約だけ返す
+  if (path === "/bunko/oshipre/spells") {
+    const out = [];
+    let cursor;
+    do {
+      const r = await kv.list({ prefix: "ops:", cursor });
+      for (const k of r.keys) {
+        const v = await kv.get(k.name, { type: "json" }); if (!v) continue;
+        const w = v.work || {}, t = x => String(w[x] || "").trim();
+        out.push({ code: v.code, who: v.who, savedAt: v.savedAt, owner: v.owner,
+          oshi: t("oshi").slice(0, 40), fin: t("fin").slice(0, 80), fttl: t("fttl").slice(0, 60),
+          sub_q: w.sub_q || 0, sub_theme: w.sub_theme || 0,
+          st: ["st0", "st1", "st2", "st3", "st4"].filter(t).length,
+          sb: [...Array(10).keys()].filter(i => t("sbh" + i) || t("sbv" + i)).length,
+          ck: [...Array(9).keys()].filter(i => w["ck" + i]).length,
+          pt: [...Array(6).keys()].filter(i => t("pt" + i)).length });
+      }
+      cursor = r.list_complete ? null : r.cursor;
+    } while (cursor);
+    return J({ items: out }, headers);
+  }
   // 先生：推しプレゼンの提出の一覧
   if (path === "/bunko/oshipre/list") {
     const out = [];
     let cursor;
     do {
       const r = await kv.list({ prefix: "op:", cursor });
-      for (const k of r.keys) { const v = await kv.get(k.name, { type: "json" }); if (v) out.push(v); }
+      for (const k of r.keys) { const v = await kv.get(k.name, { type: "json" }); if (v) out.push(Object.assign(v, { token: k.name.split(":")[2] })); }
       cursor = r.list_complete ? null : r.cursor;
     } while (cursor);
     return J({ items: out }, headers);
