@@ -1076,8 +1076,7 @@ async function bunko(request, env, headers, path, ctx) {
     const token = clip(body.token, 64), kind = body.kind;
     if (token.length < 16 || !["q", "theme"].includes(kind)) return J({ error: "bad" }, headers, 400);
     const who = { cls: clip(body.cls, 10).trim(), no: clip(body.no, 10).trim(), name: clip(body.name, 20).trim() };
-    // 質問は名前なしでよい（Classi のアンケートに写すだけなので）。テーマは視聴の割りふりに使うので名前がいる
-    if (kind === "theme" && (!who.cls || !who.no || !who.name)) return J({ error: "who", message: "組・番号・名前を書いてください。" }, headers, 400);
+    // 名前はなくてよい（先生の方針。Classi のアンケートに写すだけなので）。送られてきたときだけ残す
     let data;
     if (kind === "q") {
       const qs = (Array.isArray(body.qs) ? body.qs : []).slice(0, 2).map(q => ({
