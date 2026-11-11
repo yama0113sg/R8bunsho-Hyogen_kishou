@@ -7,7 +7,8 @@
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
 //  POST {mode:"bridge", stage, genre, before, line, after}    → {bridge}   整えるときのつなぎの文
 //  ※ oshi_ask と /bunko/oshipre/* は推しプレゼン（R8bunsho-Hyogen_oshipre）のページが使う
-//  POST {mode:"oshi_ask", role:"coach"|"kohai"|"fit"|"qcheck"|"spice", oshi, q, a, log:[{ask,ans}]} → {ask}（fit・qcheck・spice は {fit,why,ask}）  推しプレゼンのテーマを練る問い返し
+//  POST {mode:"oshi_ask", role:"coach"|"kohai"|"fit"|"qcheck"|"spice", oshi, q, a, log:[{ask,ans}]} → {ask}（fit・qcheck・spice は {fit,why,ask}）
+//  POST {mode:"oshi_qformat", first, log:[{ask,ans}]} → {type,text,opts,use}  1年生への質問を Classi のアンケートの形に整える  推しプレゼンのテーマを練る問い返し
 //
 //  ── クラス文庫（/bunko/...）──
 //  KV：BUNKO（KV namespace のバインディング）
@@ -604,7 +605,7 @@ const OSHI_ASK = {
 ・個人情報（住所・家族・成績・恋愛経験など）を聞く質問なら、聞かないほうがよいと気づかせる問いにする。
 出力は JSON だけ：{"fit":"ok|close|off","why":"…","ask":"…？"}`,
   spice: `高校3年生が、1年生（約150人）に向けて5分間の「推しプレゼン」（自分の好きなものを語る発表）を準備しています。
-いまは、決めたテーマを「1年生が聞きたくなる」形に尖らせている段階です。生徒は下の「切り口カード」から1〜2枚を選び、テーマを書き直しています。
+いまは、決めたテーマを「1年生が聞きたくなる」形に尖らせている段階です。生徒は下の「切り口カード」から1枚を選び、テーマを書き直しています。
 あなたは、そのテーマの尖り具合を見て、もう一歩よくするための問いを返す相談役です。
 3つのものさし：
 ・具体性：推しの全部ではなく、一点（1場面・1曲・1つの特徴など）にしぼれているか
@@ -635,6 +636,21 @@ const parseFit = t => { const o = jsonOf(t); if (!o) return null;
 const parseFitWide = t => { const o = jsonOf(t); if (!o) return null;
   const fit = ["ok", "close", "off"].includes(o.fit) ? o.fit : null, ask = String(o.ask || "").trim(), why = String(o.why || "").trim();
   return fit && ask && len(ask) <= 90 && /[？?]$/.test(ask) && len(why) <= 90 ? { fit, why, ask } : null; };
+// 推しプレゼン：AIと磨いた「1年生への質問」のやりとりから、最終版の質問を取り出して Classi のアンケートの形に整える
+const OSHI_QFORMAT = `高校3年生が「推しプレゼン」のために、1年生へのアンケートの質問を1問作りました。AIと相談しながら何度か書き直しています。
+あなたの仕事は、そのやりとりから「いちばん新しい版の質問」を取り出し、Classi のアンケートに入力できる形に分けることです。
+・生徒の答えの中には、AIの問いへの短い返事（「はい」「つかみで使う」など）もまざっています。質問文や選択肢を書き直している部分を見つけて、最後に決まった形を使う。
+・生徒のことばは、できるだけそのまま使う。言いかえ・足し算・おぎないはしない（明らかな誤字だけ直してよい）。
+・形式："single"（1つだけ選ぶ）、"multi"（いくつでも選ぶ）、"text"（自由に書く）。生徒が書いていれば従う。書いていなければ、選択肢があれば single、なければ text。
+・text：設問文だけ（選択肢やプレゼンでの使い方は入れない）。
+・opts：選択肢を1つずつ（記号や番号は外す）。text 形式なら空。
+・use：プレゼンのどこでどう使うか、生徒が書いていればその要約（30字以内）。なければ空。
+・質問がまだ書かれていないときは text を空にする。
+出力は JSON だけ：{"type":"single|multi|text","text":"…","opts":["…"],"use":"…"}`;
+const parseQFormat = t => { const o = jsonOf(t); if (!o) return null;
+  const type = ["single", "multi", "text"].includes(o.type) ? o.type : "single";
+  const opts = (Array.isArray(o.opts) ? o.opts : []).map(x => String(x || "").trim()).filter(Boolean).slice(0, 12).map(x => x.slice(0, 80));
+  return { type: type !== "text" && !opts.length ? "text" : type, text: String(o.text || "").trim().slice(0, 300), opts: type === "text" ? [] : opts, use: String(o.use || "").trim().slice(0, 60) }; };
 // ── 提案箱（アプリをよくする提案）──
 // 生徒の書いたことばは、そのまま先生には見せない。AIが、中身は具体的なまま、おだやかなことばに整えてから届ける。
 // 心配な内容（自分やだれかを傷つけるおそれ・いじめなど）があるときは、強いことばを使わずに先生に知らせる。
@@ -1060,7 +1076,8 @@ async function bunko(request, env, headers, path, ctx) {
     const token = clip(body.token, 64), kind = body.kind;
     if (token.length < 16 || !["q", "theme"].includes(kind)) return J({ error: "bad" }, headers, 400);
     const who = { cls: clip(body.cls, 10).trim(), no: clip(body.no, 10).trim(), name: clip(body.name, 20).trim() };
-    if (!who.cls || !who.no || !who.name) return J({ error: "who", message: "組・番号・名前を書いてください。" }, headers, 400);
+    // 質問は名前なしでよい（Classi のアンケートに写すだけなので）。テーマは視聴の割りふりに使うので名前がいる
+    if (kind === "theme" && (!who.cls || !who.no || !who.name)) return J({ error: "who", message: "組・番号・名前を書いてください。" }, headers, 400);
     let data;
     if (kind === "q") {
       const qs = (Array.isArray(body.qs) ? body.qs : []).slice(0, 2).map(q => ({
@@ -1299,6 +1316,15 @@ export default {
         return new Response(JSON.stringify({ rewrite: result, model }), { headers });
       }
 
+      if (body.mode === "oshi_qformat") {
+        const first = clip(body.first, 800).trim();
+        const log = (Array.isArray(body.log) ? body.log : []).slice(-5)
+          .map(x => `AIの問い：${clip(x && x.ask, 150)}\n生徒の答え：${clip(x && x.ans, 500)}`).join("\n\n");
+        if (len(first) < 4) return new Response(JSON.stringify({ error: "short", message: "先に、上の欄に質問を書いてください。" }), { status: 400, headers });
+        const user = `最初に書いた質問：\n${first}` + (log ? `\n\nその後のやりとり（下ほど新しい）：\n${log}` : "") + "\n\nJSON で出してください。";
+        const { result, model } = await callGemini(env, OSHI_QFORMAT, user, { models: HINT_MODELS, parse: parseQFormat, temperature: 0.1, json: true, maxTokens: 600 });
+        return new Response(JSON.stringify(Object.assign({ model }, result)), { headers });
+      }
       if (body.mode === "oshi_ask") {
         const role = ["kohai", "fit", "qcheck", "spice"].includes(body.role) ? body.role : "coach";
         const a = clip(body.a, 800).trim();
