@@ -7,7 +7,7 @@
 //  POST {mode:"hint", stage, genre, story, line, body, avoid} → {hints:[問い,問い]}
 //  POST {mode:"bridge", stage, genre, before, line, after}    → {bridge}   整えるときのつなぎの文
 //  ※ oshi_ask は推しプレゼン（R8bunsho-Hyogen_oshipre）のページが使う
-//  POST {mode:"oshi_ask", role:"coach"|"kohai"|"fit"|"qcheck", oshi, q, a, log:[{ask,ans}]} → {ask}（fit・qcheck は {fit,why,ask}）  推しプレゼンのテーマを練る問い返し
+//  POST {mode:"oshi_ask", role:"coach"|"kohai"|"fit"|"qcheck"|"spice", oshi, q, a, log:[{ask,ans}]} → {ask}（fit・qcheck・spice は {fit,why,ask}）  推しプレゼンのテーマを練る問い返し
 //
 //  ── クラス文庫（/bunko/...）──
 //  KV：BUNKO（KV namespace のバインディング）
@@ -23,6 +23,9 @@ const MODELS = [
 ];
 // ヒントは lite だけで回す（lite でない Flash は1日20回しかないため）
 const HINT_MODELS = MODELS.slice(0, 2);
+// 推しプレゼンの「テーマを尖らせる」（spice）だけは、問いの質を上げたいので Flash を先に使う。
+// Flash の1日の上限に達したら（429 など）、callGemini がそのまま lite に切りかえる。
+const SPICE_MODELS = ["gemini-flash-latest", ...HINT_MODELS];
 
 const GENRES = {
   nichijo: "日常（なにげない学校生活や街の出来事）",
@@ -599,6 +602,30 @@ const OSHI_ASK = {
 ・why：生徒に見せる短いことば（40字以内）。どこが良い／気になるかを具体的に、やわらかく。
 ・ask：次に考える問い（50字以内、「？」で終わる）。直した質問文や選択肢を代わりに書かない。
 ・個人情報（住所・家族・成績・恋愛経験など）を聞く質問なら、聞かないほうがよいと気づかせる問いにする。
+出力は JSON だけ：{"fit":"ok|close|off","why":"…","ask":"…？"}`,
+  spice: `高校3年生が、1年生（約150人）に向けて5分間の「推しプレゼン」（自分の好きなものを語る発表）を準備しています。
+いまは、決めたテーマを「1年生が聞きたくなる」形に尖らせている段階です。生徒は下の「切り口カード」から1〜2枚を選び、テーマを書き直しています。
+あなたは、そのテーマの尖り具合を見て、もう一歩よくするための問いを返す相談役です。
+3つのものさし：
+・具体性：推しの全部ではなく、一点（1場面・1曲・1つの特徴など）にしぼれているか
+・意外性：知らない1年生が「えっ」「へえ」と思うところ、続きを聞きたくなるところがあるか
+・自分らしさ：同じ推しの人が話しても同じにならない、本人だけの体験・こだわり・気持ちがあるか
+切り口カード（12種）：
+・どこが好き？：一点集中型（〇〇の□□だけを5分語る）／ワンシーン型（この1場面・1曲・1セリフで〇〇が分かる）／弱点も好き型（〇〇のダメなところまで愛おしい）
+・どれだけ好き？：数字型（私の「好き」を数字で見せる）／マイベスト3型（私が選ぶ〇〇のベスト3）／推し方型（推しそのものより、私の「推し方」を語る）
+・どうして好きに？：転機型（知らなかった・苦手だった私が□□でハマった）／支えられた型（〇〇に背中を押された瞬間）
+・好きだと何が見える？：自分を映す型（〇〇が好きな理由を考えたら、自分の□□が見えた）
+・1年生に届ける：ギャップ型（△△と思われてるけど、私にとっては□□）／景色が変わる型（〇〇を知ると、いつもの□□がちがって見える）／届けたい相手型（□□な1年生にこそ〇〇を）
+判断：
+・"ok"：3つとも出ている。
+・"close"：1つが弱い。
+・"off"：2つ以上弱い、または自分の「好き」の話からずれている（討論・一般論・解説・調べ学習になっている など）。
+・why：生徒に見せる短いことば（40字以内）。どのものさしが出ていて、どれが弱いかを、やわらかく前向きに。「ダメ」「つまらない」とは言わない。
+・ask：いちばん弱いものさしを伸ばす問いを1つ（50字以内、「？」で終わる）。生徒の書いたことばを拾って具体的に聞く。ok のときは、さらに尖らせる問い。
+・ときどき、まだ使っていない切り口カードを名前で1つ勧めてよい（例：「数字型で考えると、どんな数字が出てくる？」）。
+・答え、例文、書き直したテーマ、推しについての情報や知識は書かない。ほかの作品やファンを下げる方向には導かない。
+・家庭の事情、体や心の不調、恋愛の個人的な体験には踏みこまない。
+ここまでのやりとりがあれば、それをふまえて判断し直す。同じことは聞かない。
 出力は JSON だけ：{"fit":"ok|close|off","why":"…","ask":"…？"}`,
 };
 const parseFit = t => { const o = jsonOf(t); if (!o) return null;
@@ -1233,16 +1260,16 @@ export default {
       }
 
       if (body.mode === "oshi_ask") {
-        const role = ["kohai", "fit", "qcheck"].includes(body.role) ? body.role : "coach";
+        const role = ["kohai", "fit", "qcheck", "spice"].includes(body.role) ? body.role : "coach";
         const a = clip(body.a, 800).trim();
         // AIの問いへの答え（log があるとき）は、作品名などの短い答えでもよい
         if (len(a) < (Array.isArray(body.log) && body.log.length ? 2 : 8)) return new Response(JSON.stringify({ error: "short", message: "もう少し書いてから押してください。" }), { status: 400, headers });
         const log = (Array.isArray(body.log) ? body.log : []).slice(-3)
           .map(x => `AIの問い：${clip(x && x.ask, 100)}\n生徒の答え：${clip(x && x.ans, 400)}`).join("\n\n");
-        const user = `推し：${clip(body.oshi, 60) || "（まだ決めていない）"}\n\n考えているテーマ：${clip(body.q, 120)}\n\n生徒の答え：\n${a}`
+        const user = `推し：${clip(body.oshi, 60) || "（まだ決めていない）"}\n\n考えているテーマ：${clip(body.q, role === "spice" ? 300 : 120)}\n\n生徒の答え：\n${a}`
           + (log ? `\n\nここまでのやりとり（同じことは聞かない）：\n${log}` : "") + "\n\nJSON で出してください。";
-        if (role === "fit" || role === "qcheck") {
-          const { result, model } = await callGemini(env, OSHI_ASK[role], user, { models: HINT_MODELS, parse: parseFit, temperature: 0.5, json: true, maxTokens: 400 });
+        if (role === "fit" || role === "qcheck" || role === "spice") {
+          const { result, model } = await callGemini(env, OSHI_ASK[role], user, { models: role === "spice" ? SPICE_MODELS : HINT_MODELS, parse: parseFit, temperature: 0.5, json: true, maxTokens: 400 });
           return new Response(JSON.stringify(Object.assign({ model }, result)), { headers });
         }
         const { result, model } = await callGemini(env, OSHI_ASK[role], user, { models: HINT_MODELS, parse: parseFuriAsk, temperature: 0.8, json: true, maxTokens: 300 });
